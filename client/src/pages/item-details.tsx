@@ -63,16 +63,12 @@ const paymentFormSchema = insertClientPaymentSchema.extend({
   paidAt: z.string().min(1, "Payment date is required")
 });
 
-const expenseFormSchema = insertItemExpenseSchema.pick({
-  itemId: true,
-  expenseType: true,
-  amount: true,
-  incurredAt: true,
-  notes: true,
-}).extend({
+const expenseFormSchema = z.object({
+  itemId: z.string().optional(),
   expenseType: z.string().min(1, "Expense type is required"),
   amount: z.string().min(1, "Amount is required"),
-  incurredAt: z.string().min(1, "Expense date is required")
+  incurredAt: z.string().min(1, "Expense date is required"),
+  notes: z.string().optional()
 });
 
 type ItemFormData = z.infer<typeof itemFormSchema>;
