@@ -8,6 +8,7 @@ import Dashboard from "@/pages/dashboard";
 import Inventory from "@/pages/inventory";
 import ItemDetails from "@/pages/item-details";
 import Vendors from "@/pages/vendors";
+import VendorDetails from "@/pages/vendor-details";
 import Clients from "@/pages/clients";
 import Payments from "@/pages/payments";
 import Payouts from "@/pages/payouts";
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/inventory" component={Inventory} />
       <Route path="/item/:id" component={ItemDetails} />
       <Route path="/vendors" component={Vendors} />
+      <Route path="/vendor/:vendorId" component={VendorDetails} />
       <Route path="/clients" component={Clients} />
       <Route path="/payments" component={Payments} />
       <Route path="/payouts" component={Payouts} />
