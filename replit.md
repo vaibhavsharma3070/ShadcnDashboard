@@ -10,6 +10,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### July 15, 2025 - Dashboard Improvements & Payment Validation
+- **New Feature**: Comprehensive dashboard enhancements
+  - Fixed top metric cards to show consistent data from database
+  - Added Recent Payments section with pagination (5 payments per page)
+  - Enhanced Quick Actions buttons with proper navigation
+  - Improved Attention Required section with accurate counts
+  - Added pagination to Recent Items table (5, 10, 20 items per page)
+  - All data now comes directly from database without mock information
+
 ### July 15, 2025 - Payment Validation & Installment Management
 - **New Feature**: Payment amount validation with error prevention
   - Full payments cannot exceed item price

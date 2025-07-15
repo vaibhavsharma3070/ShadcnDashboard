@@ -137,6 +137,8 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const paymentsPerPage = 5;
 
   const { data: metrics, isLoading: metricsLoading } =
     useQuery<DashboardMetrics>({
@@ -165,11 +167,17 @@ export default function Dashboard() {
     queryKey: ["/api/payments/metrics"],
   });
 
-  // Pagination logic
+  // Pagination logic for items
   const totalPages = Math.ceil((recentItems?.length || 0) / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentItems = recentItems?.slice(startIndex, endIndex) || [];
+
+  // Pagination logic for payments
+  const totalPaymentPages = Math.ceil((recentPayments?.length || 0) / paymentsPerPage);
+  const paymentsStartIndex = (paymentsPage - 1) * paymentsPerPage;
+  const paymentsEndIndex = paymentsStartIndex + paymentsPerPage;
+  const currentPayments = recentPayments?.slice(paymentsStartIndex, paymentsEndIndex) || [];
 
   const handleQuickAction = (action: string) => {
     switch (action) {
@@ -402,7 +410,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {paymentsLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
+                Array.from({ length: paymentsPerPage }).map((_, i) => (
                   <div key={i} className="flex items-center space-x-4 p-3 border border-border rounded-lg">
                     <Skeleton className="w-10 h-10 rounded-full" />
                     <div className="flex-1 space-y-2">
@@ -412,8 +420,8 @@ export default function Dashboard() {
                     <Skeleton className="h-4 w-20" />
                   </div>
                 ))
-              ) : recentPayments && recentPayments.length > 0 ? (
-                recentPayments.map((payment) => (
+              ) : currentPayments && currentPayments.length > 0 ? (
+                currentPayments.map((payment) => (
                   <div key={payment.paymentId} className="flex items-center space-x-4 p-3 border border-border rounded-lg hover:bg-accent">
                     <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
                       <CreditCard className="h-5 w-5 text-green-600" />
@@ -440,6 +448,48 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+
+            {/* Payments Pagination Controls */}
+            {recentPayments && recentPayments.length > paymentsPerPage && (
+              <div className="flex items-center justify-between pt-4 border-t border-border">
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <span>Showing {paymentsStartIndex + 1} to {Math.min(paymentsEndIndex, recentPayments.length)} of {recentPayments.length} payments</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPaymentsPage(Math.max(1, paymentsPage - 1))}
+                    disabled={paymentsPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: totalPaymentPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={paymentsPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPaymentsPage(page)}
+                        className="w-8 h-8"
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPaymentsPage(Math.min(totalPaymentPages, paymentsPage + 1))}
+                    disabled={paymentsPage === totalPaymentPages}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
