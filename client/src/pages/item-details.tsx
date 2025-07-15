@@ -144,9 +144,8 @@ export default function ItemDetails() {
   const [, navigate] = useLocation();
   const itemId = params.id;
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
-  const [isEditInstallmentModalOpen, setIsEditInstallmentModalOpen] = useState(false);
-  const [editingInstallment, setEditingInstallment] = useState<(InstallmentPlan & { client: Client }) | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -782,6 +781,14 @@ export default function ItemDetails() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Payment History</CardTitle>
+              {assignedClient && (
+                <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Payment
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Record Payment</DialogTitle>
@@ -945,6 +952,19 @@ export default function ItemDetails() {
                         )}
                       />
 
+                      <div className="flex justify-end space-x-2 pt-4">
+                        <Button type="button" variant="outline" onClick={() => setIsPaymentModalOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={createPaymentMutation.isPending}>
+                          {createPaymentMutation.isPending ? "Recording..." : "Record Payment"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+                </Dialog>
+              )}
             </div>
           </CardHeader>
           <CardContent>
