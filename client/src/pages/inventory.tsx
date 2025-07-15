@@ -45,14 +45,17 @@ import {
 
 type ItemWithVendor = Item & { vendor: Vendor };
 
-const itemFormSchema = insertItemSchema.extend({
+const itemFormSchema = z.object({
   vendorId: z.string().min(1, "Vendor is required"),
   title: z.string().min(1, "Title is required"),
   brand: z.string().min(1, "Brand is required"),
   model: z.string().min(1, "Model is required"),
+  serialNo: z.string().optional(),
+  condition: z.string().optional(),
   agreedVendorPayout: z.string().min(1, "Vendor payout is required"),
   listPrice: z.string().min(1, "List price is required"),
-  acquisitionDate: z.string().min(1, "Acquisition date is required")
+  acquisitionDate: z.string().min(1, "Acquisition date is required"),
+  status: z.string().default("in-store")
 });
 
 const saleFormSchema = insertClientPaymentSchema.extend({
@@ -145,14 +148,8 @@ export default function Inventory() {
   });
 
   const createItemMutation = useMutation({
-    mutationFn: async (data: ItemFormData) => {
-      const payload = {
-        ...data,
-        agreedVendorPayout: data.agreedVendorPayout,
-        listPrice: data.listPrice,
-        acquisitionDate: data.acquisitionDate
-      };
-      return await apiRequest('/api/items', 'POST', payload);
+    mutationFn: async (data: any) => {
+      return await apiRequest('/api/items', 'POST', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/items'] });
@@ -289,7 +286,14 @@ export default function Inventory() {
   });
 
   const onSubmit = (data: ItemFormData) => {
-    createItemMutation.mutate(data);
+    const payload = {
+      ...data,
+      agreedVendorPayout: data.agreedVendorPayout ? parseFloat(data.agreedVendorPayout) : undefined,
+      listPrice: data.listPrice ? parseFloat(data.listPrice) : undefined,
+      serialNo: data.serialNo || undefined,
+      condition: data.condition || undefined
+    };
+    createItemMutation.mutate(payload);
   };
 
   const onSaleSubmit = (data: SaleFormData) => {
