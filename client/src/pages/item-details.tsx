@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertItemSchema, insertClientPaymentSchema, insertItemExpenseSchema, type Item, type Vendor, type Client, type ClientPayment, type ItemExpense } from "@shared/schema";
+import { insertItemSchema, insertClientPaymentSchema, insertItemExpenseSchema, insertInstallmentPlanSchema, type Item, type Vendor, type Client, type ClientPayment, type ItemExpense, type InstallmentPlan } from "@shared/schema";
 import { StatusUpdateDropdown } from "@/components/status-update-dropdown";
 import { z } from "zod";
 import { 
@@ -67,9 +67,14 @@ const expenseFormSchema = z.object({
   notes: z.string().optional()
 });
 
-type ItemFormData = z.infer<typeof itemFormSchema>;
+const installmentFormSchema = insertInstallmentPlanSchema.extend({
+  amount: z.string().min(1, "Amount is required"),
+  dueDate: z.string().min(1, "Due date is required")
+});
 
+type ItemFormData = z.infer<typeof itemFormSchema>;
 type ExpenseFormData = z.infer<typeof expenseFormSchema>;
+type InstallmentFormData = z.infer<typeof installmentFormSchema>;
 
 function formatCurrency(amount: number | string) {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -138,8 +143,10 @@ export default function ItemDetails() {
   const [, navigate] = useLocation();
   const itemId = params.id;
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isEditInstallmentModalOpen, setIsEditInstallmentModalOpen] = useState(false);
+  const [editingInstallment, setEditingInstallment] = useState<InstallmentPlan | null>(null);
+  const [isSplitMode, setIsSplitMode] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -297,6 +304,73 @@ export default function ItemDetails() {
     },
   });
 
+  const updateInstallmentMutation = useMutation({
+    mutationFn: async (data: { id: string; updates: Partial<InstallmentFormData> }) => {
+      return await apiRequest('PUT', `/api/installment-plans/${data.id}`, data.updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/installment-plans/item', itemId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+      setIsEditInstallmentModalOpen(false);
+      setEditingInstallment(null);
+      toast({
+        title: "Success",
+        description: "Installment updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update installment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteInstallmentMutation = useMutation({
+    mutationFn: async (installmentId: string) => {
+      return await apiRequest('DELETE', `/api/installment-plans/${installmentId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/installment-plans/item', itemId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+      toast({
+        title: "Success",
+        description: "Installment deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete installment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createInstallmentMutation = useMutation({
+    mutationFn: async (data: InstallmentFormData) => {
+      return await apiRequest('POST', '/api/installment-plans', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/installment-plans/item', itemId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+      setIsEditInstallmentModalOpen(false);
+      setIsSplitMode(false);
+      toast({
+        title: "Success",
+        description: "New installment created successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create installment",
+        variant: "destructive",
+      });
+    },
+  });
+
   const editForm = useForm<ItemFormData>({
     resolver: zodResolver(itemFormSchema),
     defaultValues: {
@@ -326,6 +400,24 @@ export default function ItemDetails() {
       notes: ""
     },
   });
+
+  const installmentForm = useForm<InstallmentFormData>({
+    resolver: zodResolver(installmentFormSchema),
+    defaultValues: {
+      itemId: itemId || "",
+      clientId: assignedClient?.clientId || "",
+      amount: "",
+      dueDate: "",
+      status: "pending"
+    },
+  });
+
+  // Update installment form when assigned client changes
+  React.useEffect(() => {
+    if (assignedClient) {
+      installmentForm.setValue('clientId', assignedClient.clientId);
+    }
+  }, [assignedClient, installmentForm]);
 
   // Update form when item data loads (only once when modal opens)
   const resetEditForm = () => {
@@ -358,6 +450,54 @@ export default function ItemDetails() {
     console.log("🔍 [DEBUG] onExpenseSubmit - About to call createExpenseMutation.mutate");
     
     createExpenseMutation.mutate(data);
+  };
+
+  const openEditInstallmentModal = (installment: InstallmentPlan) => {
+    setEditingInstallment(installment);
+    setIsSplitMode(false);
+    installmentForm.reset({
+      itemId: installment.itemId,
+      clientId: installment.clientId,
+      amount: installment.amount.toString(),
+      dueDate: installment.dueDate,
+      status: installment.status
+    });
+    setIsEditInstallmentModalOpen(true);
+  };
+
+  const openSplitInstallmentModal = (installment: InstallmentPlan) => {
+    setEditingInstallment(installment);
+    setIsSplitMode(true);
+    installmentForm.reset({
+      itemId: installment.itemId,
+      clientId: installment.clientId,
+      amount: (parseFloat(installment.amount.toString()) / 2).toString(),
+      dueDate: installment.dueDate,
+      status: "pending"
+    });
+    setIsEditInstallmentModalOpen(true);
+  };
+
+  const onInstallmentSubmit = (data: InstallmentFormData) => {
+    if (isSplitMode && editingInstallment) {
+      // Split mode: create new installment with half the amount and adjust the original
+      const remainingAmount = parseFloat(editingInstallment.amount.toString()) - parseFloat(data.amount);
+      
+      // Update original installment with remaining amount
+      updateInstallmentMutation.mutate({
+        id: editingInstallment.installmentId,
+        updates: { amount: remainingAmount.toString() }
+      });
+      
+      // Create new installment with the split amount
+      createInstallmentMutation.mutate(data);
+    } else if (editingInstallment) {
+      // Edit mode: update existing installment
+      updateInstallmentMutation.mutate({
+        id: editingInstallment.installmentId,
+        updates: data
+      });
+    }
   };
 
   const handleDelete = () => {
@@ -970,13 +1110,31 @@ export default function ItemDetails() {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-orange-600 mb-2">{formatCurrency(plan.amount)}</p>
-                          <Button 
-                            size="sm" 
-                            onClick={() => markInstallmentPaidMutation.mutate(plan.installmentId)}
-                            disabled={markInstallmentPaidMutation.isPending}
-                          >
-                            {markInstallmentPaidMutation.isPending ? "Processing..." : "Mark as Paid"}
-                          </Button>
+                          <div className="flex gap-2 flex-wrap">
+                            <Button 
+                              size="sm" 
+                              onClick={() => markInstallmentPaidMutation.mutate(plan.installmentId)}
+                              disabled={markInstallmentPaidMutation.isPending}
+                            >
+                              {markInstallmentPaidMutation.isPending ? "Processing..." : "Mark as Paid"}
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => openEditInstallmentModal(plan)}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => openSplitInstallmentModal(plan)}
+                            >
+                              <Minus className="h-4 w-4 mr-1" />
+                              Split
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))
@@ -991,6 +1149,102 @@ export default function ItemDetails() {
           </Card>
         )}
       </div>
+
+      {/* Edit Installment Modal */}
+      <Dialog open={isEditInstallmentModalOpen} onOpenChange={setIsEditInstallmentModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isSplitMode ? "Split Installment Payment" : "Edit Installment Payment"}
+            </DialogTitle>
+          </DialogHeader>
+          <Form {...installmentForm}>
+            <form onSubmit={installmentForm.handleSubmit(onInstallmentSubmit)} className="space-y-4">
+              <FormField
+                control={installmentForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {isSplitMode ? "New Payment Amount ($)" : "Payment Amount ($)"}
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    {isSplitMode && editingInstallment && (
+                      <p className="text-sm text-muted-foreground">
+                        Remaining amount: {formatCurrency(
+                          parseFloat(editingInstallment.amount.toString()) - parseFloat(field.value || "0")
+                        )}
+                      </p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={installmentForm.control}
+                name="dueDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Due Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-between pt-4">
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setIsEditInstallmentModalOpen(false);
+                      setEditingInstallment(null);
+                      setIsSplitMode(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  {!isSplitMode && editingInstallment && (
+                    <Button 
+                      type="button" 
+                      variant="destructive"
+                      onClick={() => {
+                        deleteInstallmentMutation.mutate(editingInstallment.installmentId);
+                        setIsEditInstallmentModalOpen(false);
+                        setEditingInstallment(null);
+                      }}
+                      disabled={deleteInstallmentMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {deleteInstallmentMutation.isPending ? "Deleting..." : "Delete"}
+                    </Button>
+                  )}
+                </div>
+                <Button 
+                  type="submit" 
+                  disabled={updateInstallmentMutation.isPending || createInstallmentMutation.isPending}
+                >
+                  {updateInstallmentMutation.isPending || createInstallmentMutation.isPending 
+                    ? "Processing..." 
+                    : (isSplitMode ? "Split Payment" : "Update Payment")
+                  }
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

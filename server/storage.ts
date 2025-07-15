@@ -80,6 +80,7 @@ export interface IStorage {
   getInstallmentPlansByClient(clientId: string): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor } }>>;
   createInstallmentPlan(plan: InsertInstallmentPlan): Promise<InstallmentPlan>;
   updateInstallmentPlan(id: string, plan: Partial<InsertInstallmentPlan>): Promise<InstallmentPlan>;
+  deleteInstallmentPlan(id: string): Promise<void>;
   
   // Dashboard methods
   getDashboardMetrics(): Promise<{
@@ -639,6 +640,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(installmentPlan.installmentId, id))
       .returning();
     return plan;
+  }
+
+  async deleteInstallmentPlan(id: string): Promise<void> {
+    await db
+      .delete(installmentPlan)
+      .where(eq(installmentPlan.installmentId, id));
   }
 
   async getPaymentMetrics(): Promise<{

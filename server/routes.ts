@@ -459,6 +459,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/installment-plans/:id", async (req, res) => {
+    try {
+      const validatedData = insertInstallmentPlanSchema.partial().parse(req.body);
+      const plan = await storage.updateInstallmentPlan(req.params.id, validatedData);
+      res.json(plan);
+    } catch (error) {
+      console.error("Installment plan update error:", error);
+      if (error.errors) {
+        res.status(400).json({ error: "Invalid installment plan data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Failed to update installment plan", details: error.message });
+      }
+    }
+  });
+
+  app.delete("/api/installment-plans/:id", async (req, res) => {
+    try {
+      await storage.deleteInstallmentPlan(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Installment plan deletion error:", error);
+      res.status(500).json({ error: "Failed to delete installment plan" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
