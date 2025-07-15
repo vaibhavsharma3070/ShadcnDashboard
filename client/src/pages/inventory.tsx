@@ -344,12 +344,16 @@ export default function Inventory() {
   };
 
   const addInstallment = () => {
-    setInstallments([...installments, { amount: "", dueDate: "" }]);
+    const newInstallments = [...installments, { amount: "", dueDate: "" }];
+    setInstallments(newInstallments);
+    saleForm.setValue('installments', newInstallments);
   };
 
   const removeInstallment = (index: number) => {
     if (installments.length > 1) {
-      setInstallments(installments.filter((_, i) => i !== index));
+      const newInstallments = installments.filter((_, i) => i !== index);
+      setInstallments(newInstallments);
+      saleForm.setValue('installments', newInstallments);
     }
   };
 
@@ -357,6 +361,7 @@ export default function Inventory() {
     const updated = [...installments];
     updated[index][field] = value;
     setInstallments(updated);
+    saleForm.setValue('installments', updated);
   };
 
   const handleDeleteItem = (itemId: string, itemTitle: string) => {
@@ -369,7 +374,9 @@ export default function Inventory() {
     setSelectedItem(item);
     saleForm.setValue('amount', item.listPrice?.toString() || '');
     saleForm.setValue('paymentType', 'full');
-    setInstallments([{ amount: "", dueDate: "" }]);
+    const initialInstallments = [{ amount: "", dueDate: "" }];
+    setInstallments(initialInstallments);
+    saleForm.setValue('installments', initialInstallments);
     setIsSaleModalOpen(true);
   };
 
