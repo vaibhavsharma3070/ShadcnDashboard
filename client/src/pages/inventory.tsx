@@ -195,18 +195,30 @@ export default function Inventory() {
     mutationFn: async (data: SaleFormData) => {
       if (data.paymentType === "full") {
         // Create a single payment for full payment
-        return await apiRequest('POST', '/api/payments', {
+        const paymentResult = await apiRequest('POST', '/api/payments', {
           itemId: selectedItem?.itemId,
           clientId: data.clientId,
           amount: parseFloat(data.amount),
           paymentMethod: data.paymentMethod,
           paidAt: new Date().toISOString()
         });
+        
+        // Update item status to "sold" for full payment
+        await apiRequest('PUT', `/api/items/${selectedItem?.itemId}`, {
+          status: "sold"
+        });
+        
+        return paymentResult;
       } else {
         // Create installment plan
         if (!data.installments || data.installments.length === 0) {
           throw new Error("Installments are required for installment payment");
         }
+        
+        // Update item status to "reserved" for installment plan
+        await apiRequest('PUT', `/api/items/${selectedItem?.itemId}`, {
+          status: "reserved"
+        });
         
         // Create the first payment (if amount > 0)
         if (parseFloat(data.amount) > 0) {
@@ -247,10 +259,11 @@ export default function Inventory() {
         description: "Sale recorded successfully",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Sale mutation error:', error);
       toast({
         title: "Error",
-        description: "Failed to record sale",
+        description: error?.message || "Failed to record sale",
         variant: "destructive",
       });
     },
@@ -295,10 +308,28 @@ export default function Inventory() {
   };
 
   const onSaleSubmit = (data: SaleFormData) => {
+    console.log('Sale form submitted!');
+    console.log('Sale form data:', data);
+    console.log('Selected item:', selectedItem);
+    console.log('Installments:', installments);
+    console.log('Form errors:', saleForm.formState.errors);
+    
+    if (!selectedItem?.itemId) {
+      console.error('No item selected');
+      toast({
+        title: "Error",
+        description: "No item selected for sale",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const formData = {
       ...data,
       installments: data.paymentType === "installment" ? installments : undefined
     };
+    
+    console.log('Final form data:', formData);
     createSaleMutation.mutate(formData);
   };
 
