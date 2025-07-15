@@ -308,6 +308,28 @@ export default function ItemDetails() {
     },
   });
 
+  const markInstallmentPaidMutation = useMutation({
+    mutationFn: async (installmentId: string) => {
+      return await apiRequest('PATCH', `/api/installments/${installmentId}/mark-paid`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/installment-plans/item', itemId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments/item', itemId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+      toast({
+        title: "Success",
+        description: "Installment marked as paid successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to mark installment as paid",
+        variant: "destructive",
+      });
+    },
+  });
+
   const editForm = useForm<ItemFormData>({
     resolver: zodResolver(itemFormSchema),
     defaultValues: {
@@ -1083,6 +1105,62 @@ export default function ItemDetails() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Upcoming Payments (Only show if there are installment plans) */}
+        {assignedClient && installmentPlans && installmentPlans.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Upcoming Payments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {installmentPlansLoading ? (
+                  Array.from({ length: 2 }).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4 p-3 border border-border rounded-lg">
+                      <Skeleton className="w-10 h-10 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                      <Skeleton className="h-8 w-20" />
+                    </div>
+                  ))
+                ) : installmentPlans.filter(plan => plan.status === 'pending').length > 0 ? (
+                  installmentPlans
+                    .filter(plan => plan.status === 'pending')
+                    .map((plan) => (
+                      <div key={plan.installmentId} className="flex items-center space-x-4 p-3 border border-border rounded-lg">
+                        <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center">
+                          <Calendar className="h-5 w-5 text-orange-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">{assignedClient.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Due: {formatDate(plan.dueDate)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-orange-600 mb-2">{formatCurrency(plan.amount)}</p>
+                          <Button 
+                            size="sm" 
+                            onClick={() => markInstallmentPaidMutation.mutate(plan.installmentId)}
+                            disabled={markInstallmentPaidMutation.isPending}
+                          >
+                            {markInstallmentPaidMutation.isPending ? "Processing..." : "Mark as Paid"}
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                ) : (
+                  <div className="text-center py-8">
+                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                    <p className="text-muted-foreground">All installments have been paid</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </MainLayout>
   );

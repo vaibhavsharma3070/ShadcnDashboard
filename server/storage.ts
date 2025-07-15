@@ -858,12 +858,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async markInstallmentPaid(installmentId: string): Promise<InstallmentPlan> {
+    // Get the installment plan details first
     const [plan] = await db
+      .select()
+      .from(installmentPlan)
+      .where(eq(installmentPlan.installmentId, installmentId));
+    
+    if (!plan) {
+      throw new Error("Installment plan not found");
+    }
+    
+    // Create a payment record for this installment
+    await db.insert(clientPayment).values({
+      itemId: plan.itemId,
+      clientId: plan.clientId,
+      amount: plan.amount,
+      paymentMethod: "Installment Payment",
+      paidAt: new Date(),
+    });
+    
+    // Update the installment plan status to paid
+    const [updatedPlan] = await db
       .update(installmentPlan)
-      .set({ status: 'paid' })
+      .set({ 
+        status: 'paid',
+        paidAmount: plan.amount
+      })
       .where(eq(installmentPlan.installmentId, installmentId))
       .returning();
-    return plan;
+    
+    return updatedPlan;
   }
 
   async sendPaymentReminder(installmentId: string): Promise<boolean> {

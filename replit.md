@@ -10,6 +10,21 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### July 15, 2025 - Installment Payment Management & Client Assignment
+- **New Feature**: Automatic client assignment for purchased items
+  - Items are now automatically assigned to clients after purchase (full or installment)
+  - Payment forms auto-populate assigned client instead of showing dropdown
+  - Streamlined payment process for items with existing owners
+- **New Feature**: Upcoming Payments section in item details
+  - Shows pending installment payments with due dates
+  - "Mark as Paid" button for each pending installment
+  - Automatically creates payment records when installments are marked as paid
+  - Real-time updates to payment history and remaining balances
+- **Backend Enhancement**: Enhanced `markInstallmentPaid` function
+  - Now creates corresponding payment records in payment history
+  - Updates installment status and paid amount
+  - Maintains data consistency between installments and payments
+
 ### July 15, 2025 - Data Type Consistency Fixes
 - **Issue**: Payment forms were failing due to data type mismatches between frontend forms, API validation, and database schemas
 - **Root Cause**: Forms sent string values for numeric/date fields, but Drizzle Zod schemas expected exact types
