@@ -165,6 +165,27 @@ export default function ItemDetails() {
     enabled: !!itemId,
   });
 
+  const { data: installmentPlans, isLoading: installmentPlansLoading } = useQuery<Array<InstallmentPlan & { client: Client }>>({
+    queryKey: ['/api/installment-plans/item', itemId],
+    enabled: !!itemId,
+  });
+
+  // Determine the assigned client for this item
+  const assignedClient = React.useMemo(() => {
+    // First check if there are any payments - use the client from the first payment
+    if (payments && payments.length > 0) {
+      return payments[0].client;
+    }
+    
+    // If no payments, check if there are installment plans - use the client from the first plan
+    if (installmentPlans && installmentPlans.length > 0) {
+      return installmentPlans[0].client;
+    }
+    
+    // No assigned client yet
+    return null;
+  }, [payments, installmentPlans]);
+
   const { data: expenses, isLoading: expensesLoading } = useQuery<ItemExpense[]>({
     queryKey: ['/api/expenses/item', itemId],
     enabled: !!itemId,
@@ -311,6 +332,13 @@ export default function ItemDetails() {
       paidAt: new Date().toISOString().split('T')[0]
     },
   });
+
+  // Auto-populate client when assigned client is determined
+  React.useEffect(() => {
+    if (assignedClient) {
+      paymentForm.setValue('clientId', assignedClient.clientId);
+    }
+  }, [assignedClient, paymentForm]);
 
   const expenseForm = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseFormSchema),
@@ -741,30 +769,48 @@ export default function ItemDetails() {
                   </DialogHeader>
                   <Form {...paymentForm}>
                     <form onSubmit={paymentForm.handleSubmit(onPaymentSubmit)} className="space-y-4">
-                      <FormField
-                        control={paymentForm.control}
-                        name="clientId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Client</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select client" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {clients?.map((client) => (
-                                  <SelectItem key={client.clientId} value={client.clientId}>
-                                    {client.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {assignedClient ? (
+                        <div className="space-y-2">
+                          <FormLabel>Client</FormLabel>
+                          <div className="flex items-center space-x-3 p-3 border rounded-lg bg-muted/50">
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                              <User className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{assignedClient.name}</p>
+                              <p className="text-sm text-muted-foreground">{assignedClient.email}</p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            This item is assigned to {assignedClient.name}
+                          </p>
+                        </div>
+                      ) : (
+                        <FormField
+                          control={paymentForm.control}
+                          name="clientId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Client</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select client" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {clients?.map((client) => (
+                                    <SelectItem key={client.clientId} value={client.clientId}>
+                                      {client.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
 
                       <FormField
                         control={paymentForm.control}
