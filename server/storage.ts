@@ -430,7 +430,6 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(vendorPayout, eq(vendorPayout.itemId, item.itemId))
       .where(
         and(
-          eq(item.status, 'sold'),
           isNull(vendorPayout.payoutId),
           isNotNull(clientPayment.paymentId) // Only show items with payments
         )
