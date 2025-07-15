@@ -4,7 +4,7 @@ import {
   type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sum, count, sql, and, isNull } from "drizzle-orm";
+import { eq, desc, sum, count, sql, and, isNull, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   // Legacy user methods
@@ -64,6 +64,8 @@ export interface IStorage {
     paymentProgress: number;
     isFullyPaid: boolean;
     fullyPaidAt?: string;
+    firstPaymentDate?: string;
+    lastPaymentDate?: string;
     vendor: Vendor;
   }>>;
   
@@ -404,6 +406,8 @@ export class DatabaseStorage implements IStorage {
     paymentProgress: number;
     isFullyPaid: boolean;
     fullyPaidAt?: string;
+    firstPaymentDate?: string;
+    lastPaymentDate?: string;
     vendor: Vendor;
   }>> {
     const results = await db
@@ -416,6 +420,8 @@ export class DatabaseStorage implements IStorage {
         salePrice: item.listPrice,
         vendorPayoutAmount: item.agreedVendorPayout,
         totalPaid: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+        firstPaymentDate: sql<string>`MIN(${clientPayment.paidAt})`,
+        lastPaymentDate: sql<string>`MAX(${clientPayment.paidAt})`,
         vendor: vendor
       })
       .from(item)
@@ -425,35 +431,56 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(item.status, 'sold'),
-          isNull(vendorPayout.payoutId)
+          isNull(vendorPayout.payoutId),
+          isNotNull(clientPayment.paymentId) // Only show items with payments
         )
       )
       .groupBy(item.itemId, vendor.vendorId);
 
-    return results.map(result => {
-      const totalPaid = result.totalPaid;
-      const listPrice = parseFloat(result.listPrice || '0');
-      const vendorPayoutAmount = parseFloat(result.vendorPayoutAmount || '0');
-      const remainingBalance = listPrice - totalPaid;
-      const paymentProgress = listPrice > 0 ? (totalPaid / listPrice) * 100 : 0;
-      const isFullyPaid = totalPaid >= listPrice;
+    // Now get installment plans for each item to determine the expected last payment date
+    const itemsWithInstallments = await Promise.all(
+      results.map(async (result) => {
+        const installmentPlans = await db
+          .select()
+          .from(installmentPlan)
+          .where(eq(installmentPlan.itemId, result.itemId))
+          .orderBy(desc(installmentPlan.dueDate));
 
-      return {
-        itemId: result.itemId,
-        title: result.title || '',
-        brand: result.brand || '',
-        model: result.model || '',
-        listPrice: listPrice,
-        salePrice: listPrice,
-        vendorPayoutAmount: vendorPayoutAmount,
-        totalPaid,
-        remainingBalance: Math.max(0, remainingBalance),
-        paymentProgress: Math.min(100, paymentProgress),
-        isFullyPaid,
-        fullyPaidAt: isFullyPaid ? new Date().toISOString() : undefined,
-        vendor: result.vendor
-      };
-    });
+        const totalPaid = result.totalPaid;
+        const listPrice = parseFloat(result.listPrice || '0');
+        const vendorPayoutAmount = parseFloat(result.vendorPayoutAmount || '0');
+        const remainingBalance = listPrice - totalPaid;
+        const paymentProgress = listPrice > 0 ? (totalPaid / listPrice) * 100 : 0;
+        const isFullyPaid = totalPaid >= listPrice;
+
+        // Determine the expected last payment date
+        let expectedLastPaymentDate = result.lastPaymentDate;
+        if (installmentPlans.length > 0) {
+          // If there are installment plans, use the latest due date
+          expectedLastPaymentDate = installmentPlans[0].dueDate;
+        }
+
+        return {
+          itemId: result.itemId,
+          title: result.title || '',
+          brand: result.brand || '',
+          model: result.model || '',
+          listPrice: listPrice,
+          salePrice: listPrice,
+          vendorPayoutAmount: vendorPayoutAmount,
+          totalPaid,
+          remainingBalance: Math.max(0, remainingBalance),
+          paymentProgress: Math.min(100, paymentProgress),
+          isFullyPaid,
+          fullyPaidAt: isFullyPaid ? new Date().toISOString() : undefined,
+          firstPaymentDate: result.firstPaymentDate,
+          lastPaymentDate: expectedLastPaymentDate,
+          vendor: result.vendor
+        };
+      })
+    );
+
+    return itemsWithInstallments;
   }
 
   // Expense methods

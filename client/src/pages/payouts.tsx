@@ -87,6 +87,8 @@ interface UpcomingPayout {
   paymentProgress: number;
   isFullyPaid: boolean;
   fullyPaidAt?: string;
+  firstPaymentDate?: string;
+  lastPaymentDate?: string;
   vendor: {
     vendorId: string;
     name: string;
@@ -673,6 +675,7 @@ export default function Payouts() {
                           <TableHead>Item</TableHead>
                           <TableHead>Payout Amount</TableHead>
                           <TableHead>Payment Progress</TableHead>
+                          <TableHead>Payment Timeline</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
@@ -680,7 +683,7 @@ export default function Payouts() {
                       <TableBody>
                         {filteredUpcomingPayouts?.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8">
+                            <TableCell colSpan={7} className="text-center py-8">
                               <p className="text-muted-foreground">No upcoming payouts found</p>
                             </TableCell>
                           </TableRow>
@@ -734,6 +737,39 @@ export default function Payouts() {
                                   {payout.remainingBalance > 0 && (
                                     <div className="text-xs text-muted-foreground">
                                       Remaining: {formatCurrency(payout.remainingBalance)}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="space-y-2">
+                                  {payout.firstPaymentDate && (
+                                    <div className="flex items-center space-x-2">
+                                      <Calendar className="h-3 w-3 text-green-500" />
+                                      <div>
+                                        <div className="text-xs text-muted-foreground">First Payment</div>
+                                        <div className="text-sm font-medium">
+                                          {formatDate(payout.firstPaymentDate)}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {payout.lastPaymentDate && (
+                                    <div className="flex items-center space-x-2">
+                                      <Calendar className="h-3 w-3 text-blue-500" />
+                                      <div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {payout.isFullyPaid ? 'Last Payment' : 'Expected Final'}
+                                        </div>
+                                        <div className="text-sm font-medium">
+                                          {formatDate(payout.lastPaymentDate)}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {!payout.firstPaymentDate && !payout.lastPaymentDate && (
+                                    <div className="text-xs text-muted-foreground">
+                                      No payment timeline available
                                     </div>
                                   )}
                                 </div>

@@ -10,6 +10,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### July 15, 2025 - Payment Timeline in Payouts Section
+- **New Feature**: Enhanced upcoming payouts table with payment timeline information
+  - Added "Payment Timeline" column showing first and last payment dates
+  - First payment date shows when the initial payment was made (green calendar icon)
+  - Last payment date shows either actual last payment (for fully paid items) or expected final payment date (for partial payments)
+  - For items paid upfront, both dates show the same date
+  - Enhanced backend storage to fetch payment timeline data from database
+  - Updated query to include first/last payment dates and expected completion dates from installment plans
+  - Improved user experience with clear visual indicators for payment progress
+
 ### July 15, 2025 - Dashboard Improvements & Payment Validation
 - **New Feature**: Comprehensive dashboard enhancements
   - Fixed top metric cards to show consistent data from database
