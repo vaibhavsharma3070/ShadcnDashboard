@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
@@ -94,7 +95,7 @@ export default function Clients() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormData) => {
-      return await apiRequest('/api/clients', 'POST', data);
+      return await apiRequest('POST', '/api/clients', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
@@ -117,7 +118,7 @@ export default function Clients() {
 
   const deleteClientMutation = useMutation({
     mutationFn: async (clientId: string) => {
-      return await apiRequest(`/api/clients/${clientId}`, 'DELETE');
+      return await apiRequest('DELETE', `/api/clients/${clientId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
@@ -141,7 +142,8 @@ export default function Clients() {
     defaultValues: {
       name: "",
       phone: "",
-      email: ""
+      email: "",
+      billingAddr: ""
     },
   });
 
@@ -338,6 +340,20 @@ export default function Clients() {
                       <FormLabel>Email</FormLabel>
                       <FormControl>
                         <Input type="email" placeholder="Email address" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="billingAddr"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Billing Address</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Billing address" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

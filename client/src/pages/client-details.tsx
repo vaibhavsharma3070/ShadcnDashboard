@@ -148,7 +148,7 @@ export default function ClientDetails() {
 
   const updateClientMutation = useMutation({
     mutationFn: async (data: ClientFormData) => {
-      return await apiRequest(`/api/clients/${clientId}`, 'PUT', data);
+      return await apiRequest('PUT', `/api/clients/${clientId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId] });
@@ -171,7 +171,7 @@ export default function ClientDetails() {
 
   const createPaymentMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
-      return await apiRequest('/api/payments', 'POST', {
+      return await apiRequest('POST', '/api/payments', {
         ...data,
         clientId,
         amount: parseFloat(data.amount)
@@ -199,7 +199,7 @@ export default function ClientDetails() {
 
   const deleteClientMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/clients/${clientId}`, 'DELETE');
+      return await apiRequest('DELETE', `/api/clients/${clientId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
@@ -225,7 +225,8 @@ export default function ClientDetails() {
     defaultValues: {
       name: client?.name || "",
       phone: client?.phone || "",
-      email: client?.email || ""
+      email: client?.email || "",
+      billingAddr: client?.billingAddr || ""
     },
   });
 
@@ -241,7 +242,8 @@ export default function ClientDetails() {
     editForm.reset({
       name: client?.name || "",
       phone: client?.phone || "",
-      email: client?.email || ""
+      email: client?.email || "",
+      billingAddr: client?.billingAddr || ""
     });
   };
 

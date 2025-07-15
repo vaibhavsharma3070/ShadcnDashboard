@@ -45,17 +45,14 @@ import {
 
 type ItemWithVendor = Item & { vendor: Vendor };
 
-const itemFormSchema = z.object({
+const itemFormSchema = insertItemSchema.extend({
   vendorId: z.string().min(1, "Vendor is required"),
   title: z.string().min(1, "Title is required"),
   brand: z.string().min(1, "Brand is required"),
   model: z.string().min(1, "Model is required"),
-  serialNo: z.string().optional(),
-  condition: z.string().optional(),
   agreedVendorPayout: z.string().min(1, "Vendor payout is required"),
   listPrice: z.string().min(1, "List price is required"),
-  acquisitionDate: z.string().min(1, "Acquisition date is required"),
-  status: z.string().default("in-store")
+  acquisitionDate: z.string().min(1, "Acquisition date is required")
 });
 
 const saleFormSchema = insertClientPaymentSchema.extend({

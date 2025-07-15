@@ -170,7 +170,7 @@ export default function ItemDetails() {
 
   const updateItemMutation = useMutation({
     mutationFn: async (data: ItemFormData) => {
-      return await apiRequest(`/api/items/${itemId}`, 'PUT', data);
+      return await apiRequest('PUT', `/api/items/${itemId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/items', itemId] });
@@ -193,7 +193,7 @@ export default function ItemDetails() {
 
   const deleteItemMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/items/${itemId}`, 'DELETE');
+      return await apiRequest('DELETE', `/api/items/${itemId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/items'] });
@@ -221,7 +221,7 @@ export default function ItemDetails() {
         amount: data.amount,
         paidAt: new Date(data.paidAt).toISOString()
       };
-      return await apiRequest('/api/payments', 'POST', payload);
+      return await apiRequest('POST', '/api/payments', payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/payments/item', itemId] });
@@ -251,7 +251,7 @@ export default function ItemDetails() {
         amount: data.amount,
         incurredAt: new Date(data.incurredAt).toISOString()
       };
-      return await apiRequest('/api/expenses', 'POST', payload);
+      return await apiRequest('POST', '/api/expenses', payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/expenses/item', itemId] });

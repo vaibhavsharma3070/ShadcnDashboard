@@ -38,8 +38,7 @@ import {
 const vendorFormSchema = insertVendorSchema.extend({
   name: z.string().min(1, "Name is required"),
   phone: z.string().min(1, "Phone is required"),
-  email: z.string().email("Valid email is required"),
-  taxId: z.string().min(1, "Tax ID is required")
+  email: z.string().email("Valid email is required")
 });
 
 type VendorFormData = z.infer<typeof vendorFormSchema>;
@@ -93,7 +92,7 @@ export default function Vendors() {
 
   const createVendorMutation = useMutation({
     mutationFn: async (data: VendorFormData) => {
-      return await apiRequest('/api/vendors', 'POST', data);
+      return await apiRequest('POST', '/api/vendors', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });

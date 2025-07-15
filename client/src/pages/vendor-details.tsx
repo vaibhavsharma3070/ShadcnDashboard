@@ -51,8 +51,7 @@ import {
 const vendorFormSchema = insertVendorSchema.extend({
   name: z.string().min(1, "Name is required"),
   phone: z.string().min(1, "Phone is required"),
-  email: z.string().email("Valid email is required"),
-  taxId: z.string().min(1, "Tax ID is required")
+  email: z.string().email("Valid email is required")
 });
 
 const payoutFormSchema = insertVendorPayoutSchema.extend({
@@ -143,7 +142,7 @@ export default function VendorDetails() {
 
   const updateVendorMutation = useMutation({
     mutationFn: async (data: VendorFormData) => {
-      return await apiRequest(`/api/vendors/${vendorId}`, 'PUT', data);
+      return await apiRequest('PUT', `/api/vendors/${vendorId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vendors', vendorId] });
@@ -166,7 +165,7 @@ export default function VendorDetails() {
 
   const createPayoutMutation = useMutation({
     mutationFn: async (data: PayoutFormData) => {
-      return await apiRequest('/api/payouts', 'POST', {
+      return await apiRequest('POST', '/api/payouts', {
         ...data,
         vendorId,
         amount: parseFloat(data.amount)
@@ -194,7 +193,7 @@ export default function VendorDetails() {
 
   const deleteVendorMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/vendors/${vendorId}`, 'DELETE');
+      return await apiRequest('DELETE', `/api/vendors/${vendorId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
