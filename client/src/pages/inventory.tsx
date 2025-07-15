@@ -149,7 +149,7 @@ export default function Inventory() {
 
   const createItemMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest('/api/items', 'POST', data);
+      return await apiRequest('POST', '/api/items', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/items'] });
@@ -174,7 +174,7 @@ export default function Inventory() {
 
   const deleteItemMutation = useMutation({
     mutationFn: async (itemId: string) => {
-      return await apiRequest(`/api/items/${itemId}`, 'DELETE');
+      return await apiRequest('DELETE', `/api/items/${itemId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/items'] });
@@ -198,7 +198,7 @@ export default function Inventory() {
     mutationFn: async (data: SaleFormData) => {
       if (data.paymentType === "full") {
         // Create a single payment for full payment
-        return await apiRequest('/api/payments', 'POST', {
+        return await apiRequest('POST', '/api/payments', {
           itemId: selectedItem?.itemId,
           clientId: data.clientId,
           amount: parseFloat(data.amount),
@@ -213,7 +213,7 @@ export default function Inventory() {
         
         // Create the first payment (if amount > 0)
         if (parseFloat(data.amount) > 0) {
-          await apiRequest('/api/payments', 'POST', {
+          await apiRequest('POST', '/api/payments', {
             itemId: selectedItem?.itemId,
             clientId: data.clientId,
             amount: parseFloat(data.amount),
@@ -224,7 +224,7 @@ export default function Inventory() {
         
         // Create installment plans for future payments
         const installmentPromises = data.installments.map(installment => 
-          apiRequest('/api/installment-plans', 'POST', {
+          apiRequest('POST', '/api/installment-plans', {
             itemId: selectedItem?.itemId,
             clientId: data.clientId,
             amount: parseFloat(installment.amount),
