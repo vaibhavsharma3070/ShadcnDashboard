@@ -315,12 +315,7 @@ export default function ItemDetails() {
 
 
 
-  // Auto-populate client when assigned client is determined
-  React.useEffect(() => {
-    if (assignedClient) {
-      paymentForm.setValue('clientId', assignedClient.clientId);
-    }
-  }, [assignedClient, paymentForm]);
+
 
   const expenseForm = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseFormSchema),

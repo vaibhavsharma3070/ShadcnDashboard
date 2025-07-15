@@ -10,6 +10,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### July 15, 2025 - Removed Redundant Payment Functionality
+- **Cleanup**: Removed "Add Payment" button from item details page
+  - Eliminated redundant payment functionality that conflicted with structured installment system
+  - Removed associated payment dialog, form code, and mutations
+  - Fixed syntax errors and cleaned up orphaned dialog content
+  - Removed useEffect hook that referenced deleted payment form
+  - Application now focuses on structured installment payments only
+  - Payment section displays clean payment history without confusing add payment options
+
 ### July 15, 2025 - Payment Timeline in Payouts Section
 - **New Feature**: Enhanced upcoming payouts table with payment timeline information
   - Added "Payment Timeline" column showing first and last payment dates
