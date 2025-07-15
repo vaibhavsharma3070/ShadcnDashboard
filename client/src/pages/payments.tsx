@@ -801,6 +801,71 @@ export default function Payments() {
                 </div>
               </CardHeader>
               <CardContent>
+                {/* Priority Statistics */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground">Critical</div>
+                          <div className="text-2xl font-bold text-red-600">
+                            {upcomingPayments?.filter(p => isOverdue(p.dueDate)).length || 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Overdue</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Clock className="h-4 w-4 text-yellow-500" />
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground">Urgent</div>
+                          <div className="text-2xl font-bold text-yellow-600">
+                            {upcomingPayments?.filter(p => {
+                              const days = Math.ceil((new Date(p.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                              return days <= 3 && days > 0;
+                            }).length || 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground">≤ 3 days</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="h-4 w-4 text-blue-500" />
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground">Soon</div>
+                          <div className="text-2xl font-bold text-blue-600">
+                            {upcomingPayments?.filter(p => {
+                              const days = Math.ceil((new Date(p.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                              return days <= 7 && days > 3;
+                            }).length || 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground">4-7 days</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <DollarSign className="h-4 w-4 text-green-500" />
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground">Total Amount</div>
+                          <div className="text-2xl font-bold text-green-600">
+                            {formatCurrency(upcomingPayments?.reduce((sum, p) => sum + p.amount, 0) || 0)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Expected</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
                 {upcomingLoading || overdueLoading ? (
                   <div className="space-y-4">
                     {[...Array(5)].map((_, i) => (
@@ -828,6 +893,7 @@ export default function Payments() {
                           <TableHead>Item</TableHead>
                           <TableHead>Amount</TableHead>
                           <TableHead>Due Date</TableHead>
+                          <TableHead>Priority</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
@@ -835,21 +901,39 @@ export default function Payments() {
                       <TableBody>
                         {filteredUpcomingPayments?.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8">
+                            <TableCell colSpan={7} className="text-center py-8">
                               <p className="text-muted-foreground">No upcoming payments found</p>
                             </TableCell>
                           </TableRow>
                         ) : (
                           filteredUpcomingPayments?.map((payment) => {
                             const paymentIsOverdue = isOverdue(payment.dueDate);
+                            const daysUntilDue = Math.ceil((new Date(payment.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                            const daysOverdue = paymentIsOverdue ? Math.ceil((Date.now() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                            
+                            // Priority calculation
+                            const getPriority = () => {
+                              if (daysOverdue > 0) return { level: "high", color: "red", text: "Critical" };
+                              if (daysUntilDue <= 3) return { level: "medium", color: "yellow", text: "Urgent" };
+                              if (daysUntilDue <= 7) return { level: "low", color: "blue", text: "Soon" };
+                              return { level: "normal", color: "green", text: "Normal" };
+                            };
+                            
+                            const priority = getPriority();
+                            
                             return (
-                              <TableRow key={payment.installmentId} className={paymentIsOverdue ? "bg-red-50" : ""}>
+                              <TableRow key={payment.installmentId} className={
+                                paymentIsOverdue ? "bg-red-50 border-l-4 border-l-red-500" : 
+                                daysUntilDue <= 3 ? "bg-yellow-50 border-l-4 border-l-yellow-500" :
+                                daysUntilDue <= 7 ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
+                              }>
                                 <TableCell>
                                   <div className="flex items-center space-x-2">
                                     <User className="h-4 w-4 text-muted-foreground" />
                                     <div>
                                       <div className="font-medium">{payment.client.name}</div>
                                       <div className="text-sm text-muted-foreground">{payment.client.email}</div>
+                                      <div className="text-xs text-muted-foreground">{payment.client.phone}</div>
                                     </div>
                                   </div>
                                 </TableCell>
@@ -861,24 +945,54 @@ export default function Payments() {
                                       <div className="text-sm text-muted-foreground">
                                         {payment.item.brand} {payment.item.model}
                                       </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        Vendor: {payment.item.vendor.name}
+                                      </div>
                                     </div>
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  <div className="font-medium">{formatCurrency(payment.amount)}</div>
+                                  <div className="font-medium text-lg">{formatCurrency(payment.amount)}</div>
                                   <div className="text-sm text-muted-foreground">
                                     List: {formatCurrency(payment.item.listPrice)}
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  <div className={`text-sm font-medium ${paymentIsOverdue ? 'text-red-600' : ''}`}>
-                                    {formatDate(payment.dueDate)}
-                                  </div>
-                                  {paymentIsOverdue && (
-                                    <div className="text-xs text-red-500">
-                                      {Math.ceil((new Date().getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))} days overdue
+                                  <div className="flex items-center space-x-2">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                      <div className={`text-sm font-medium ${
+                                        paymentIsOverdue ? 'text-red-600' : 
+                                        daysUntilDue <= 3 ? 'text-yellow-600' : 
+                                        daysUntilDue <= 7 ? 'text-blue-600' : ''
+                                      }`}>
+                                        {formatDate(payment.dueDate)}
+                                      </div>
+                                      {paymentIsOverdue ? (
+                                        <div className="text-xs text-red-600 font-medium">
+                                          {daysOverdue} days overdue
+                                        </div>
+                                      ) : (
+                                        <div className="text-xs text-muted-foreground">
+                                          {daysUntilDue === 0 ? "Due today" : `${daysUntilDue} days left`}
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={priority.level === "high" ? "destructive" : priority.level === "medium" ? "secondary" : "outline"} className={
+                                    priority.color === "red" ? "bg-red-100 text-red-800 border-red-200" :
+                                    priority.color === "yellow" ? "bg-yellow-100 text-yellow-800 border-yellow-200" :
+                                    priority.color === "blue" ? "bg-blue-100 text-blue-800 border-blue-200" :
+                                    "bg-green-100 text-green-800 border-green-200"
+                                  }>
+                                    {priority.color === "red" && <AlertTriangle className="h-3 w-3 mr-1" />}
+                                    {priority.color === "yellow" && <Clock className="h-3 w-3 mr-1" />}
+                                    {priority.color === "blue" && <Calendar className="h-3 w-3 mr-1" />}
+                                    {priority.color === "green" && <CheckCircle className="h-3 w-3 mr-1" />}
+                                    {priority.text}
+                                  </Badge>
                                 </TableCell>
                                 <TableCell>
                                   {getStatusBadge(paymentIsOverdue ? "overdue" : payment.status)}
