@@ -63,7 +63,13 @@ const paymentFormSchema = insertClientPaymentSchema.extend({
   paidAt: z.string().min(1, "Payment date is required")
 });
 
-const expenseFormSchema = insertItemExpenseSchema.extend({
+const expenseFormSchema = insertItemExpenseSchema.pick({
+  itemId: true,
+  expenseType: true,
+  amount: true,
+  incurredAt: true,
+  notes: true,
+}).extend({
   expenseType: z.string().min(1, "Expense type is required"),
   amount: z.string().min(1, "Amount is required"),
   incurredAt: z.string().min(1, "Expense date is required")
@@ -248,8 +254,6 @@ export default function ItemDetails() {
       const payload = {
         ...data,
         itemId: itemId!,
-        amount: data.amount,
-        incurredAt: new Date(data.incurredAt).toISOString()
       };
       return await apiRequest('POST', '/api/expenses', payload);
     },
