@@ -1,7 +1,7 @@
 import { 
-  vendor, client, item, clientPayment, vendorPayout, itemExpense, users,
-  type Vendor, type Client, type Item, type ClientPayment, type VendorPayout, type ItemExpense, type User,
-  type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertUser
+  vendor, client, item, clientPayment, vendorPayout, itemExpense, installmentPlan, users,
+  type Vendor, type Client, type Item, type ClientPayment, type VendorPayout, type ItemExpense, type InstallmentPlan, type User,
+  type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sum, count, sql } from "drizzle-orm";
@@ -47,6 +47,13 @@ export interface IStorage {
   getExpenses(): Promise<Array<ItemExpense & { item: Item }>>;
   getExpensesByItem(itemId: string): Promise<ItemExpense[]>;
   createExpense(expense: InsertItemExpense): Promise<ItemExpense>;
+  
+  // Installment plan methods
+  getInstallmentPlans(): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor }, client: Client }>>;
+  getInstallmentPlansByItem(itemId: string): Promise<Array<InstallmentPlan & { client: Client }>>;
+  getInstallmentPlansByClient(clientId: string): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor } }>>;
+  createInstallmentPlan(plan: InsertInstallmentPlan): Promise<InstallmentPlan>;
+  updateInstallmentPlan(id: string, plan: Partial<InsertInstallmentPlan>): Promise<InstallmentPlan>;
   
   // Dashboard methods
   getDashboardMetrics(): Promise<{
@@ -339,6 +346,65 @@ export class DatabaseStorage implements IStorage {
     return itemsWithProfit
       .sort((a, b) => b.profit - a.profit)
       .slice(0, limit);
+  }
+
+  async getInstallmentPlans(): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor }, client: Client }>> {
+    return await db
+      .select()
+      .from(installmentPlan)
+      .innerJoin(item, eq(installmentPlan.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(installmentPlan.clientId, client.clientId))
+      .orderBy(desc(installmentPlan.dueDate))
+      .then(rows => rows.map(row => ({
+        ...row.installment_plan,
+        item: { ...row.item, vendor: row.vendor },
+        client: row.client
+      })));
+  }
+
+  async getInstallmentPlansByItem(itemId: string): Promise<Array<InstallmentPlan & { client: Client }>> {
+    return await db
+      .select()
+      .from(installmentPlan)
+      .innerJoin(client, eq(installmentPlan.clientId, client.clientId))
+      .where(eq(installmentPlan.itemId, itemId))
+      .orderBy(installmentPlan.dueDate)
+      .then(rows => rows.map(row => ({
+        ...row.installment_plan,
+        client: row.client
+      })));
+  }
+
+  async getInstallmentPlansByClient(clientId: string): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor } }>> {
+    return await db
+      .select()
+      .from(installmentPlan)
+      .innerJoin(item, eq(installmentPlan.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .where(eq(installmentPlan.clientId, clientId))
+      .orderBy(installmentPlan.dueDate)
+      .then(rows => rows.map(row => ({
+        ...row.installment_plan,
+        item: { ...row.item, vendor: row.vendor }
+      })));
+  }
+
+  async createInstallmentPlan(insertPlan: InsertInstallmentPlan): Promise<InstallmentPlan> {
+    const [plan] = await db
+      .insert(installmentPlan)
+      .values(insertPlan)
+      .returning();
+    return plan;
+  }
+
+  async updateInstallmentPlan(id: string, updatePlan: Partial<InsertInstallmentPlan>): Promise<InstallmentPlan> {
+    const [plan] = await db
+      .update(installmentPlan)
+      .set(updatePlan)
+      .where(eq(installmentPlan.installmentId, id))
+      .returning();
+    return plan;
   }
 }
 

@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertVendorSchema, insertClientSchema, insertItemSchema, 
-  insertClientPaymentSchema, insertVendorPayoutSchema, insertItemExpenseSchema 
+  insertClientPaymentSchema, insertVendorPayoutSchema, insertItemExpenseSchema, insertInstallmentPlanSchema 
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -272,6 +272,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(expense);
     } catch (error) {
       res.status(400).json({ error: "Invalid expense data" });
+    }
+  });
+
+  // Installment plan routes
+  app.get("/api/installment-plans", async (req, res) => {
+    try {
+      const plans = await storage.getInstallmentPlans();
+      res.json(plans);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch installment plans" });
+    }
+  });
+
+  app.get("/api/installment-plans/item/:itemId", async (req, res) => {
+    try {
+      const plans = await storage.getInstallmentPlansByItem(req.params.itemId);
+      res.json(plans);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch installment plans for item" });
+    }
+  });
+
+  app.get("/api/installment-plans/client/:clientId", async (req, res) => {
+    try {
+      const plans = await storage.getInstallmentPlansByClient(req.params.clientId);
+      res.json(plans);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch installment plans for client" });
+    }
+  });
+
+  app.post("/api/installment-plans", async (req, res) => {
+    try {
+      const validatedData = insertInstallmentPlanSchema.parse(req.body);
+      const plan = await storage.createInstallmentPlan(validatedData);
+      res.status(201).json(plan);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid installment plan data" });
     }
   });
 

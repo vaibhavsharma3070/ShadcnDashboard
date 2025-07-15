@@ -38,7 +38,8 @@ import {
   AlertCircle,
   CheckCircle,
   ShoppingCart,
-  CreditCard
+  CreditCard,
+  X
 } from "lucide-react";
 
 type ItemWithVendor = Item & { vendor: Vendor };
@@ -55,8 +56,13 @@ const itemFormSchema = insertItemSchema.extend({
 
 const saleFormSchema = insertClientPaymentSchema.extend({
   clientId: z.string().min(1, "Client is required"),
+  paymentType: z.enum(["full", "installment"]),
   amount: z.string().min(1, "Amount is required"),
-  paymentMethod: z.string().min(1, "Payment method is required")
+  paymentMethod: z.string().min(1, "Payment method is required"),
+  installments: z.array(z.object({
+    amount: z.string().min(1, "Amount is required"),
+    dueDate: z.string().min(1, "Due date is required")
+  })).optional()
 });
 
 type ItemFormData = z.infer<typeof itemFormSchema>;
@@ -121,6 +127,7 @@ export default function Inventory() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ItemWithVendor | null>(null);
+  const [installments, setInstallments] = useState([{ amount: "", dueDate: "" }]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -190,20 +197,54 @@ export default function Inventory() {
 
   const createSaleMutation = useMutation({
     mutationFn: async (data: SaleFormData) => {
-      return await apiRequest('/api/payments', 'POST', {
-        ...data,
-        itemId: selectedItem?.itemId,
-        amount: parseFloat(data.amount),
-        paidAt: new Date().toISOString()
-      });
+      if (data.paymentType === "full") {
+        // Create a single payment for full payment
+        return await apiRequest('/api/payments', 'POST', {
+          itemId: selectedItem?.itemId,
+          clientId: data.clientId,
+          amount: parseFloat(data.amount),
+          paymentMethod: data.paymentMethod,
+          paidAt: new Date().toISOString()
+        });
+      } else {
+        // Create installment plan
+        if (!data.installments || data.installments.length === 0) {
+          throw new Error("Installments are required for installment payment");
+        }
+        
+        // Create the first payment (if amount > 0)
+        if (parseFloat(data.amount) > 0) {
+          await apiRequest('/api/payments', 'POST', {
+            itemId: selectedItem?.itemId,
+            clientId: data.clientId,
+            amount: parseFloat(data.amount),
+            paymentMethod: data.paymentMethod,
+            paidAt: new Date().toISOString()
+          });
+        }
+        
+        // Create installment plans for future payments
+        const installmentPromises = data.installments.map(installment => 
+          apiRequest('/api/installment-plans', 'POST', {
+            itemId: selectedItem?.itemId,
+            clientId: data.clientId,
+            amount: parseFloat(installment.amount),
+            dueDate: installment.dueDate
+          })
+        );
+        
+        return await Promise.all(installmentPromises);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/installment-plans'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
       setIsSaleModalOpen(false);
       setSelectedItem(null);
+      setInstallments([{ amount: "", dueDate: "" }]);
       saleForm.reset();
       toast({
         title: "Success",
@@ -239,8 +280,10 @@ export default function Inventory() {
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
       clientId: "",
+      paymentType: "full",
       amount: "",
-      paymentMethod: "cash"
+      paymentMethod: "cash",
+      installments: [{ amount: "", dueDate: "" }]
     },
   });
 
@@ -249,7 +292,27 @@ export default function Inventory() {
   };
 
   const onSaleSubmit = (data: SaleFormData) => {
-    createSaleMutation.mutate(data);
+    const formData = {
+      ...data,
+      installments: data.paymentType === "installment" ? installments : undefined
+    };
+    createSaleMutation.mutate(formData);
+  };
+
+  const addInstallment = () => {
+    setInstallments([...installments, { amount: "", dueDate: "" }]);
+  };
+
+  const removeInstallment = (index: number) => {
+    if (installments.length > 1) {
+      setInstallments(installments.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateInstallment = (index: number, field: 'amount' | 'dueDate', value: string) => {
+    const updated = [...installments];
+    updated[index][field] = value;
+    setInstallments(updated);
   };
 
   const handleDeleteItem = (itemId: string, itemTitle: string) => {
@@ -261,6 +324,8 @@ export default function Inventory() {
   const handleSellItem = (item: ItemWithVendor) => {
     setSelectedItem(item);
     saleForm.setValue('amount', item.listPrice?.toString() || '');
+    saleForm.setValue('paymentType', 'full');
+    setInstallments([{ amount: "", dueDate: "" }]);
     setIsSaleModalOpen(true);
   };
 
@@ -812,10 +877,34 @@ export default function Inventory() {
 
               <FormField
                 control={saleForm.control}
+                name="paymentType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select payment type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="full">Full Payment</SelectItem>
+                        <SelectItem value="installment">Installment Plan</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={saleForm.control}
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Payment Amount</FormLabel>
+                    <FormLabel>
+                      {saleForm.watch("paymentType") === "installment" ? "Initial Payment Amount" : "Payment Amount"}
+                    </FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" placeholder="0.00" {...field} />
                     </FormControl>
@@ -848,6 +937,44 @@ export default function Inventory() {
                   </FormItem>
                 )}
               />
+
+              {saleForm.watch("paymentType") === "installment" && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Installment Schedule</FormLabel>
+                    <Button type="button" variant="outline" size="sm" onClick={addInstallment}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Installment
+                    </Button>
+                  </div>
+                  {installments.map((installment, index) => (
+                    <div key={index} className="flex items-center space-x-2 p-3 border rounded-lg">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Amount"
+                        value={installment.amount}
+                        onChange={(e) => updateInstallment(index, 'amount', e.target.value)}
+                      />
+                      <Input
+                        type="date"
+                        value={installment.dueDate}
+                        onChange={(e) => updateInstallment(index, 'dueDate', e.target.value)}
+                      />
+                      {installments.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeInstallment(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="flex justify-end space-x-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsSaleModalOpen(false)}>

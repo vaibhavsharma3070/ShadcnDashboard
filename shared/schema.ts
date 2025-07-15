@@ -103,6 +103,30 @@ export const itemExpense = pgTable("item_expense", {
   }),
 }));
 
+export const installmentPlan = pgTable("installment_plan", {
+  installmentId: uuid("installment_id").primaryKey().defaultRandom(),
+  itemId: uuid("item_id").notNull(),
+  clientId: uuid("client_id").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  dueDate: date("due_date").notNull(),
+  paidAmount: numeric("paid_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  status: text("status").notNull().default("pending"), // pending, paid, overdue
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  itemIdx: index("idx_ip_item").on(table.itemId),
+  clientIdx: index("idx_ip_client").on(table.clientId),
+  dueDateIdx: index("idx_ip_due_date").on(table.dueDate),
+  statusIdx: index("idx_ip_status").on(table.status),
+  itemFk: foreignKey({
+    columns: [table.itemId],
+    foreignColumns: [item.itemId]
+  }),
+  clientFk: foreignKey({
+    columns: [table.clientId],
+    foreignColumns: [client.clientId]
+  }),
+}));
+
 // Relations
 export const vendorRelations = relations(vendor, ({ many }) => ({
   items: many(item),
@@ -111,6 +135,7 @@ export const vendorRelations = relations(vendor, ({ many }) => ({
 
 export const clientRelations = relations(client, ({ many }) => ({
   payments: many(clientPayment),
+  installmentPlans: many(installmentPlan),
 }));
 
 export const itemRelations = relations(item, ({ one, many }) => ({
@@ -120,6 +145,7 @@ export const itemRelations = relations(item, ({ one, many }) => ({
   }),
   payments: many(clientPayment),
   expenses: many(itemExpense),
+  installmentPlans: many(installmentPlan),
   payout: one(vendorPayout, {
     fields: [item.itemId],
     references: [vendorPayout.itemId]
@@ -155,6 +181,17 @@ export const itemExpenseRelations = relations(itemExpense, ({ one }) => ({
   }),
 }));
 
+export const installmentPlanRelations = relations(installmentPlan, ({ one }) => ({
+  item: one(item, {
+    fields: [installmentPlan.itemId],
+    references: [item.itemId]
+  }),
+  client: one(client, {
+    fields: [installmentPlan.clientId],
+    references: [client.clientId]
+  }),
+}));
+
 // Insert schemas
 export const insertVendorSchema = createInsertSchema(vendor).omit({
   vendorId: true,
@@ -183,6 +220,13 @@ export const insertItemExpenseSchema = createInsertSchema(itemExpense).omit({
   expenseId: true,
 });
 
+export const insertInstallmentPlanSchema = createInsertSchema(installmentPlan).omit({
+  installmentId: true,
+  paidAmount: true,
+  status: true,
+  createdAt: true,
+});
+
 // Types
 export type InsertVendor = z.infer<typeof insertVendorSchema>;
 export type Vendor = typeof vendor.$inferSelect;
@@ -201,6 +245,9 @@ export type VendorPayout = typeof vendorPayout.$inferSelect;
 
 export type InsertItemExpense = z.infer<typeof insertItemExpenseSchema>;
 export type ItemExpense = typeof itemExpense.$inferSelect;
+
+export type InsertInstallmentPlan = z.infer<typeof insertInstallmentPlanSchema>;
+export type InstallmentPlan = typeof installmentPlan.$inferSelect;
 
 // Legacy user table (keeping for compatibility)
 export const users = pgTable("users", {
