@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -135,6 +136,7 @@ export default function Inventory() {
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-items'] });
       setIsCreateModalOpen(false);
+      form.reset();
       toast({
         title: "Success",
         description: "Item created successfully",
@@ -144,6 +146,28 @@ export default function Inventory() {
       toast({
         title: "Error",
         description: "Failed to create item",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteItemMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      return await apiRequest(`/api/items/${itemId}`, 'DELETE');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/recent-items'] });
+      toast({
+        title: "Success",
+        description: "Item deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete item",
         variant: "destructive",
       });
     },
@@ -167,6 +191,12 @@ export default function Inventory() {
 
   const onSubmit = (data: ItemFormData) => {
     createItemMutation.mutate(data);
+  };
+
+  const handleDeleteItem = (itemId: string, itemTitle: string) => {
+    if (confirm(`Are you sure you want to delete "${itemTitle}"? This action cannot be undone.`)) {
+      deleteItemMutation.mutate(itemId);
+    }
   };
 
   // Filter and sort items
@@ -606,13 +636,22 @@ export default function Inventory() {
                     </div>
                     
                     <div className="flex space-x-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
+                      <Link href={`/item/${item.itemId}`}>
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Link href={`/item/${item.itemId}`}>
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleDeleteItem(item.itemId, item.title || "Item")}
+                        disabled={deleteItemMutation.isPending}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
