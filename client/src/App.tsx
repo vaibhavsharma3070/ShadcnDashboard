@@ -10,6 +10,7 @@ import ItemDetails from "@/pages/item-details";
 import Vendors from "@/pages/vendors";
 import VendorDetails from "@/pages/vendor-details";
 import Clients from "@/pages/clients";
+import ClientDetails from "@/pages/client-details";
 import Payments from "@/pages/payments";
 import Payouts from "@/pages/payouts";
 import Expenses from "@/pages/expenses";
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/vendors" component={Vendors} />
       <Route path="/vendor/:vendorId" component={VendorDetails} />
       <Route path="/clients" component={Clients} />
+      <Route path="/client/:clientId" component={ClientDetails} />
       <Route path="/payments" component={Payments} />
       <Route path="/payouts" component={Payouts} />
       <Route path="/expenses" component={Expenses} />
