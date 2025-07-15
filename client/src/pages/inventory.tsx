@@ -55,15 +55,23 @@ const itemFormSchema = insertItemSchema.extend({
   acquisitionDate: z.string().min(1, "Acquisition date is required")
 });
 
-const saleFormSchema = insertClientPaymentSchema.extend({
+const saleFormSchema = z.object({
   clientId: z.string().min(1, "Client is required"),
   paymentType: z.enum(["full", "installment"]),
-  amount: z.string().min(1, "Amount is required"),
+  amount: z.string().min(1, "Amount is required"), 
   paymentMethod: z.string().min(1, "Payment method is required"),
   installments: z.array(z.object({
     amount: z.string().min(1, "Amount is required"),
     dueDate: z.string().min(1, "Due date is required")
   })).optional()
+}).refine((data) => {
+  if (data.paymentType === "installment") {
+    return data.installments && data.installments.length > 0;
+  }
+  return true;
+}, {
+  message: "Installments are required for installment payment type",
+  path: ["installments"]
 });
 
 type ItemFormData = z.infer<typeof itemFormSchema>;
@@ -193,55 +201,87 @@ export default function Inventory() {
 
   const createSaleMutation = useMutation({
     mutationFn: async (data: SaleFormData) => {
-      if (data.paymentType === "full") {
-        // Create a single payment for full payment
-        const paymentResult = await apiRequest('POST', '/api/payments', {
-          itemId: selectedItem?.itemId,
-          clientId: data.clientId,
-          amount: parseFloat(data.amount),
-          paymentMethod: data.paymentMethod,
-          paidAt: new Date().toISOString()
-        });
-        
-        // Update item status to "sold" for full payment
-        await apiRequest('PUT', `/api/items/${selectedItem?.itemId}`, {
-          status: "sold"
-        });
-        
-        return paymentResult;
-      } else {
-        // Create installment plan
-        if (!data.installments || data.installments.length === 0) {
-          throw new Error("Installments are required for installment payment");
-        }
-        
-        // Update item status to "reserved" for installment plan
-        await apiRequest('PUT', `/api/items/${selectedItem?.itemId}`, {
-          status: "reserved"
-        });
-        
-        // Create the first payment (if amount > 0)
-        if (parseFloat(data.amount) > 0) {
-          await apiRequest('POST', '/api/payments', {
+      console.log('=== MUTATION STARTED ===');
+      console.log('Mutation data:', data);
+      console.log('Selected item:', selectedItem);
+      
+      try {
+        if (data.paymentType === "full") {
+          console.log('Processing full payment...');
+          
+          // Create a single payment for full payment
+          const paymentPayload = {
             itemId: selectedItem?.itemId,
             clientId: data.clientId,
             amount: parseFloat(data.amount),
             paymentMethod: data.paymentMethod,
             paidAt: new Date().toISOString()
+          };
+          console.log('Payment payload:', paymentPayload);
+          
+          const paymentResult = await apiRequest('POST', '/api/payments', paymentPayload);
+          console.log('Payment result:', paymentResult);
+          
+          // Update item status to "sold" for full payment
+          const statusPayload = { status: "sold" };
+          console.log('Status update payload:', statusPayload);
+          
+          const statusResult = await apiRequest('PUT', `/api/items/${selectedItem?.itemId}`, statusPayload);
+          console.log('Status update result:', statusResult);
+          
+          return paymentResult;
+        } else {
+          console.log('Processing installment payment...');
+          
+          // Create installment plan
+          if (!data.installments || data.installments.length === 0) {
+            throw new Error("Installments are required for installment payment");
+          }
+          
+          // Update item status to "reserved" for installment plan
+          const statusPayload = { status: "reserved" };
+          console.log('Status update payload:', statusPayload);
+          
+          const statusResult = await apiRequest('PUT', `/api/items/${selectedItem?.itemId}`, statusPayload);
+          console.log('Status update result:', statusResult);
+          
+          // Create the first payment (if amount > 0)
+          if (parseFloat(data.amount) > 0) {
+            const paymentPayload = {
+              itemId: selectedItem?.itemId,
+              clientId: data.clientId,
+              amount: parseFloat(data.amount),
+              paymentMethod: data.paymentMethod,
+              paidAt: new Date().toISOString()
+            };
+            console.log('Initial payment payload:', paymentPayload);
+            
+            const paymentResult = await apiRequest('POST', '/api/payments', paymentPayload);
+            console.log('Initial payment result:', paymentResult);
+          }
+          
+          // Create installment plans for future payments
+          const installmentPromises = data.installments.map((installment, index) => {
+            const installmentPayload = {
+              itemId: selectedItem?.itemId,
+              clientId: data.clientId,
+              amount: parseFloat(installment.amount),
+              dueDate: installment.dueDate
+            };
+            console.log(`Installment ${index + 1} payload:`, installmentPayload);
+            
+            return apiRequest('POST', '/api/installment-plans', installmentPayload);
           });
+          
+          const installmentResults = await Promise.all(installmentPromises);
+          console.log('Installment results:', installmentResults);
+          
+          return installmentResults;
         }
-        
-        // Create installment plans for future payments
-        const installmentPromises = data.installments.map(installment => 
-          apiRequest('POST', '/api/installment-plans', {
-            itemId: selectedItem?.itemId,
-            clientId: data.clientId,
-            amount: parseFloat(installment.amount),
-            dueDate: installment.dueDate
-          })
-        );
-        
-        return await Promise.all(installmentPromises);
+      } catch (error) {
+        console.error('=== MUTATION ERROR ===');
+        console.error('Error details:', error);
+        throw error;
       }
     },
     onSuccess: () => {
@@ -886,7 +926,14 @@ export default function Inventory() {
             </div>
           )}
           <Form {...saleForm}>
-            <form onSubmit={saleForm.handleSubmit(onSaleSubmit)} className="space-y-4">
+            <form onSubmit={saleForm.handleSubmit(onSaleSubmit, (errors) => {
+              console.log('Form submission failed due to validation errors:', errors);
+              toast({
+                title: "Form Validation Error",
+                description: "Please check all required fields",
+                variant: "destructive",
+              });
+            })} className="space-y-4">
               <FormField
                 control={saleForm.control}
                 name="clientId"
@@ -1017,7 +1064,24 @@ export default function Inventory() {
                 <Button type="button" variant="outline" onClick={() => setIsSaleModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createSaleMutation.isPending}>
+                <Button 
+                  type="submit" 
+                  disabled={createSaleMutation.isPending}
+                  onClick={(e) => {
+                    console.log('Record Sale button clicked');
+                    console.log('Form valid:', saleForm.formState.isValid);
+                    console.log('Form errors:', saleForm.formState.errors);
+                    console.log('Form values:', saleForm.getValues());
+                    console.log('Selected item:', selectedItem);
+                    
+                    // Check if form is valid
+                    if (!saleForm.formState.isValid) {
+                      console.log('Form is invalid, preventing submission');
+                      e.preventDefault();
+                      return;
+                    }
+                  }}
+                >
                   {createSaleMutation.isPending ? "Processing..." : "Record Sale"}
                 </Button>
               </div>
