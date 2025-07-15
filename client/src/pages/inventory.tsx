@@ -290,8 +290,6 @@ export default function Inventory() {
     console.log('Form data:', data);
     const payload = {
       ...data,
-      agreedVendorPayout: data.agreedVendorPayout ? parseFloat(data.agreedVendorPayout) : undefined,
-      listPrice: data.listPrice ? parseFloat(data.listPrice) : undefined,
       serialNo: data.serialNo || undefined,
       condition: data.condition || undefined
     };
