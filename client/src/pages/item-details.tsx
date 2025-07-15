@@ -479,9 +479,48 @@ export default function ItemDetails() {
   };
 
   const onInstallmentSubmit = (data: InstallmentFormData) => {
+    // Calculate current total of pending installments
+    const pendingInstallments = installmentPlans?.filter(plan => plan.status === 'pending') || [];
+    const currentTotalUpcoming = pendingInstallments.reduce((sum, plan) => sum + parseFloat(plan.amount.toString()), 0);
+    
+    let newTotalUpcoming: number;
+    
     if (isSplitMode && editingInstallment) {
-      // Split mode: create new installment with half the amount and adjust the original
+      // Split mode: the original installment amount stays the same total, just split into two
+      newTotalUpcoming = currentTotalUpcoming;
+    } else if (editingInstallment) {
+      // Edit mode: calculate new total by replacing the edited installment's amount
+      const originalAmount = parseFloat(editingInstallment.amount.toString());
+      const newAmount = parseFloat(data.amount);
+      newTotalUpcoming = currentTotalUpcoming - originalAmount + newAmount;
+    } else {
+      // This shouldn't happen but handle it gracefully
+      newTotalUpcoming = currentTotalUpcoming;
+    }
+    
+    // Check if new total would be below remaining balance
+    if (newTotalUpcoming < remainingBalance) {
+      toast({
+        title: "Invalid Amount",
+        description: `Total upcoming payments (${formatCurrency(newTotalUpcoming)}) cannot be less than the remaining balance (${formatCurrency(remainingBalance)}). You can increase amounts but not decrease them below the balance owed.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isSplitMode && editingInstallment) {
+      // Split mode: create new installment with specified amount and adjust the original
       const remainingAmount = parseFloat(editingInstallment.amount.toString()) - parseFloat(data.amount);
+      
+      // Validate split amounts
+      if (remainingAmount <= 0) {
+        toast({
+          title: "Invalid Split Amount",
+          description: "Split amount must be less than the original installment amount.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       // Update original installment with remaining amount
       updateInstallmentMutation.mutate({
@@ -1158,6 +1197,27 @@ export default function ItemDetails() {
               {isSplitMode ? "Split Installment Payment" : "Edit Installment Payment"}
             </DialogTitle>
           </DialogHeader>
+          
+          {/* Balance Information */}
+          <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Remaining Balance:</span>
+              <span className="font-medium">{formatCurrency(remainingBalance)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Current Total Upcoming:</span>
+              <span className="font-medium">
+                {formatCurrency(
+                  installmentPlans?.filter(plan => plan.status === 'pending')
+                    .reduce((sum, plan) => sum + parseFloat(plan.amount.toString()), 0) || 0
+                )}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Total upcoming payments cannot be less than the remaining balance
+            </div>
+          </div>
+
           <Form {...installmentForm}>
             <form onSubmit={installmentForm.handleSubmit(onInstallmentSubmit)} className="space-y-4">
               <FormField
@@ -1182,6 +1242,28 @@ export default function ItemDetails() {
                           parseFloat(editingInstallment.amount.toString()) - parseFloat(field.value || "0")
                         )}
                       </p>
+                    )}
+                    {!isSplitMode && editingInstallment && (
+                      <div className="text-sm">
+                        <p className="text-muted-foreground">
+                          New total upcoming: {formatCurrency(
+                            (installmentPlans?.filter(plan => plan.status === 'pending')
+                              .reduce((sum, plan) => sum + parseFloat(plan.amount.toString()), 0) || 0) -
+                            parseFloat(editingInstallment.amount.toString()) +
+                            parseFloat(field.value || "0")
+                          )}
+                        </p>
+                        {editingInstallment && (
+                          (installmentPlans?.filter(plan => plan.status === 'pending')
+                            .reduce((sum, plan) => sum + parseFloat(plan.amount.toString()), 0) || 0) -
+                          parseFloat(editingInstallment.amount.toString()) +
+                          parseFloat(field.value || "0") < remainingBalance
+                        ) && (
+                          <p className="text-destructive text-xs">
+                            ⚠️ Cannot be less than remaining balance
+                          </p>
+                        )}
+                      </div>
                     )}
                     <FormMessage />
                   </FormItem>

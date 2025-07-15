@@ -10,6 +10,27 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### July 15, 2025 - Edit Installment Validation & Balance Protection
+- **New Feature**: Added comprehensive validation for installment editing
+  - Prevents total upcoming payments from falling below remaining balance
+  - Real-time validation feedback as users type amounts
+  - Visual indicators showing current balance and total upcoming payments
+  - Clear error messages when validation fails
+  - Allows increases but prevents decreases below balance owed
+  - Protects against scenarios where users reduce payments without ability to add them back
+  - Enhanced split payment validation to ensure proper amount distribution
+
+### July 15, 2025 - Edit Installment Functionality
+- **New Feature**: Complete installment editing system for upcoming payments
+  - Edit button for each pending installment payment
+  - Split button to divide payments into smaller installments
+  - Delete option for removing installments when needed
+  - Real-time amount calculation for split payments
+  - Form validation with proper error handling
+  - API endpoints for updating, deleting, and creating installment plans
+  - Automatic UI refresh after changes
+  - Enhanced payment workflow flexibility for client negotiations
+
 ### July 15, 2025 - Removed Redundant Payment Functionality
 - **Cleanup**: Removed "Add Payment" button from item details page
   - Eliminated redundant payment functionality that conflicted with structured installment system
