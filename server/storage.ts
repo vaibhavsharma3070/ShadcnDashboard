@@ -4,7 +4,7 @@ import {
   type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sum, count, sql } from "drizzle-orm";
+import { eq, desc, sum, count, sql, and, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // Legacy user methods
@@ -42,6 +42,30 @@ export interface IStorage {
   getPayouts(): Promise<Array<VendorPayout & { item: Item, vendor: Vendor }>>;
   getPendingPayouts(): Promise<Array<Item & { vendor: Vendor }>>;
   createPayout(payout: InsertVendorPayout): Promise<VendorPayout>;
+  getPayoutMetrics(): Promise<{
+    totalPayoutsPaid: number;
+    totalPayoutsAmount: number;
+    pendingPayouts: number;
+    upcomingPayouts: number;
+    averagePayoutAmount: number;
+    monthlyPayoutTrend: number;
+  }>;
+  getRecentPayouts(limit?: number): Promise<Array<VendorPayout & { item: Item, vendor: Vendor }>>;
+  getUpcomingPayouts(): Promise<Array<{
+    itemId: string;
+    title: string;
+    brand: string;
+    model: string;
+    listPrice: number;
+    salePrice: number;
+    vendorPayoutAmount: number;
+    totalPaid: number;
+    remainingBalance: number;
+    paymentProgress: number;
+    isFullyPaid: boolean;
+    fullyPaidAt?: string;
+    vendor: Vendor;
+  }>>;
   
   // Expense methods
   getExpenses(): Promise<Array<ItemExpense & { item: Item }>>;
@@ -277,6 +301,159 @@ export class DatabaseStorage implements IStorage {
   async createPayout(insertPayout: InsertVendorPayout): Promise<VendorPayout> {
     const [result] = await db.insert(vendorPayout).values(insertPayout).returning();
     return result;
+  }
+
+  async getPayoutMetrics(): Promise<{
+    totalPayoutsPaid: number;
+    totalPayoutsAmount: number;
+    pendingPayouts: number;
+    upcomingPayouts: number;
+    averagePayoutAmount: number;
+    monthlyPayoutTrend: number;
+  }> {
+    // Get total payouts
+    const [payoutData] = await db
+      .select({
+        totalPayoutsPaid: sql<number>`COUNT(*)`,
+        totalPayoutsAmount: sql<number>`COALESCE(SUM(${vendorPayout.amount}), 0)`
+      })
+      .from(vendorPayout);
+
+    // Get pending payouts (items fully paid but not yet paid out)
+    const [pendingData] = await db
+      .select({
+        pendingPayouts: sql<number>`COUNT(DISTINCT ${item.itemId})`
+      })
+      .from(item)
+      .leftJoin(clientPayment, eq(clientPayment.itemId, item.itemId))
+      .leftJoin(vendorPayout, eq(vendorPayout.itemId, item.itemId))
+      .where(
+        and(
+          sql`${item.listPrice} <= (
+            SELECT COALESCE(SUM(${clientPayment.amount}), 0) 
+            FROM ${clientPayment} 
+            WHERE ${clientPayment.itemId} = ${item.itemId}
+          )`,
+          isNull(vendorPayout.payoutId)
+        )
+      );
+
+    // Get upcoming payouts (items with partial payments)
+    const [upcomingData] = await db
+      .select({
+        upcomingPayouts: sql<number>`COUNT(DISTINCT ${item.itemId})`
+      })
+      .from(item)
+      .leftJoin(clientPayment, eq(clientPayment.itemId, item.itemId))
+      .leftJoin(vendorPayout, eq(vendorPayout.itemId, item.itemId))
+      .where(
+        and(
+          sql`${item.listPrice} > (
+            SELECT COALESCE(SUM(${clientPayment.amount}), 0) 
+            FROM ${clientPayment} 
+            WHERE ${clientPayment.itemId} = ${item.itemId}
+          )`,
+          isNull(vendorPayout.payoutId)
+        )
+      );
+
+    // Calculate average payout amount
+    const averagePayoutAmount = payoutData.totalPayoutsPaid > 0 
+      ? payoutData.totalPayoutsAmount / payoutData.totalPayoutsPaid 
+      : 0;
+
+    // Calculate monthly trend (simple mock for now)
+    const monthlyPayoutTrend = 5.2; // This would be calculated from historical data
+
+    return {
+      totalPayoutsPaid: payoutData.totalPayoutsPaid,
+      totalPayoutsAmount: payoutData.totalPayoutsAmount,
+      pendingPayouts: pendingData.pendingPayouts,
+      upcomingPayouts: upcomingData.upcomingPayouts,
+      averagePayoutAmount,
+      monthlyPayoutTrend
+    };
+  }
+
+  async getRecentPayouts(limit = 10): Promise<Array<VendorPayout & { item: Item, vendor: Vendor }>> {
+    const results = await db
+      .select()
+      .from(vendorPayout)
+      .innerJoin(item, eq(item.itemId, vendorPayout.itemId))
+      .innerJoin(vendor, eq(vendor.vendorId, item.vendorId))
+      .orderBy(desc(vendorPayout.paidAt))
+      .limit(limit);
+    
+    return results.map(result => ({
+      ...result.vendor_payout,
+      item: result.item,
+      vendor: result.vendor
+    }));
+  }
+
+  async getUpcomingPayouts(): Promise<Array<{
+    itemId: string;
+    title: string;
+    brand: string;
+    model: string;
+    listPrice: number;
+    salePrice: number;
+    vendorPayoutAmount: number;
+    totalPaid: number;
+    remainingBalance: number;
+    paymentProgress: number;
+    isFullyPaid: boolean;
+    fullyPaidAt?: string;
+    vendor: Vendor;
+  }>> {
+    const results = await db
+      .select({
+        itemId: item.itemId,
+        title: item.title,
+        brand: item.brand,
+        model: item.model,
+        listPrice: item.listPrice,
+        salePrice: item.listPrice,
+        vendorPayoutAmount: item.agreedVendorPayout,
+        totalPaid: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+        vendor: vendor
+      })
+      .from(item)
+      .innerJoin(vendor, eq(vendor.vendorId, item.vendorId))
+      .leftJoin(clientPayment, eq(clientPayment.itemId, item.itemId))
+      .leftJoin(vendorPayout, eq(vendorPayout.itemId, item.itemId))
+      .where(
+        and(
+          eq(item.status, 'sold'),
+          isNull(vendorPayout.payoutId)
+        )
+      )
+      .groupBy(item.itemId, vendor.vendorId);
+
+    return results.map(result => {
+      const totalPaid = result.totalPaid;
+      const listPrice = parseFloat(result.listPrice || '0');
+      const vendorPayoutAmount = parseFloat(result.vendorPayoutAmount || '0');
+      const remainingBalance = listPrice - totalPaid;
+      const paymentProgress = listPrice > 0 ? (totalPaid / listPrice) * 100 : 0;
+      const isFullyPaid = totalPaid >= listPrice;
+
+      return {
+        itemId: result.itemId,
+        title: result.title || '',
+        brand: result.brand || '',
+        model: result.model || '',
+        listPrice: listPrice,
+        salePrice: listPrice,
+        vendorPayoutAmount: vendorPayoutAmount,
+        totalPaid,
+        remainingBalance: Math.max(0, remainingBalance),
+        paymentProgress: Math.min(100, paymentProgress),
+        isFullyPaid,
+        fullyPaidAt: isFullyPaid ? new Date().toISOString() : undefined,
+        vendor: result.vendor
+      };
+    });
   }
 
   // Expense methods

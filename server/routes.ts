@@ -293,6 +293,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/payouts/metrics", async (req, res) => {
+    try {
+      const metrics = await storage.getPayoutMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching payout metrics:", error);
+      res.status(500).json({ error: "Failed to fetch payout metrics" });
+    }
+  });
+
+  app.get("/api/payouts/recent", async (req, res) => {
+    try {
+      const recentPayouts = await storage.getRecentPayouts();
+      res.json(recentPayouts);
+    } catch (error) {
+      console.error("Error fetching recent payouts:", error);
+      res.status(500).json({ error: "Failed to fetch recent payouts" });
+    }
+  });
+
+  app.get("/api/payouts/upcoming", async (req, res) => {
+    try {
+      const upcomingPayouts = await storage.getUpcomingPayouts();
+      res.json(upcomingPayouts);
+    } catch (error) {
+      console.error("Error fetching upcoming payouts:", error);
+      res.status(500).json({ error: "Failed to fetch upcoming payouts" });
+    }
+  });
+
   app.get("/api/payouts/pending", async (req, res) => {
     try {
       const pendingPayouts = await storage.getPendingPayouts();
