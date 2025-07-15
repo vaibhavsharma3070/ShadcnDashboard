@@ -221,7 +221,7 @@ export default function Inventory() {
           const paymentPayload = {
             itemId: selectedItem?.itemId,
             clientId: data.clientId,
-            amount: parseFloat(data.amount),
+            amount: data.amount, // Keep as string for Drizzle schema
             paymentMethod: data.paymentMethod,
             paidAt: new Date().toISOString()
           };
@@ -258,7 +258,7 @@ export default function Inventory() {
             const paymentPayload = {
               itemId: selectedItem?.itemId,
               clientId: data.clientId,
-              amount: parseFloat(data.amount),
+              amount: data.amount, // Keep as string for Drizzle schema
               paymentMethod: data.paymentMethod,
               paidAt: new Date().toISOString()
             };
@@ -273,7 +273,7 @@ export default function Inventory() {
             const installmentPayload = {
               itemId: selectedItem?.itemId,
               clientId: data.clientId,
-              amount: parseFloat(installment.amount),
+              amount: installment.amount, // Keep as string for Drizzle schema
               dueDate: installment.dueDate
             };
             console.log(`Installment ${index + 1} payload:`, installmentPayload);

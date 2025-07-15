@@ -1,0 +1,134 @@
+VM1707:1 Console was cleared
+undefined
+inventory.tsx:1079 Record Sale button clicked
+inventory.tsx:1080 Form valid: true
+inventory.tsx:1081 Form errors: {}
+inventory.tsx:1082 Form values: {clientId: 'fc2c7124-6d6d-487b-ac5f-a65fe1440a19', paymentType: 'full', amount: '1400.00', paymentMethod: 'cash', installments: Array(1)}
+inventory.tsx:1083 Selected item: {itemId: 'a436a6fd-048b-481b-810a-815f21c3c88e', vendorId: '4c07e452-62d1-49d0-9cf7-b8b43c3772a5', title: 'Prada Saffiano Tote', brand: 'Prada', model: '1BA786', …}
+inventory.tsx:1087 Manual validation attempt...
+inventory.tsx:1091 Validation result: {success: true, data: {…}}
+inventory.tsx:359 Sale form submitted!
+inventory.tsx:360 Sale form data: {clientId: 'fc2c7124-6d6d-487b-ac5f-a65fe1440a19', paymentType: 'full', amount: '1400.00', paymentMethod: 'cash', installments: Array(1)}
+inventory.tsx:361 Selected item: {itemId: 'a436a6fd-048b-481b-810a-815f21c3c88e', vendorId: '4c07e452-62d1-49d0-9cf7-b8b43c3772a5', title: 'Prada Saffiano Tote', brand: 'Prada', model: '1BA786', …}
+inventory.tsx:362 Installments: [{…}]
+inventory.tsx:363 Form errors: {}
+inventory.tsx:380 Final form data: {clientId: 'fc2c7124-6d6d-487b-ac5f-a65fe1440a19', paymentType: 'full', amount: '1400.00', paymentMethod: 'cash', installments: undefined}
+inventory.tsx:212 === MUTATION STARTED ===
+inventory.tsx:213 Mutation data: {clientId: 'fc2c7124-6d6d-487b-ac5f-a65fe1440a19', paymentType: 'full', amount: '1400.00', paymentMethod: 'cash', installments: undefined}
+inventory.tsx:214 Selected item: {itemId: 'a436a6fd-048b-481b-810a-815f21c3c88e', vendorId: '4c07e452-62d1-49d0-9cf7-b8b43c3772a5', title: 'Prada Saffiano Tote', brand: 'Prada', model: '1BA786', …}
+inventory.tsx:218 Processing full payment...
+inventory.tsx:228 Payment payload: {itemId: 'a436a6fd-048b-481b-810a-815f21c3c88e', clientId: 'fc2c7124-6d6d-487b-ac5f-a65fe1440a19', amount: 1400, paymentMethod: 'cash', paidAt: '2025-07-15T19:20:57.342Z'}
+queryClient.ts:15  POST https://ab56687b-20b2-4208-9d4d-21aa2a145c18-00-2hor0be3kb3u1.picard.replit.dev/api/payments 400 (Bad Request)
+apiRequest @ queryClient.ts:15
+mutationFn @ inventory.tsx:230
+fn @ @tanstack_react-query.js?v=7eabef17:1189
+run @ @tanstack_react-query.js?v=7eabef17:494
+start @ @tanstack_react-query.js?v=7eabef17:536
+execute @ @tanstack_react-query.js?v=7eabef17:1225
+await in execute
+mutate @ @tanstack_react-query.js?v=7eabef17:2630
+(anonymous) @ @tanstack_react-query.js?v=7eabef17:3295
+onSaleSubmit @ inventory.tsx:381
+(anonymous) @ chunk-4BFJKWC4.js?v=7eabef17:1465
+await in (anonymous)
+callCallback2 @ chunk-RPCDYKBN.js?v=7eabef17:3674
+invokeGuardedCallbackDev @ chunk-RPCDYKBN.js?v=7eabef17:3699
+invokeGuardedCallback @ chunk-RPCDYKBN.js?v=7eabef17:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-RPCDYKBN.js?v=7eabef17:3736
+executeDispatch @ chunk-RPCDYKBN.js?v=7eabef17:7014
+processDispatchQueueItemsInOrder @ chunk-RPCDYKBN.js?v=7eabef17:7034
+processDispatchQueue @ chunk-RPCDYKBN.js?v=7eabef17:7043
+dispatchEventsForPlugins @ chunk-RPCDYKBN.js?v=7eabef17:7051
+(anonymous) @ chunk-RPCDYKBN.js?v=7eabef17:7174
+batchedUpdates$1 @ chunk-RPCDYKBN.js?v=7eabef17:18913
+batchedUpdates @ chunk-RPCDYKBN.js?v=7eabef17:3579
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=7eabef17:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=7eabef17:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=7eabef17:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=7eabef17:5449
+inventory.tsx:290 === MUTATION ERROR ===
+mutationFn @ inventory.tsx:290
+await in mutationFn
+fn @ @tanstack_react-query.js?v=7eabef17:1189
+run @ @tanstack_react-query.js?v=7eabef17:494
+start @ @tanstack_react-query.js?v=7eabef17:536
+execute @ @tanstack_react-query.js?v=7eabef17:1225
+await in execute
+mutate @ @tanstack_react-query.js?v=7eabef17:2630
+(anonymous) @ @tanstack_react-query.js?v=7eabef17:3295
+onSaleSubmit @ inventory.tsx:381
+(anonymous) @ chunk-4BFJKWC4.js?v=7eabef17:1465
+await in (anonymous)
+callCallback2 @ chunk-RPCDYKBN.js?v=7eabef17:3674
+invokeGuardedCallbackDev @ chunk-RPCDYKBN.js?v=7eabef17:3699
+invokeGuardedCallback @ chunk-RPCDYKBN.js?v=7eabef17:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-RPCDYKBN.js?v=7eabef17:3736
+executeDispatch @ chunk-RPCDYKBN.js?v=7eabef17:7014
+processDispatchQueueItemsInOrder @ chunk-RPCDYKBN.js?v=7eabef17:7034
+processDispatchQueue @ chunk-RPCDYKBN.js?v=7eabef17:7043
+dispatchEventsForPlugins @ chunk-RPCDYKBN.js?v=7eabef17:7051
+(anonymous) @ chunk-RPCDYKBN.js?v=7eabef17:7174
+batchedUpdates$1 @ chunk-RPCDYKBN.js?v=7eabef17:18913
+batchedUpdates @ chunk-RPCDYKBN.js?v=7eabef17:3579
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=7eabef17:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=7eabef17:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=7eabef17:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=7eabef17:5449
+inventory.tsx:291 Error details: Error: 400: {"error":"Invalid payment data"}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (inventory.tsx:230:33)
+mutationFn @ inventory.tsx:291
+await in mutationFn
+fn @ @tanstack_react-query.js?v=7eabef17:1189
+run @ @tanstack_react-query.js?v=7eabef17:494
+start @ @tanstack_react-query.js?v=7eabef17:536
+execute @ @tanstack_react-query.js?v=7eabef17:1225
+await in execute
+mutate @ @tanstack_react-query.js?v=7eabef17:2630
+(anonymous) @ @tanstack_react-query.js?v=7eabef17:3295
+onSaleSubmit @ inventory.tsx:381
+(anonymous) @ chunk-4BFJKWC4.js?v=7eabef17:1465
+await in (anonymous)
+callCallback2 @ chunk-RPCDYKBN.js?v=7eabef17:3674
+invokeGuardedCallbackDev @ chunk-RPCDYKBN.js?v=7eabef17:3699
+invokeGuardedCallback @ chunk-RPCDYKBN.js?v=7eabef17:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-RPCDYKBN.js?v=7eabef17:3736
+executeDispatch @ chunk-RPCDYKBN.js?v=7eabef17:7014
+processDispatchQueueItemsInOrder @ chunk-RPCDYKBN.js?v=7eabef17:7034
+processDispatchQueue @ chunk-RPCDYKBN.js?v=7eabef17:7043
+dispatchEventsForPlugins @ chunk-RPCDYKBN.js?v=7eabef17:7051
+(anonymous) @ chunk-RPCDYKBN.js?v=7eabef17:7174
+batchedUpdates$1 @ chunk-RPCDYKBN.js?v=7eabef17:18913
+batchedUpdates @ chunk-RPCDYKBN.js?v=7eabef17:3579
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=7eabef17:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=7eabef17:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=7eabef17:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=7eabef17:5449
+inventory.tsx:311 Sale mutation error: Error: 400: {"error":"Invalid payment data"}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (inventory.tsx:230:33)
+onError @ inventory.tsx:311
+execute @ @tanstack_react-query.js?v=7eabef17:1254
+await in execute
+mutate @ @tanstack_react-query.js?v=7eabef17:2630
+(anonymous) @ @tanstack_react-query.js?v=7eabef17:3295
+onSaleSubmit @ inventory.tsx:381
+(anonymous) @ chunk-4BFJKWC4.js?v=7eabef17:1465
+await in (anonymous)
+callCallback2 @ chunk-RPCDYKBN.js?v=7eabef17:3674
+invokeGuardedCallbackDev @ chunk-RPCDYKBN.js?v=7eabef17:3699
+invokeGuardedCallback @ chunk-RPCDYKBN.js?v=7eabef17:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-RPCDYKBN.js?v=7eabef17:3736
+executeDispatch @ chunk-RPCDYKBN.js?v=7eabef17:7014
+processDispatchQueueItemsInOrder @ chunk-RPCDYKBN.js?v=7eabef17:7034
+processDispatchQueue @ chunk-RPCDYKBN.js?v=7eabef17:7043
+dispatchEventsForPlugins @ chunk-RPCDYKBN.js?v=7eabef17:7051
+(anonymous) @ chunk-RPCDYKBN.js?v=7eabef17:7174
+batchedUpdates$1 @ chunk-RPCDYKBN.js?v=7eabef17:18913
+batchedUpdates @ chunk-RPCDYKBN.js?v=7eabef17:3579
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=7eabef17:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=7eabef17:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=7eabef17:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=7eabef17:5449
