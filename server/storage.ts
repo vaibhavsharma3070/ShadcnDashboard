@@ -65,6 +65,20 @@ export interface IStorage {
   
   getRecentItems(limit?: number): Promise<Array<Item & { vendor: Vendor }>>;
   getTopPerformingItems(limit?: number): Promise<Array<Item & { vendor: Vendor, profit: number }>>;
+  
+  // Payment metrics methods
+  getPaymentMetrics(): Promise<{
+    totalPaymentsReceived: number;
+    totalPaymentsAmount: number;
+    overduePayments: number;
+    upcomingPayments: number;
+    averagePaymentAmount: number;
+    monthlyPaymentTrend: number;
+  }>;
+  
+  getUpcomingPayments(limit?: number): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor }, client: Client }>>;
+  getRecentPayments(limit?: number): Promise<Array<ClientPayment & { item: Item & { vendor: Vendor }, client: Client }>>;
+  getOverduePayments(): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor }, client: Client }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -405,6 +419,101 @@ export class DatabaseStorage implements IStorage {
       .where(eq(installmentPlan.installmentId, id))
       .returning();
     return plan;
+  }
+
+  async getPaymentMetrics(): Promise<{
+    totalPaymentsReceived: number;
+    totalPaymentsAmount: number;
+    overduePayments: number;
+    upcomingPayments: number;
+    averagePaymentAmount: number;
+    monthlyPaymentTrend: number;
+  }> {
+    const today = new Date().toISOString().split('T')[0];
+    const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    const [paymentsData, installmentsData] = await Promise.all([
+      db
+        .select({
+          totalCount: count(),
+          totalAmount: sum(clientPayment.amount),
+          avgAmount: sql<number>`AVG(${clientPayment.amount})`,
+          recentCount: sql<number>`COUNT(CASE WHEN ${clientPayment.paidAt} >= ${lastMonth} THEN 1 END)`
+        })
+        .from(clientPayment),
+      db
+        .select({
+          overdueCount: sql<number>`COUNT(CASE WHEN ${installmentPlan.dueDate} < ${today} AND ${installmentPlan.status} = 'pending' THEN 1 END)`,
+          upcomingCount: sql<number>`COUNT(CASE WHEN ${installmentPlan.dueDate} >= ${today} AND ${installmentPlan.status} = 'pending' THEN 1 END)`
+        })
+        .from(installmentPlan)
+    ]);
+
+    const payments = paymentsData[0];
+    const installments = installmentsData[0];
+    
+    const monthlyTrend = payments.recentCount > 0 ? 
+      ((payments.recentCount / Math.max(payments.totalCount - payments.recentCount, 1)) * 100) : 0;
+
+    return {
+      totalPaymentsReceived: payments.totalCount || 0,
+      totalPaymentsAmount: Number(payments.totalAmount) || 0,
+      overduePayments: installments.overdueCount || 0,
+      upcomingPayments: installments.upcomingCount || 0,
+      averagePaymentAmount: Number(payments.avgAmount) || 0,
+      monthlyPaymentTrend: monthlyTrend
+    };
+  }
+
+  async getUpcomingPayments(limit = 10): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor }, client: Client }>> {
+    const today = new Date().toISOString().split('T')[0];
+    return await db
+      .select()
+      .from(installmentPlan)
+      .innerJoin(item, eq(installmentPlan.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(installmentPlan.clientId, client.clientId))
+      .where(eq(installmentPlan.status, 'pending'))
+      .orderBy(installmentPlan.dueDate)
+      .limit(limit)
+      .then(rows => rows.map(row => ({
+        ...row.installment_plan,
+        item: { ...row.item, vendor: row.vendor },
+        client: row.client
+      })));
+  }
+
+  async getRecentPayments(limit = 10): Promise<Array<ClientPayment & { item: Item & { vendor: Vendor }, client: Client }>> {
+    return await db
+      .select()
+      .from(clientPayment)
+      .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+      .orderBy(desc(clientPayment.paidAt))
+      .limit(limit)
+      .then(rows => rows.map(row => ({
+        ...row.client_payment,
+        item: { ...row.item, vendor: row.vendor },
+        client: row.client
+      })));
+  }
+
+  async getOverduePayments(): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor }, client: Client }>> {
+    const today = new Date().toISOString().split('T')[0];
+    return await db
+      .select()
+      .from(installmentPlan)
+      .innerJoin(item, eq(installmentPlan.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(installmentPlan.clientId, client.clientId))
+      .where(sql`${installmentPlan.dueDate} < ${today} AND ${installmentPlan.status} = 'pending'`)
+      .orderBy(installmentPlan.dueDate)
+      .then(rows => rows.map(row => ({
+        ...row.installment_plan,
+        item: { ...row.item, vendor: row.vendor },
+        client: row.client
+      })));
   }
 }
 

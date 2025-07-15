@@ -217,6 +217,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Payment metrics routes
+  app.get("/api/payments/metrics", async (req, res) => {
+    try {
+      const metrics = await storage.getPaymentMetrics();
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch payment metrics" });
+    }
+  });
+
+  app.get("/api/payments/recent", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const payments = await storage.getRecentPayments(limit);
+      res.json(payments);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch recent payments" });
+    }
+  });
+
+  app.get("/api/payments/upcoming", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const payments = await storage.getUpcomingPayments(limit);
+      res.json(payments);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch upcoming payments" });
+    }
+  });
+
+  app.get("/api/payments/overdue", async (req, res) => {
+    try {
+      const payments = await storage.getOverduePayments();
+      res.json(payments);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch overdue payments" });
+    }
+  });
+
   // Payout routes
   app.get("/api/payouts", async (req, res) => {
     try {
