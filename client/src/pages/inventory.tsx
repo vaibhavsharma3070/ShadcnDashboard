@@ -209,87 +209,60 @@ export default function Inventory() {
 
   const createSaleMutation = useMutation({
     mutationFn: async (data: SaleFormData) => {
-      console.log('=== MUTATION STARTED ===');
-      console.log('Mutation data:', data);
-      console.log('Selected item:', selectedItem);
-      
-      try {
-        if (data.paymentType === "full") {
-          console.log('Processing full payment...');
-          
-          // Create a single payment for full payment
+      if (data.paymentType === "full") {
+        // Create a single payment for full payment
+        const paymentPayload = {
+          itemId: selectedItem?.itemId,
+          clientId: data.clientId,
+          amount: data.amount,
+          paymentMethod: data.paymentMethod,
+          paidAt: new Date().toISOString()
+        };
+        
+        const paymentResult = await apiRequest('POST', '/api/payments', paymentPayload);
+        
+        // Update item status to "sold" for full payment
+        const statusPayload = { status: "sold" };
+        await apiRequest('PUT', `/api/items/${selectedItem?.itemId}`, statusPayload);
+        
+        return paymentResult;
+      } else {
+        // Create installment plan
+        if (!data.installments || data.installments.length === 0) {
+          throw new Error("Installments are required for installment payment");
+        }
+        
+        // Update item status to "reserved" for installment plan
+        const statusPayload = { status: "reserved" };
+        await apiRequest('PUT', `/api/items/${selectedItem?.itemId}`, statusPayload);
+        
+        // Create the first payment (if amount > 0)
+        if (data.amount && parseFloat(data.amount) > 0) {
           const paymentPayload = {
             itemId: selectedItem?.itemId,
             clientId: data.clientId,
-            amount: data.amount, // Keep as string for Drizzle schema
+            amount: data.amount,
             paymentMethod: data.paymentMethod,
             paidAt: new Date().toISOString()
           };
-          console.log('Payment payload:', paymentPayload);
           
-          const paymentResult = await apiRequest('POST', '/api/payments', paymentPayload);
-          console.log('Payment result:', paymentResult);
-          
-          // Update item status to "sold" for full payment
-          const statusPayload = { status: "sold" };
-          console.log('Status update payload:', statusPayload);
-          
-          const statusResult = await apiRequest('PUT', `/api/items/${selectedItem?.itemId}`, statusPayload);
-          console.log('Status update result:', statusResult);
-          
-          return paymentResult;
-        } else {
-          console.log('Processing installment payment...');
-          
-          // Create installment plan
-          if (!data.installments || data.installments.length === 0) {
-            throw new Error("Installments are required for installment payment");
-          }
-          
-          // Update item status to "reserved" for installment plan
-          const statusPayload = { status: "reserved" };
-          console.log('Status update payload:', statusPayload);
-          
-          const statusResult = await apiRequest('PUT', `/api/items/${selectedItem?.itemId}`, statusPayload);
-          console.log('Status update result:', statusResult);
-          
-          // Create the first payment (if amount > 0)
-          if (parseFloat(data.amount) > 0) {
-            const paymentPayload = {
-              itemId: selectedItem?.itemId,
-              clientId: data.clientId,
-              amount: data.amount, // Keep as string for Drizzle schema
-              paymentMethod: data.paymentMethod,
-              paidAt: new Date().toISOString()
-            };
-            console.log('Initial payment payload:', paymentPayload);
-            
-            const paymentResult = await apiRequest('POST', '/api/payments', paymentPayload);
-            console.log('Initial payment result:', paymentResult);
-          }
-          
-          // Create installment plans for future payments
-          const installmentPromises = data.installments.map((installment, index) => {
-            const installmentPayload = {
-              itemId: selectedItem?.itemId,
-              clientId: data.clientId,
-              amount: installment.amount, // Keep as string for Drizzle schema
-              dueDate: installment.dueDate
-            };
-            console.log(`Installment ${index + 1} payload:`, installmentPayload);
-            
-            return apiRequest('POST', '/api/installment-plans', installmentPayload);
-          });
-          
-          const installmentResults = await Promise.all(installmentPromises);
-          console.log('Installment results:', installmentResults);
-          
-          return installmentResults;
+          await apiRequest('POST', '/api/payments', paymentPayload);
         }
-      } catch (error) {
-        console.error('=== MUTATION ERROR ===');
-        console.error('Error details:', error);
-        throw error;
+        
+        // Create installment plans for future payments
+        const installmentPromises = data.installments.map((installment) => {
+          const installmentPayload = {
+            itemId: selectedItem?.itemId,
+            clientId: data.clientId,
+            amount: installment.amount,
+            dueDate: installment.dueDate
+          };
+          
+          return apiRequest('POST', '/api/installment-plans', installmentPayload);
+        });
+        
+        const installmentResults = await Promise.all(installmentPromises);
+        return installmentResults;
       }
     },
     onSuccess: () => {
@@ -308,7 +281,6 @@ export default function Inventory() {
       });
     },
     onError: (error) => {
-      console.error('Sale mutation error:', error);
       toast({
         title: "Error",
         description: error?.message || "Failed to record sale",
@@ -345,25 +317,16 @@ export default function Inventory() {
   });
 
   const onSubmit = (data: ItemFormData) => {
-    console.log('Form data:', data);
     const payload = {
       ...data,
       serialNo: data.serialNo || undefined,
       condition: data.condition || undefined
     };
-    console.log('Payload being sent:', payload);
     createItemMutation.mutate(payload);
   };
 
   const onSaleSubmit = (data: SaleFormData) => {
-    console.log('Sale form submitted!');
-    console.log('Sale form data:', data);
-    console.log('Selected item:', selectedItem);
-    console.log('Installments:', installments);
-    console.log('Form errors:', saleForm.formState.errors);
-    
     if (!selectedItem?.itemId) {
-      console.error('No item selected');
       toast({
         title: "Error",
         description: "No item selected for sale",
@@ -377,7 +340,6 @@ export default function Inventory() {
       installments: data.paymentType === "installment" ? installments : undefined
     };
     
-    console.log('Final form data:', formData);
     createSaleMutation.mutate(formData);
   };
 
@@ -935,7 +897,6 @@ export default function Inventory() {
           )}
           <Form {...saleForm}>
             <form onSubmit={saleForm.handleSubmit(onSaleSubmit, (errors) => {
-              console.log('Form submission failed due to validation errors:', errors);
               toast({
                 title: "Form Validation Error",
                 description: "Please check all required fields",

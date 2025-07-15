@@ -206,18 +206,40 @@ export const insertClientSchema = createInsertSchema(client).omit({
 export const insertItemSchema = createInsertSchema(item).omit({
   itemId: true,
   createdAt: true,
+}).extend({
+  agreedVendorPayout: z.preprocess((val) => 
+    val === null || val === undefined || val === '' ? null : (typeof val === 'string' ? parseFloat(val) : val),
+    z.number().nullable()
+  ).optional(),
+  listPrice: z.preprocess((val) => 
+    val === null || val === undefined || val === '' ? null : (typeof val === 'string' ? parseFloat(val) : val),
+    z.number().nullable()
+  ).optional(),
+  acquisitionDate: z.preprocess((val) => 
+    val === null || val === undefined || val === '' ? null : (typeof val === 'string' ? new Date(val) : val),
+    z.date().nullable()
+  ).optional(),
 });
 
 export const insertClientPaymentSchema = createInsertSchema(clientPayment).omit({
   paymentId: true,
+}).extend({
+  amount: z.preprocess((val) => typeof val === 'string' ? parseFloat(val) : val, z.number()),
+  paidAt: z.preprocess((val) => typeof val === 'string' ? new Date(val) : val, z.date()),
 });
 
 export const insertVendorPayoutSchema = createInsertSchema(vendorPayout).omit({
   payoutId: true,
+}).extend({
+  amount: z.preprocess((val) => typeof val === 'string' ? parseFloat(val) : val, z.number()),
+  paidAt: z.preprocess((val) => typeof val === 'string' ? new Date(val) : val, z.date()),
 });
 
 export const insertItemExpenseSchema = createInsertSchema(itemExpense).omit({
   expenseId: true,
+}).extend({
+  amount: z.preprocess((val) => typeof val === 'string' ? parseFloat(val) : val, z.number()),
+  incurredAt: z.preprocess((val) => typeof val === 'string' ? new Date(val) : val, z.date()),
 });
 
 export const insertInstallmentPlanSchema = createInsertSchema(installmentPlan).omit({
@@ -225,6 +247,9 @@ export const insertInstallmentPlanSchema = createInsertSchema(installmentPlan).o
   paidAmount: true,
   status: true,
   createdAt: true,
+}).extend({
+  amount: z.preprocess((val) => typeof val === 'string' ? parseFloat(val) : val, z.number()),
+  dueDate: z.preprocess((val) => typeof val === 'string' ? new Date(val) : val, z.date()),
 });
 
 // Types

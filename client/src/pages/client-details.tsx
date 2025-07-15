@@ -174,7 +174,7 @@ export default function ClientDetails() {
       return await apiRequest('POST', '/api/payments', {
         ...data,
         clientId,
-        amount: parseFloat(data.amount)
+        paidAt: new Date().toISOString()
       });
     },
     onSuccess: () => {

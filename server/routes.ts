@@ -161,11 +161,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/items", async (req, res) => {
     try {
-      console.log('Creating item with data:', req.body);
       const validatedData = insertItemSchema.parse(req.body);
-      console.log('Validated data:', validatedData);
       const item = await storage.createItem(validatedData);
-      console.log('Created item:', item);
       res.status(201).json(item);
     } catch (error) {
       console.error('Error creating item:', error);
@@ -241,7 +238,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const payment = await storage.createPayment(validatedData);
       res.status(201).json(payment);
     } catch (error) {
-      res.status(400).json({ error: "Invalid payment data" });
+      console.error("Payment validation error:", error);
+      if (error.errors) {
+        res.status(400).json({ error: "Invalid payment data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Invalid payment data", details: error.message });
+      }
     }
   });
 
@@ -433,7 +435,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const plan = await storage.createInstallmentPlan(validatedData);
       res.status(201).json(plan);
     } catch (error) {
-      res.status(400).json({ error: "Invalid installment plan data" });
+      console.error("Installment plan validation error:", error);
+      if (error.errors) {
+        res.status(400).json({ error: "Invalid installment plan data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Invalid installment plan data", details: error.message });
+      }
     }
   });
 

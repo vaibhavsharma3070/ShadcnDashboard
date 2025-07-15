@@ -8,6 +8,19 @@ This is a luxury consignment management system built with React, TypeScript, and
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### July 15, 2025 - Data Type Consistency Fixes
+- **Issue**: Payment forms were failing due to data type mismatches between frontend forms, API validation, and database schemas
+- **Root Cause**: Forms sent string values for numeric/date fields, but Drizzle Zod schemas expected exact types
+- **Solution**: Enhanced insert schemas with preprocessing for automatic type conversion:
+  - `insertClientPaymentSchema`: Added preprocessing for `amount` (string → number) and `paidAt` (string → Date)
+  - `insertVendorPayoutSchema`: Added preprocessing for `amount` and `paidAt`
+  - `insertItemExpenseSchema`: Added preprocessing for `amount` and `incurredAt`
+  - `insertInstallmentPlanSchema`: Added preprocessing for `amount` and `dueDate`
+  - `insertItemSchema`: Added preprocessing for `agreedVendorPayout`, `listPrice`, and `acquisitionDate`
+- **Result**: All forms now work consistently with proper data type handling and validation
+
 ## System Architecture
 
 ### Frontend Architecture
