@@ -256,6 +256,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/financial-health", async (req, res) => {
+    try {
+      const healthScore = await storage.getFinancialHealthScore();
+      res.json(healthScore);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch financial health score" });
+    }
+  });
+
+  app.patch("/api/installments/:id/mark-paid", async (req, res) => {
+    try {
+      const installment = await storage.markInstallmentPaid(req.params.id);
+      res.json(installment);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to mark installment as paid" });
+    }
+  });
+
+  app.post("/api/installments/:id/send-reminder", async (req, res) => {
+    try {
+      const success = await storage.sendPaymentReminder(req.params.id);
+      res.json({ success });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send payment reminder" });
+    }
+  });
+
   // Payout routes
   app.get("/api/payouts", async (req, res) => {
     try {

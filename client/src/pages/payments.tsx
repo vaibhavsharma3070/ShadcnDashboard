@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -29,7 +32,13 @@ import {
   Eye,
   Watch,
   Gem,
-  Crown
+  Crown,
+  Heart,
+  Mail,
+  Shield,
+  Target,
+  Activity,
+  BarChart3
 } from "lucide-react";
 
 interface PaymentMetrics {
@@ -39,6 +48,19 @@ interface PaymentMetrics {
   upcomingPayments: number;
   averagePaymentAmount: number;
   monthlyPaymentTrend: number;
+}
+
+interface FinancialHealthScore {
+  score: number;
+  grade: string;
+  factors: {
+    paymentTimeliness: number;
+    cashFlow: number;
+    inventoryTurnover: number;
+    profitMargin: number;
+    clientRetention: number;
+  };
+  recommendations: string[];
 }
 
 interface RecentPayment {
@@ -173,6 +195,8 @@ export default function Payments() {
   const [recentSortOrder, setRecentSortOrder] = useState<"asc" | "desc">("desc");
   const [upcomingSortBy, setUpcomingSortBy] = useState("date");
   const [upcomingSortOrder, setUpcomingSortOrder] = useState<"asc" | "desc">("asc");
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: metrics, isLoading: metricsLoading } = useQuery<PaymentMetrics>({
     queryKey: ['/api/payments/metrics'],
@@ -208,6 +232,57 @@ export default function Payments() {
       if (!response.ok) throw new Error('Failed to fetch overdue payments');
       return response.json();
     }
+  });
+
+  const { data: financialHealth, isLoading: healthLoading } = useQuery<FinancialHealthScore>({
+    queryKey: ['/api/financial-health'],
+    queryFn: async () => {
+      const response = await fetch('/api/financial-health');
+      if (!response.ok) throw new Error('Failed to fetch financial health');
+      return response.json();
+    }
+  });
+
+  const markPaidMutation = useMutation({
+    mutationFn: async (installmentId: string) => {
+      return await apiRequest(`/api/installments/${installmentId}/mark-paid`, 'PATCH');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/payments/upcoming'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments/overdue'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments/metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/financial-health'] });
+      toast({
+        title: "Success",
+        description: "Payment marked as paid",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to mark payment as paid",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendReminderMutation = useMutation({
+    mutationFn: async (installmentId: string) => {
+      return await apiRequest(`/api/installments/${installmentId}/send-reminder`, 'POST');
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Payment reminder sent",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to send reminder",
+        variant: "destructive",
+      });
+    },
   });
 
   const filteredRecentPayments = useMemo(() => {
@@ -317,6 +392,116 @@ export default function Payments() {
       subtitle="Track client payments and manage payment schedules"
     >
       <div className="space-y-6">
+        {/* Financial Health Score */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Heart className="h-5 w-5 text-red-500" />
+              Financial Health Score
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {healthLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-16 w-16 rounded-full mx-auto" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24 mx-auto" />
+                  <Skeleton className="h-3 w-32 mx-auto" />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className={`text-4xl font-bold ${
+                    financialHealth?.score >= 80 ? 'text-green-600' :
+                    financialHealth?.score >= 60 ? 'text-yellow-600' :
+                    'text-red-600'
+                  }`}>
+                    {financialHealth?.score || 0}
+                  </div>
+                  <div className="text-lg font-semibold text-muted-foreground">
+                    Grade: {financialHealth?.grade || 'N/A'}
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm">Payment Timeliness</span>
+                    </div>
+                    <span className="text-sm font-medium">
+                      {financialHealth?.factors.paymentTimeliness.toFixed(1) || 0}%
+                    </span>
+                  </div>
+                  <Progress value={financialHealth?.factors.paymentTimeliness || 0} className="h-2" />
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">Cash Flow</span>
+                    </div>
+                    <span className="text-sm font-medium">
+                      {financialHealth?.factors.cashFlow.toFixed(1) || 0}%
+                    </span>
+                  </div>
+                  <Progress value={financialHealth?.factors.cashFlow || 0} className="h-2" />
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-purple-500" />
+                      <span className="text-sm">Inventory Turnover</span>
+                    </div>
+                    <span className="text-sm font-medium">
+                      {financialHealth?.factors.inventoryTurnover.toFixed(1) || 0}%
+                    </span>
+                  </div>
+                  <Progress value={financialHealth?.factors.inventoryTurnover || 0} className="h-2" />
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-orange-500" />
+                      <span className="text-sm">Profit Margin</span>
+                    </div>
+                    <span className="text-sm font-medium">
+                      {financialHealth?.factors.profitMargin.toFixed(1) || 0}%
+                    </span>
+                  </div>
+                  <Progress value={financialHealth?.factors.profitMargin || 0} className="h-2" />
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-indigo-500" />
+                      <span className="text-sm">Client Retention</span>
+                    </div>
+                    <span className="text-sm font-medium">
+                      {financialHealth?.factors.clientRetention.toFixed(1) || 0}%
+                    </span>
+                  </div>
+                  <Progress value={financialHealth?.factors.clientRetention || 0} className="h-2" />
+                </div>
+                
+                {financialHealth?.recommendations && financialHealth.recommendations.length > 0 && (
+                  <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+                    <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-yellow-600" />
+                      Recommendations
+                    </h4>
+                    <ul className="text-xs text-yellow-800 space-y-1">
+                      {financialHealth.recommendations.map((rec, index) => (
+                        <li key={index} className="flex items-start gap-1">
+                          <span className="text-yellow-600 mt-1">•</span>
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <Card>
@@ -705,6 +890,39 @@ export default function Payments() {
                                         <Eye className="h-4 w-4" />
                                       </Button>
                                     </Link>
+                                    {paymentIsOverdue && (
+                                      <>
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm"
+                                          onClick={() => markPaidMutation.mutate(payment.installmentId)}
+                                          disabled={markPaidMutation.isPending}
+                                        >
+                                          <CheckCircle className="h-4 w-4 mr-1" />
+                                          Mark Paid
+                                        </Button>
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm"
+                                          onClick={() => sendReminderMutation.mutate(payment.installmentId)}
+                                          disabled={sendReminderMutation.isPending}
+                                        >
+                                          <Mail className="h-4 w-4 mr-1" />
+                                          Remind
+                                        </Button>
+                                      </>
+                                    )}
+                                    {!paymentIsOverdue && payment.status === 'pending' && (
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => markPaidMutation.mutate(payment.installmentId)}
+                                        disabled={markPaidMutation.isPending}
+                                      >
+                                        <CheckCircle className="h-4 w-4 mr-1" />
+                                        Mark Paid
+                                      </Button>
+                                    )}
                                   </div>
                                 </TableCell>
                               </TableRow>

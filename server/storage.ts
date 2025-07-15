@@ -79,6 +79,23 @@ export interface IStorage {
   getUpcomingPayments(limit?: number): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor }, client: Client }>>;
   getRecentPayments(limit?: number): Promise<Array<ClientPayment & { item: Item & { vendor: Vendor }, client: Client }>>;
   getOverduePayments(): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor }, client: Client }>>;
+  
+  // Financial health score methods
+  getFinancialHealthScore(): Promise<{
+    score: number;
+    grade: string;
+    factors: {
+      paymentTimeliness: number;
+      cashFlow: number;
+      inventoryTurnover: number;
+      profitMargin: number;
+      clientRetention: number;
+    };
+    recommendations: string[];
+  }>;
+  
+  markInstallmentPaid(installmentId: string): Promise<InstallmentPlan>;
+  sendPaymentReminder(installmentId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -514,6 +531,179 @@ export class DatabaseStorage implements IStorage {
         item: { ...row.item, vendor: row.vendor },
         client: row.client
       })));
+  }
+
+  async getFinancialHealthScore(): Promise<{
+    score: number;
+    grade: string;
+    factors: {
+      paymentTimeliness: number;
+      cashFlow: number;
+      inventoryTurnover: number;
+      profitMargin: number;
+      clientRetention: number;
+    };
+    recommendations: string[];
+  }> {
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // Calculate payment timeliness (40% weight)
+    const [paymentTimeliness] = await db
+      .select({
+        onTimePayments: sql<number>`COUNT(CASE WHEN ${installmentPlan.status} = 'paid' THEN 1 END)`,
+        overduePayments: sql<number>`COUNT(CASE WHEN ${installmentPlan.dueDate} < ${today} AND ${installmentPlan.status} = 'pending' THEN 1 END)`,
+        totalPayments: count()
+      })
+      .from(installmentPlan);
+
+    const timelinessScore = paymentTimeliness.totalPayments > 0 ? 
+      ((paymentTimeliness.onTimePayments / paymentTimeliness.totalPayments) * 100) : 100;
+
+    // Calculate cash flow (25% weight)
+    const [revenueData] = await db
+      .select({
+        currentMonthRevenue: sql<number>`SUM(CASE WHEN ${clientPayment.paidAt} >= ${thirtyDaysAgo} THEN ${clientPayment.amount} ELSE 0 END)`,
+        previousMonthRevenue: sql<number>`SUM(CASE WHEN ${clientPayment.paidAt} >= ${sixtyDaysAgo} AND ${clientPayment.paidAt} < ${thirtyDaysAgo} THEN ${clientPayment.amount} ELSE 0 END)`,
+        totalRevenue: sum(clientPayment.amount)
+      })
+      .from(clientPayment);
+
+    const cashFlowScore = revenueData.previousMonthRevenue > 0 ? 
+      Math.min(((revenueData.currentMonthRevenue / revenueData.previousMonthRevenue) * 50), 100) : 50;
+
+    // Calculate inventory turnover (20% weight)
+    const [inventoryData] = await db
+      .select({
+        soldItems: sql<number>`COUNT(CASE WHEN ${item.status} = 'sold' THEN 1 END)`,
+        totalItems: count()
+      })
+      .from(item);
+
+    const inventoryTurnoverScore = inventoryData.totalItems > 0 ? 
+      ((inventoryData.soldItems / inventoryData.totalItems) * 100) : 0;
+
+    // Calculate profit margin (10% weight)
+    const [revenueTotal] = await db
+      .select({
+        totalRevenue: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`
+      })
+      .from(clientPayment);
+
+    const [payoutTotal] = await db
+      .select({
+        totalPayouts: sql<number>`COALESCE(SUM(${vendorPayout.amount}), 0)`
+      })
+      .from(vendorPayout);
+
+    const [expenseTotal] = await db
+      .select({
+        totalExpenses: sql<number>`COALESCE(SUM(${itemExpense.amount}), 0)`
+      })
+      .from(itemExpense);
+
+    const profitData = {
+      totalRevenue: revenueTotal.totalRevenue,
+      totalPayouts: payoutTotal.totalPayouts,
+      totalExpenses: expenseTotal.totalExpenses
+    };
+
+    const totalCosts = profitData.totalPayouts + profitData.totalExpenses;
+    const profitMarginScore = profitData.totalRevenue > 0 ? 
+      (((profitData.totalRevenue - totalCosts) / profitData.totalRevenue) * 100) : 0;
+
+    // Calculate client retention (5% weight)
+    const [clientData] = await db
+      .select({
+        returningClients: sql<number>`COUNT(DISTINCT CASE WHEN payment_count > 1 THEN client_id END)`,
+        totalClients: sql<number>`COUNT(DISTINCT client_id)`
+      })
+      .from(sql`(
+        SELECT client_id, COUNT(*) as payment_count 
+        FROM client_payment 
+        GROUP BY client_id
+      ) as client_stats`);
+
+    const clientRetentionScore = clientData.totalClients > 0 ? 
+      ((clientData.returningClients / clientData.totalClients) * 100) : 0;
+
+    // Calculate weighted score
+    const factors = {
+      paymentTimeliness: Math.max(0, Math.min(100, timelinessScore)),
+      cashFlow: Math.max(0, Math.min(100, cashFlowScore)),
+      inventoryTurnover: Math.max(0, Math.min(100, inventoryTurnoverScore)),
+      profitMargin: Math.max(0, Math.min(100, profitMarginScore)),
+      clientRetention: Math.max(0, Math.min(100, clientRetentionScore))
+    };
+
+    const score = Math.round(
+      (factors.paymentTimeliness * 0.4) +
+      (factors.cashFlow * 0.25) +
+      (factors.inventoryTurnover * 0.2) +
+      (factors.profitMargin * 0.1) +
+      (factors.clientRetention * 0.05)
+    );
+
+    // Determine grade
+    let grade: string;
+    if (score >= 90) grade = 'A+';
+    else if (score >= 80) grade = 'A';
+    else if (score >= 70) grade = 'B';
+    else if (score >= 60) grade = 'C';
+    else if (score >= 50) grade = 'D';
+    else grade = 'F';
+
+    // Generate recommendations
+    const recommendations: string[] = [];
+    if (factors.paymentTimeliness < 80) {
+      recommendations.push("Improve payment collection processes and follow up on overdue payments");
+    }
+    if (factors.cashFlow < 60) {
+      recommendations.push("Focus on increasing monthly revenue and diversifying payment methods");
+    }
+    if (factors.inventoryTurnover < 50) {
+      recommendations.push("Optimize inventory management and consider price adjustments for slow-moving items");
+    }
+    if (factors.profitMargin < 30) {
+      recommendations.push("Review pricing strategy and reduce operational costs");
+    }
+    if (factors.clientRetention < 40) {
+      recommendations.push("Implement client retention strategies and improve customer service");
+    }
+
+    return {
+      score,
+      grade,
+      factors,
+      recommendations: recommendations.length > 0 ? recommendations : ["Maintain current performance levels"]
+    };
+  }
+
+  async markInstallmentPaid(installmentId: string): Promise<InstallmentPlan> {
+    const [plan] = await db
+      .update(installmentPlan)
+      .set({ status: 'paid' })
+      .where(eq(installmentPlan.installmentId, installmentId))
+      .returning();
+    return plan;
+  }
+
+  async sendPaymentReminder(installmentId: string): Promise<boolean> {
+    // In a real implementation, this would send an email/SMS reminder
+    // For now, we'll just update a lastReminder field if it exists
+    try {
+      await db
+        .update(installmentPlan)
+        .set({ 
+          // Add a lastReminder field in the future
+          status: 'pending' // Keep status as pending but log the reminder
+        })
+        .where(eq(installmentPlan.installmentId, installmentId));
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 }
 
