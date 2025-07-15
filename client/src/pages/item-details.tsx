@@ -61,7 +61,8 @@ const paymentFormSchema = insertClientPaymentSchema.extend({
   clientId: z.string().min(1, "Client is required"),
   amount: z.string().min(1, "Amount is required"),
   paymentMethod: z.string().min(1, "Payment method is required"),
-  paidAt: z.string().min(1, "Payment date is required")
+  paidAt: z.string().min(1, "Payment date is required"),
+  paymentType: z.enum(["full", "partial"]).optional()
 });
 
 const expenseFormSchema = z.object({
@@ -352,7 +353,8 @@ export default function ItemDetails() {
       clientId: "",
       amount: "",
       paymentMethod: "",
-      paidAt: new Date().toISOString().split('T')[0]
+      paidAt: new Date().toISOString().split('T')[0],
+      paymentType: "full"
     },
   });
 
@@ -837,12 +839,71 @@ export default function ItemDetails() {
 
                       <FormField
                         control={paymentForm.control}
+                        name="paymentType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Payment Type</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select payment type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="full">Full Payment</SelectItem>
+                                <SelectItem value="partial">Partial Payment</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {paymentForm.watch("paymentType") === "partial" && (
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <p className="text-sm text-blue-700 dark:text-blue-300">
+                            <strong>Remaining Amount:</strong> {formatCurrency(remainingBalance)}
+                          </p>
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                            Your installment payment cannot exceed this amount.
+                          </p>
+                        </div>
+                      )}
+
+                      <FormField
+                        control={paymentForm.control}
                         name="amount"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Amount ($)</FormLabel>
                             <FormControl>
-                              <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                              <Input 
+                                type="number" 
+                                step="0.01" 
+                                placeholder="0.00" 
+                                max={remainingBalance}
+                                {...field}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  const amount = parseFloat(value);
+                                  const paymentType = paymentForm.watch("paymentType");
+                                  
+                                  // Validation logic
+                                  if (paymentType === "full" && amount > parseFloat(item?.listPrice || "0")) {
+                                    paymentForm.setError("amount", {
+                                      message: "Full payment cannot exceed item price"
+                                    });
+                                  } else if (amount + totalPayments > parseFloat(item?.listPrice || "0")) {
+                                    paymentForm.setError("amount", {
+                                      message: "Payment would exceed remaining balance"
+                                    });
+                                  } else {
+                                    paymentForm.clearErrors("amount");
+                                  }
+                                  
+                                  field.onChange(value);
+                                }}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

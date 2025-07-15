@@ -10,16 +10,25 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### July 15, 2025 - Installment Payment Management & Client Assignment
-- **New Feature**: Automatic client assignment for purchased items
-  - Items are now automatically assigned to clients after purchase (full or installment)
-  - Payment forms auto-populate assigned client instead of showing dropdown
-  - Streamlined payment process for items with existing owners
+### July 15, 2025 - Payment Validation & Installment Management
+- **New Feature**: Payment amount validation with error prevention
+  - Full payments cannot exceed item price
+  - Partial payments + installments cannot exceed item price
+  - Real-time validation with clear error messages
+  - Remaining amount display for installment payments
+- **New Feature**: Installment payment breakdown display
+  - Shows initial payment, installment total, and remaining amount
+  - Real-time calculation updates as amounts change
+  - Visual feedback for payment planning
 - **New Feature**: Upcoming Payments section in item details
   - Shows pending installment payments with due dates
   - "Mark as Paid" button for each pending installment
   - Automatically creates payment records when installments are marked as paid
   - Real-time updates to payment history and remaining balances
+- **New Feature**: Automatic client assignment for purchased items
+  - Items are now automatically assigned to clients after purchase (full or installment)
+  - Payment forms auto-populate assigned client instead of showing dropdown
+  - Streamlined payment process for items with existing owners
 - **Backend Enhancement**: Enhanced `markInstallmentPaid` function
   - Now creates corresponding payment records in payment history
   - Updates installment status and paid amount

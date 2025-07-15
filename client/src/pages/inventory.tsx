@@ -60,6 +60,7 @@ const saleFormSchema = z.object({
   paymentType: z.enum(["full", "installment"]),
   amount: z.string().min(1, "Amount is required"), 
   paymentMethod: z.string().min(1, "Payment method is required"),
+  listPrice: z.string().optional(), // Added for validation
   installments: z.array(z.object({
     amount: z.string().optional(),
     dueDate: z.string().optional()
@@ -71,15 +72,32 @@ const saleFormSchema = z.object({
       return false;
     }
     // Check that all installments have required fields
-    return data.installments.every(inst => 
+    if (!data.installments.every(inst => 
       inst.amount && inst.amount.length > 0 && inst.dueDate && inst.dueDate.length > 0
-    );
+    )) {
+      return false;
+    }
+    
+    // Check that initial payment + installment total doesn't exceed item price
+    const initialPayment = parseFloat(data.amount) || 0;
+    const installmentTotal = data.installments.reduce((sum, inst) => 
+      sum + (parseFloat(inst.amount) || 0), 0);
+    const itemPrice = parseFloat(data.listPrice || "0");
+    
+    return (initialPayment + installmentTotal) <= itemPrice;
   }
-  // For full payment, installments are not required
+  
+  // For full payment, check that amount doesn't exceed item price
+  if (data.paymentType === "full") {
+    const paymentAmount = parseFloat(data.amount) || 0;
+    const itemPrice = parseFloat(data.listPrice || "0");
+    return paymentAmount <= itemPrice;
+  }
+  
   return true;
 }, {
-  message: "Installments are required for installment payment type",
-  path: ["installments"]
+  message: "Payment amount cannot exceed item price",
+  path: ["amount"]
 });
 
 type ItemFormData = z.infer<typeof itemFormSchema>;
@@ -373,6 +391,7 @@ export default function Inventory() {
   const handleSellItem = (item: ItemWithVendor) => {
     setSelectedItem(item);
     saleForm.setValue('amount', item.listPrice?.toString() || '');
+    saleForm.setValue('listPrice', item.listPrice?.toString() || '');
     saleForm.setValue('paymentType', 'full');
     const initialInstallments = [{ amount: "", dueDate: "" }];
     setInstallments(initialInstallments);
@@ -1006,6 +1025,38 @@ export default function Inventory() {
                       <Plus className="h-4 w-4 mr-1" />
                       Add Installment
                     </Button>
+                  </div>
+                  
+                  {/* Remaining Amount Display */}
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                        Initial Payment:
+                      </span>
+                      <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                        {formatCurrency(parseFloat(saleForm.watch("amount")) || 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                        Installment Total:
+                      </span>
+                      <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                        {formatCurrency(installments.reduce((sum, inst) => sum + (parseFloat(inst.amount) || 0), 0))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center mt-1 pt-1 border-t border-blue-200 dark:border-blue-700">
+                      <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                        Remaining Amount:
+                      </span>
+                      <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                        {formatCurrency(
+                          parseFloat(selectedItem?.listPrice?.toString() || "0") - 
+                          parseFloat(saleForm.watch("amount")) - 
+                          installments.reduce((sum, inst) => sum + (parseFloat(inst.amount) || 0), 0)
+                        )}
+                      </span>
+                    </div>
                   </div>
                   {installments.map((installment, index) => (
                     <div key={index} className="flex items-center space-x-2 p-3 border rounded-lg">
