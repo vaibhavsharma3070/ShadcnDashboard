@@ -1,0 +1,197 @@
+Absolutely. Below is a structured and comprehensive Product Requirements Document (PRD) tailored for an AI agent to build a Retool application. It includes business background, user stories, data models, workflows, and UI layout suggestions using precise and implementation-ready terminology.
+
+🛍️ Product Requirements Document (PRD)
+Title: Consignment Management System for Pre-Owned Luxury Items Owner: Salomón Cohen Status: MVP
+
+1. Business Context
+1.1 Business Overview
+The company specializes in the resale of pre-owned luxury goods such as watches, handbags, and fashion accessories. Items are sourced from individual vendors who consign their goods with the company. The company markets these items, sells them to end clients, and takes a commission from each transaction.
+1.2 Business Model Summary
+Stakeholder	Role
+Vendor	Supplies a luxury item and agrees on a fixed payout (consignment price).
+Company	Markets, stores, sells the item, manages payments, and handles logistics.
+Client	Purchases the item, either in full or through partial payments.
+Flow:
+1. Vendor consignment agreement is created (vendor price + listing price).
+2. Item is stored and made available for sale.
+3. A client pays in full or via instalments.
+4. When fully paid, the item is delivered to the client and the vendor is paid.
+5. Profit = listing price − vendor payout − item-related expenses.
+1.3 Business Rules
+* Items may require authentication or repairs, incurring expenses.
+* Clients can pay in multiple instalments.
+* Vendors are only paid once the item is fully paid by the client.
+* Profit is calculated per item as: client payments - vendor payout - item expenses
+
+2. Product Objective
+Build a Retool-based internal web application that enables store operators, finance staff, and the business owner to:
+* Register vendors and clients
+* Log item intake and status
+* Track client payments (partial or full)
+* Register vendor payouts
+* Record item-related expenses
+* Monitor profitability in real-time
+
+3. Functional Scope
+3.1 Features Overview
+Feature	Description
+Vendor Management	Add, view, and search vendor records.
+Client Management	Add, view, and search client records.
+Item Intake	Register new items, associate them with vendors, and set pricing.
+Client Payments	Log partial or full payments from clients toward specific items.
+Vendor Payouts	Record the amount paid to vendors upon successful sale.
+Item Expenses	Record costs such as authentication and repairs.
+Profitability Dashboard	View real-time KPIs including profit, sales, outstanding payouts.
+5. Data Model
+5.1 Tables
+Table	Description
+vendor	Stores vendor info (ID, name, contact, tax ID, created date).
+client	Stores client info (ID, name, contact, billing address, created date).
+item	Core business object. Linked to vendor, holds acquisition data, pricing, and status.
+client_payment	Records instalment payments from clients for specific items.
+vendor_payout	Records amount paid to the vendor after the item is sold.
+item_expense	Tracks item-related expenses and their type.
+Note: Data types are uuid (as PK), numeric(12,2) for money, timestamptz for dates. See full DDL below.
+
+6. Views / Pages
+6.1 Item Operations (Primary Interface)
+* Inventory Table with filters (status: in-store, reserved, sold)
+* Detail Drawer: payments, expenses, vendor payout summary
+* New Item Form (inline modal)
+* Status badge that updates automatically when payment is complete
+6.2 Payment & Payouts
+* Client Payment Form
+* Outstanding Vendor Payouts (items fully paid, vendor not yet paid)
+* Auto status updater when full client payment is reached
+6.3 Expense Tracker
+* Add/view expenses per item
+* Analytics: total expenses by type or item
+6.4 Executive Dashboard
+* KPIs: total revenue, expenses, profit
+* Top-performing items/vendors
+* Revenue/expense over time chart
+
+7. SQL Schema Summary
+You can assume that the following schema is already provisioned:
+
+/* =========================================================
+   1) Core reference tables
+   ========================================================= */
+
+CREATE TABLE vendor (
+    vendor_id   uuid            PRIMARY KEY DEFAULT uuid_generate_v4(), -- requires uuid‑ossp extension
+    name        varchar(255),
+    phone       varchar(50),
+    email       varchar(255),
+    tax_id      varchar(100),
+    created_at  timestamptz     NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_vendor_email ON vendor(email);
+
+------------------------------------------------------------
+
+CREATE TABLE client (
+    client_id   uuid            PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name        varchar(255),
+    phone       varchar(50),
+    email       varchar(255),
+    billing_addr text,
+    created_at  timestamptz     NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_client_email ON client(email);
+
+ /* =========================================================
+    2) Main business object
+    ========================================================= */
+
+CREATE TABLE item (
+    item_id               uuid            PRIMARY KEY DEFAULT uuid_generate_v4(),
+    vendor_id             uuid            NOT NULL,
+    title                 varchar(255),
+    brand                 varchar(255),
+    model                 varchar(255),
+    serial_no             varchar(255) UNIQUE,
+    condition             varchar(100),
+    acquisition_date      date,
+    agreed_vendor_payout  numeric(12,2)   CHECK (agreed_vendor_payout > 0),
+    list_price            numeric(12,2)   CHECK (list_price > 0),
+    status                varchar(20)     NOT NULL DEFAULT 'in-store', -- in-store | reserved | sold | returned
+    created_at            timestamptz     NOT NULL DEFAULT now(),
+    CONSTRAINT fk_item_vendor
+        FOREIGN KEY (vendor_id) REFERENCES vendor(vendor_id)
+        ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_item_vendor  ON item(vendor_id);
+CREATE INDEX idx_item_status  ON item(status);
+
+ /* =========================================================
+    3) Money‑movement tables
+    ========================================================= */
+
+CREATE TABLE client_payment (
+    payment_id      uuid            PRIMARY KEY DEFAULT uuid_generate_v4(),
+    item_id         uuid            NOT NULL,
+    client_id       uuid            NOT NULL,
+    payment_method  varchar(100)    NOT NULL,
+    amount          numeric(12,2)   NOT NULL CHECK (amount > 0),
+    paid_at         timestamptz     NOT NULL,
+    CONSTRAINT fk_cp_item
+        FOREIGN KEY (item_id)   REFERENCES item(item_id)   ON DELETE RESTRICT,
+    CONSTRAINT fk_cp_client
+        FOREIGN KEY (client_id) REFERENCES client(client_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_cp_item   ON client_payment(item_id);
+CREATE INDEX idx_cp_client ON client_payment(client_id);
+
+------------------------------------------------------------
+
+CREATE TABLE vendor_payout (
+    payout_id       uuid            PRIMARY KEY DEFAULT uuid_generate_v4(),
+    item_id         uuid            NOT NULL,
+    vendor_id       uuid            NOT NULL,
+    amount          numeric(12,2)   NOT NULL CHECK (amount > 0),
+    paid_at         timestamptz     NOT NULL,
+    CONSTRAINT fk_vp_item
+        FOREIGN KEY (item_id)   REFERENCES item(item_id)   ON DELETE RESTRICT,
+    CONSTRAINT fk_vp_vendor
+        FOREIGN KEY (vendor_id) REFERENCES vendor(vendor_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_vp_item   ON vendor_payout(item_id);
+CREATE INDEX idx_vp_vendor ON vendor_payout(vendor_id);
+CREATE INDEX idx_vp_paidat ON vendor_payout(paid_at);
+
+------------------------------------------------------------
+
+CREATE TABLE item_expense (
+    expense_id      uuid            PRIMARY KEY DEFAULT uuid_generate_v4(),
+    item_id         uuid            NOT NULL,
+    expense_type    varchar(100)    NOT NULL,
+    amount          numeric(12,2)   NOT NULL CHECK (amount > 0),
+    incurred_at     timestamptz     NOT NULL,
+    notes           text,
+    CONSTRAINT fk_ie_item
+        FOREIGN KEY (item_id) REFERENCES item(item_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_ie_item ON item_expense(item_id);
+
+
+-- See prior DDL script with uuid_generate_v4(), no ENUMs or DOMAINs
+-- Tables: vendor, client, item, client_payment, vendor_payout, item_expense
+-- With correct indexes and foreign keys
+
+7. Smart Behaviors to Implement
+Trigger	Action
+Client payments ≥ list_price	Auto-update item status to sold
+Item marked sold, vendor payout = 0	Show in vendor payout queue
+Item expense added	Recalculate profit dynamically
+New payment added	Append to client_payment, recalc balance
+11. Non-Functional Requirements
+* Must be fast and responsive across all Retool components
+* All actions should be auditable (by user, time, and item)
+
