@@ -55,13 +55,7 @@ export function StatusUpdateDropdown({ itemId, currentStatus, onStatusChange }: 
 
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
-      return apiRequest(`/api/items/${itemId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: newStatus }),
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      return apiRequest('PATCH', `/api/items/${itemId}/status`, { status: newStatus });
     },
     onSuccess: (data) => {
       toast({
