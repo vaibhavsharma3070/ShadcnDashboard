@@ -273,16 +273,16 @@ export default function ItemDetails() {
   const editForm = useForm<ItemFormData>({
     resolver: zodResolver(itemFormSchema),
     defaultValues: {
-      vendorId: item?.vendorId || "",
-      title: item?.title || "",
-      brand: item?.brand || "",
-      model: item?.model || "",
-      serialNo: item?.serialNo || "",
-      condition: item?.condition || "",
-      agreedVendorPayout: item?.agreedVendorPayout || "",
-      listPrice: item?.listPrice || "",
-      acquisitionDate: item?.acquisitionDate || "",
-      status: item?.status || "in-store"
+      vendorId: "",
+      title: "",
+      brand: "",
+      model: "",
+      serialNo: "",
+      condition: "",
+      agreedVendorPayout: "",
+      listPrice: "",
+      acquisitionDate: "",
+      status: "in-store"
     },
   });
 
@@ -306,21 +306,23 @@ export default function ItemDetails() {
     },
   });
 
-  // Update form when item data loads
-  if (item && !editForm.formState.isDirty) {
-    editForm.reset({
-      vendorId: item.vendorId,
-      title: item.title || "",
-      brand: item.brand || "",
-      model: item.model || "",
-      serialNo: item.serialNo || "",
-      condition: item.condition || "",
-      agreedVendorPayout: item.agreedVendorPayout || "",
-      listPrice: item.listPrice || "",
-      acquisitionDate: item.acquisitionDate || "",
-      status: item.status
-    });
-  }
+  // Update form when item data loads (only once when modal opens)
+  const resetEditForm = () => {
+    if (item) {
+      editForm.reset({
+        vendorId: item.vendorId,
+        title: item.title || "",
+        brand: item.brand || "",
+        model: item.model || "",
+        serialNo: item.serialNo || "",
+        condition: item.condition || "",
+        agreedVendorPayout: item.agreedVendorPayout || "",
+        listPrice: item.listPrice || "",
+        acquisitionDate: item.acquisitionDate || "",
+        status: item.status
+      });
+    }
+  };
 
   const onEditSubmit = (data: ItemFormData) => {
     updateItemMutation.mutate(data);
@@ -390,7 +392,7 @@ export default function ItemDetails() {
         <div className="flex space-x-2">
           <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" onClick={resetEditForm}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Item
               </Button>
