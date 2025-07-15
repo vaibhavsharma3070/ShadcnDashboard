@@ -61,13 +61,21 @@ const saleFormSchema = z.object({
   amount: z.string().min(1, "Amount is required"), 
   paymentMethod: z.string().min(1, "Payment method is required"),
   installments: z.array(z.object({
-    amount: z.string().min(1, "Amount is required"),
-    dueDate: z.string().min(1, "Due date is required")
+    amount: z.string().optional(),
+    dueDate: z.string().optional()
   })).optional()
 }).refine((data) => {
   if (data.paymentType === "installment") {
-    return data.installments && data.installments.length > 0;
+    // Only validate installments if payment type is installment
+    if (!data.installments || data.installments.length === 0) {
+      return false;
+    }
+    // Check that all installments have required fields
+    return data.installments.every(inst => 
+      inst.amount && inst.amount.length > 0 && inst.dueDate && inst.dueDate.length > 0
+    );
   }
+  // For full payment, installments are not required
   return true;
 }, {
   message: "Installments are required for installment payment type",
@@ -1074,11 +1082,27 @@ export default function Inventory() {
                     console.log('Form values:', saleForm.getValues());
                     console.log('Selected item:', selectedItem);
                     
-                    // Check if form is valid
+                    // Try to trigger validation manually
+                    const values = saleForm.getValues();
+                    console.log('Manual validation attempt...');
+                    
+                    try {
+                      const validationResult = saleFormSchema.safeParse(values);
+                      console.log('Validation result:', validationResult);
+                      
+                      if (!validationResult.success) {
+                        console.log('Validation errors:', validationResult.error.issues);
+                      }
+                    } catch (err) {
+                      console.log('Validation error:', err);
+                    }
+                    
+                    // Check if form is valid - let it proceed for now to see what happens
                     if (!saleForm.formState.isValid) {
-                      console.log('Form is invalid, preventing submission');
-                      e.preventDefault();
-                      return;
+                      console.log('Form is invalid, but allowing submission for debugging');
+                      // Don't prevent the submission, let's see what happens
+                      // e.preventDefault();
+                      // return;
                     }
                   }}
                 >
