@@ -162,10 +162,11 @@ export default function Inventory() {
         description: "Item created successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Create item error:', error);
       toast({
         title: "Error",
-        description: "Failed to create item",
+        description: error?.message || "Failed to create item",
         variant: "destructive",
       });
     },
@@ -286,6 +287,7 @@ export default function Inventory() {
   });
 
   const onSubmit = (data: ItemFormData) => {
+    console.log('Form data:', data);
     const payload = {
       ...data,
       agreedVendorPayout: data.agreedVendorPayout ? parseFloat(data.agreedVendorPayout) : undefined,
@@ -293,6 +295,7 @@ export default function Inventory() {
       serialNo: data.serialNo || undefined,
       condition: data.condition || undefined
     };
+    console.log('Payload being sent:', payload);
     createItemMutation.mutate(payload);
   };
 

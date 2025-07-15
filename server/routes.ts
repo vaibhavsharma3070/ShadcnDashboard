@@ -161,11 +161,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/items", async (req, res) => {
     try {
+      console.log('Creating item with data:', req.body);
       const validatedData = insertItemSchema.parse(req.body);
+      console.log('Validated data:', validatedData);
       const item = await storage.createItem(validatedData);
+      console.log('Created item:', item);
       res.status(201).json(item);
     } catch (error) {
-      res.status(400).json({ error: "Invalid item data" });
+      console.error('Error creating item:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(400).json({ error: "Invalid item data" });
+      }
     }
   });
 
