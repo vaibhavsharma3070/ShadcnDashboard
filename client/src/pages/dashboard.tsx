@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DollarSign,
   Package,
@@ -17,8 +18,14 @@ import {
   Gem,
   Crown,
   Eye,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  Calendar,
 } from "lucide-react";
 import { MainLayout } from "@/components/layout/main-layout";
+import { useState } from "react";
+import { useLocation } from "wouter";
 
 interface DashboardMetrics {
   totalRevenue: number;
@@ -43,6 +50,34 @@ interface Item {
 
 interface TopPerformingItem extends Item {
   profit: number;
+}
+
+interface RecentPayment {
+  paymentId: string;
+  amount: number;
+  paymentMethod: string;
+  paidAt: string;
+  client: {
+    name: string;
+    email: string;
+  };
+  item: {
+    title: string;
+    brand: string;
+    model: string;
+    vendor: {
+      name: string;
+    };
+  };
+}
+
+interface PaymentMetrics {
+  totalPaymentsReceived: number;
+  totalPaymentsAmount: number;
+  overduePayments: number;
+  upcomingPayments: number;
+  averagePaymentAmount: number;
+  monthlyPaymentTrend: number;
 }
 
 function formatCurrency(amount: number) {
@@ -99,6 +134,10 @@ function getItemIcon(brand: string) {
 }
 
 export default function Dashboard() {
+  const [, setLocation] = useLocation();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   const { data: metrics, isLoading: metricsLoading } =
     useQuery<DashboardMetrics>({
       queryKey: ["/api/dashboard/metrics"],
@@ -113,6 +152,41 @@ export default function Dashboard() {
   >({
     queryKey: ["/api/dashboard/top-performing"],
   });
+
+  const { data: recentPayments, isLoading: paymentsLoading } = useQuery<
+    RecentPayment[]
+  >({
+    queryKey: ["/api/payments/recent"],
+  });
+
+  const { data: paymentMetrics, isLoading: paymentMetricsLoading } = useQuery<
+    PaymentMetrics
+  >({
+    queryKey: ["/api/payments/metrics"],
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil((recentItems?.length || 0) / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = recentItems?.slice(startIndex, endIndex) || [];
+
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case "add-item":
+        setLocation("/inventory");
+        break;
+      case "record-payment":
+        setLocation("/payments");
+        break;
+      case "process-payout":
+        setLocation("/payouts");
+        break;
+      case "add-vendor":
+        setLocation("/vendors");
+        break;
+    }
+  };
 
   return (
     <MainLayout
@@ -315,23 +389,56 @@ export default function Dashboard() {
 
       {/* Recent Activity and Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Activity Placeholder */}
+        {/* Recent Payments */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Recent Activity</CardTitle>
-              <Button variant="ghost" size="sm">
+              <CardTitle>Recent Payments</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => handleQuickAction("record-payment")}>
                 View all
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">
-                  Activity feed will be implemented here
-                </p>
-              </div>
+              {paymentsLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center space-x-4 p-3 border border-border rounded-lg">
+                    <Skeleton className="w-10 h-10 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                ))
+              ) : recentPayments && recentPayments.length > 0 ? (
+                recentPayments.map((payment) => (
+                  <div key={payment.paymentId} className="flex items-center space-x-4 p-3 border border-border rounded-lg hover:bg-accent">
+                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                      <CreditCard className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium">{payment.client.name}</span>
+                        <span className="text-sm text-muted-foreground">•</span>
+                        <span className="text-sm text-muted-foreground">{payment.item.title}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {payment.paymentMethod} • {formatDate(payment.paidAt)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-green-600">{formatCurrency(payment.amount)}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No recent payments</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -343,29 +450,29 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <Button className="w-full" size="lg">
+              <Button className="w-full" size="lg" onClick={() => handleQuickAction("add-item")}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add New Item
               </Button>
 
-              <Button className="w-full" variant="outline" size="lg">
+              <Button className="w-full" variant="outline" size="lg" onClick={() => handleQuickAction("record-payment")}>
                 <CreditCard className="mr-2 h-4 w-4" />
                 Record Payment
               </Button>
 
-              <Button className="w-full" variant="outline" size="lg">
+              <Button className="w-full" variant="outline" size="lg" onClick={() => handleQuickAction("process-payout")}>
                 <DollarSign className="mr-2 h-4 w-4" />
                 Process Payout
               </Button>
 
-              <Button className="w-full" variant="outline" size="lg">
+              <Button className="w-full" variant="outline" size="lg" onClick={() => handleQuickAction("add-vendor")}>
                 <Handshake className="mr-2 h-4 w-4" />
                 Add Vendor
               </Button>
             </div>
 
-            {/* Pending Items Alert */}
-            {metrics && metrics.pendingPayouts > 0 && (
+            {/* Attention Required */}
+            {paymentMetrics && (paymentMetrics.overduePayments > 0 || paymentMetrics.upcomingPayments > 0) && (
               <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                 <div className="flex items-center space-x-2 mb-2">
                   <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -373,15 +480,23 @@ export default function Dashboard() {
                     Attention Required
                   </h4>
                 </div>
-                <p className="text-sm text-destructive/80">
-                  15 vendors are awaiting payouts totaling{" "}
-                  {formatCurrency(metrics.pendingPayouts)}
-                </p>
+                <div className="space-y-1 text-sm text-destructive/80">
+                  {paymentMetrics.overduePayments > 0 && (
+                    <p>{paymentMetrics.overduePayments} overdue payments</p>
+                  )}
+                  {paymentMetrics.upcomingPayments > 0 && (
+                    <p>{paymentMetrics.upcomingPayments} upcoming payments</p>
+                  )}
+                  {metrics && metrics.pendingPayouts > 0 && (
+                    <p>Pending payouts: {formatCurrency(metrics.pendingPayouts)}</p>
+                  )}
+                </div>
                 <Button
                   variant="link"
                   className="mt-2 p-0 h-auto text-destructive"
+                  onClick={() => handleQuickAction("record-payment")}
                 >
-                  Review payouts →
+                  Review payments →
                 </Button>
               </div>
             )}
@@ -401,7 +516,20 @@ export default function Dashboard() {
                 <option>Reserved</option>
                 <option>Sold</option>
               </select>
-              <Button variant="ghost" size="sm">
+              <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                setItemsPerPage(parseInt(value));
+                setCurrentPage(1);
+              }}>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="ghost" size="sm" onClick={() => setLocation('/inventory')}>
                 View all inventory
               </Button>
             </div>
@@ -434,7 +562,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {itemsLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
+                  Array.from({ length: itemsPerPage }).map((_, i) => (
                     <tr key={i} className="border-b border-border">
                       <td className="py-4 px-6">
                         <div className="flex items-center space-x-3">
@@ -465,8 +593,8 @@ export default function Dashboard() {
                       </td>
                     </tr>
                   ))
-                ) : recentItems && recentItems.length > 0 ? (
-                  recentItems.map((item) => {
+                ) : currentItems && currentItems.length > 0 ? (
+                  currentItems.map((item) => {
                     const IconComponent = getItemIcon(item.brand);
                     return (
                       <tr
@@ -510,7 +638,7 @@ export default function Dashboard() {
                           </p>
                         </td>
                         <td className="py-4 px-6">
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" onClick={() => setLocation(`/item/${item.itemId}`)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View
                           </Button>
@@ -531,6 +659,48 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination Controls */}
+          {recentItems && recentItems.length > 0 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <span>Showing {startIndex + 1} to {Math.min(endIndex, recentItems.length)} of {recentItems.length} items</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="w-8 h-8"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </MainLayout>
