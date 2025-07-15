@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertItemSchema, type Item, type Vendor } from "@shared/schema";
+import { insertItemSchema, insertClientPaymentSchema, type Item, type Vendor, type Client } from "@shared/schema";
 import { z } from "zod";
 import { 
   Package, 
@@ -36,7 +36,9 @@ import {
   Crown,
   TrendingUp,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  ShoppingCart,
+  CreditCard
 } from "lucide-react";
 
 type ItemWithVendor = Item & { vendor: Vendor };
@@ -51,7 +53,14 @@ const itemFormSchema = insertItemSchema.extend({
   acquisitionDate: z.string().min(1, "Acquisition date is required")
 });
 
+const saleFormSchema = insertClientPaymentSchema.extend({
+  clientId: z.string().min(1, "Client is required"),
+  amount: z.string().min(1, "Amount is required"),
+  paymentMethod: z.string().min(1, "Payment method is required")
+});
+
 type ItemFormData = z.infer<typeof itemFormSchema>;
+type SaleFormData = z.infer<typeof saleFormSchema>;
 
 function formatCurrency(amount: number | string) {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -110,6 +119,8 @@ export default function Inventory() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ItemWithVendor | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -119,6 +130,10 @@ export default function Inventory() {
 
   const { data: vendors, isLoading: vendorsLoading } = useQuery<Vendor[]>({
     queryKey: ['/api/vendors'],
+  });
+
+  const { data: clients } = useQuery<Client[]>({
+    queryKey: ['/api/clients'],
   });
 
   const createItemMutation = useMutation({
@@ -173,6 +188,37 @@ export default function Inventory() {
     },
   });
 
+  const createSaleMutation = useMutation({
+    mutationFn: async (data: SaleFormData) => {
+      return await apiRequest('/api/payments', 'POST', {
+        ...data,
+        itemId: selectedItem?.itemId,
+        amount: parseFloat(data.amount),
+        paidAt: new Date().toISOString()
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+      setIsSaleModalOpen(false);
+      setSelectedItem(null);
+      saleForm.reset();
+      toast({
+        title: "Success",
+        description: "Sale recorded successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to record sale",
+        variant: "destructive",
+      });
+    },
+  });
+
   const form = useForm<ItemFormData>({
     resolver: zodResolver(itemFormSchema),
     defaultValues: {
@@ -189,14 +235,33 @@ export default function Inventory() {
     },
   });
 
+  const saleForm = useForm<SaleFormData>({
+    resolver: zodResolver(saleFormSchema),
+    defaultValues: {
+      clientId: "",
+      amount: "",
+      paymentMethod: "cash"
+    },
+  });
+
   const onSubmit = (data: ItemFormData) => {
     createItemMutation.mutate(data);
+  };
+
+  const onSaleSubmit = (data: SaleFormData) => {
+    createSaleMutation.mutate(data);
   };
 
   const handleDeleteItem = (itemId: string, itemTitle: string) => {
     if (confirm(`Are you sure you want to delete "${itemTitle}"? This action cannot be undone.`)) {
       deleteItemMutation.mutate(itemId);
     }
+  };
+
+  const handleSellItem = (item: ItemWithVendor) => {
+    setSelectedItem(item);
+    saleForm.setValue('amount', item.listPrice?.toString() || '');
+    setIsSaleModalOpen(true);
   };
 
   // Filter and sort items
@@ -636,6 +701,17 @@ export default function Inventory() {
                     </div>
                     
                     <div className="flex space-x-2">
+                      {item.status === 'in-store' && (
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          onClick={() => handleSellItem(item)}
+                          disabled={createSaleMutation.isPending}
+                        >
+                          <ShoppingCart className="h-4 w-4 mr-1" />
+                          Sell
+                        </Button>
+                      )}
                       <Link href={`/item/${item.itemId}`}>
                         <Button variant="ghost" size="sm">
                           <Eye className="h-4 w-4" />
@@ -679,6 +755,112 @@ export default function Inventory() {
           )}
         </CardContent>
       </Card>
+
+      {/* Sale Modal */}
+      <Dialog open={isSaleModalOpen} onOpenChange={setIsSaleModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sell Item</DialogTitle>
+          </DialogHeader>
+          {selectedItem && (
+            <div className="mb-4 p-4 border rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  {(() => {
+                    const IconComponent = getItemIcon(selectedItem.brand || "");
+                    return <IconComponent className="h-6 w-6 text-primary" />;
+                  })()}
+                </div>
+                <div>
+                  <h3 className="font-semibold">{selectedItem.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedItem.brand} {selectedItem.model}
+                  </p>
+                  <p className="text-sm font-medium">
+                    Price: {formatCurrency(selectedItem.listPrice || 0)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          <Form {...saleForm}>
+            <form onSubmit={saleForm.handleSubmit(onSaleSubmit)} className="space-y-4">
+              <FormField
+                control={saleForm.control}
+                name="clientId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Client</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a client" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {clients?.map((client) => (
+                          <SelectItem key={client.clientId} value={client.clientId}>
+                            {client.name} - {client.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={saleForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Amount</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={saleForm.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Method</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select payment method" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="credit_card">Credit Card</SelectItem>
+                        <SelectItem value="debit_card">Debit Card</SelectItem>
+                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="check">Check</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsSaleModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createSaleMutation.isPending}>
+                  {createSaleMutation.isPending ? "Processing..." : "Record Sale"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
