@@ -179,6 +179,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/items/:id/status", async (req, res) => {
+    try {
+      const { status } = req.body;
+      if (!status || typeof status !== 'string') {
+        return res.status(400).json({ error: "Status is required" });
+      }
+      
+      const validStatuses = ['in-store', 'reserved', 'sold', 'returned-to-vendor'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      
+      const item = await storage.updateItem(req.params.id, { status });
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating item status:", error);
+      res.status(500).json({ error: "Failed to update item status" });
+    }
+  });
+
   app.delete("/api/items/:id", async (req, res) => {
     try {
       await storage.deleteItem(req.params.id);

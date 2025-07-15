@@ -17,6 +17,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertItemSchema, insertClientPaymentSchema, type Item, type Vendor, type Client } from "@shared/schema";
+import { StatusUpdateDropdown } from "@/components/status-update-dropdown";
 import { z } from "zod";
 import { 
   Package, 
@@ -734,7 +735,10 @@ export default function Inventory() {
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-1">
                         <h3 className="font-semibold text-foreground">{item.title}</h3>
-                        {getStatusBadge(item.status)}
+                        <StatusUpdateDropdown 
+                          itemId={item.itemId} 
+                          currentStatus={item.status}
+                        />
                       </div>
                       <p className="text-sm text-muted-foreground mb-1">
                         {item.brand} • {item.model}

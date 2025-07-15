@@ -17,6 +17,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertItemSchema, insertClientPaymentSchema, insertItemExpenseSchema, type Item, type Vendor, type Client, type ClientPayment, type ItemExpense } from "@shared/schema";
+import { StatusUpdateDropdown } from "@/components/status-update-dropdown";
 import { z } from "zod";
 import { 
   ArrowLeft,
@@ -610,7 +611,10 @@ export default function ItemDetails() {
               <div>
                 <div className="flex items-center space-x-2 mb-1">
                   <CardTitle className="text-2xl">{item.title}</CardTitle>
-                  {getStatusBadge(item.status)}
+                  <StatusUpdateDropdown 
+                    itemId={item.itemId} 
+                    currentStatus={item.status}
+                  />
                 </div>
                 <p className="text-muted-foreground">
                   {item.brand} • {item.model}
