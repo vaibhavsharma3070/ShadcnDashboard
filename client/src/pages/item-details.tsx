@@ -251,13 +251,27 @@ export default function ItemDetails() {
 
   const createExpenseMutation = useMutation({
     mutationFn: async (data: ExpenseFormData) => {
+      console.log("🔍 [DEBUG] createExpenseMutation - Starting mutation with data:", data);
+      console.log("🔍 [DEBUG] createExpenseMutation - Item ID:", itemId);
+      
       const payload = {
         ...data,
         itemId: itemId!,
       };
-      return await apiRequest('POST', '/api/expenses', payload);
+      
+      console.log("🔍 [DEBUG] createExpenseMutation - Final payload:", payload);
+      
+      try {
+        const result = await apiRequest('POST', '/api/expenses', payload);
+        console.log("✅ [DEBUG] createExpenseMutation - API request successful:", result);
+        return result;
+      } catch (error) {
+        console.error("❌ [DEBUG] createExpenseMutation - API request failed:", error);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      console.log("✅ [DEBUG] createExpenseMutation - onSuccess called with result:", result);
       queryClient.invalidateQueries({ queryKey: ['/api/expenses/item', itemId] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
       setIsExpenseModalOpen(false);
@@ -266,7 +280,8 @@ export default function ItemDetails() {
         description: "Expense recorded successfully",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("❌ [DEBUG] createExpenseMutation - onError called with error:", error);
       toast({
         title: "Error",
         description: "Failed to record expense",
@@ -338,6 +353,11 @@ export default function ItemDetails() {
   };
 
   const onExpenseSubmit = (data: ExpenseFormData) => {
+    console.log("🔍 [DEBUG] onExpenseSubmit - Form submitted with data:", data);
+    console.log("🔍 [DEBUG] onExpenseSubmit - Form validation errors:", expenseForm.formState.errors);
+    console.log("🔍 [DEBUG] onExpenseSubmit - Form is valid:", expenseForm.formState.isValid);
+    console.log("🔍 [DEBUG] onExpenseSubmit - About to call createExpenseMutation.mutate");
+    
     createExpenseMutation.mutate(data);
   };
 
@@ -876,7 +896,14 @@ export default function ItemDetails() {
                     <DialogTitle>Record Expense</DialogTitle>
                   </DialogHeader>
                   <Form {...expenseForm}>
-                    <form onSubmit={expenseForm.handleSubmit(onExpenseSubmit)} className="space-y-4">
+                    <form 
+                      onSubmit={(e) => {
+                        console.log("🔍 [DEBUG] Form onSubmit triggered");
+                        console.log("🔍 [DEBUG] Form submit event:", e);
+                        return expenseForm.handleSubmit(onExpenseSubmit)(e);
+                      }} 
+                      className="space-y-4"
+                    >
                       <FormField
                         control={expenseForm.control}
                         name="expenseType"
@@ -952,7 +979,16 @@ export default function ItemDetails() {
                         <Button type="button" variant="outline" onClick={() => setIsExpenseModalOpen(false)}>
                           Cancel
                         </Button>
-                        <Button type="submit" disabled={createExpenseMutation.isPending}>
+                        <Button 
+                          type="submit" 
+                          disabled={createExpenseMutation.isPending}
+                          onClick={() => {
+                            console.log("🔍 [DEBUG] Record Expense button clicked");
+                            console.log("🔍 [DEBUG] Button mutation isPending:", createExpenseMutation.isPending);
+                            console.log("🔍 [DEBUG] Form state:", expenseForm.formState);
+                            console.log("🔍 [DEBUG] Form values:", expenseForm.getValues());
+                          }}
+                        >
                           {createExpenseMutation.isPending ? "Recording..." : "Record Expense"}
                         </Button>
                       </div>

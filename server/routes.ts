@@ -392,12 +392,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/expenses", async (req, res) => {
+    console.log("🔍 [DEBUG] POST /api/expenses - Request received");
+    console.log("🔍 [DEBUG] POST /api/expenses - Request body:", req.body);
+    
     try {
+      console.log("🔍 [DEBUG] POST /api/expenses - Validating with insertItemExpenseSchema");
       const validatedData = insertItemExpenseSchema.parse(req.body);
+      console.log("🔍 [DEBUG] POST /api/expenses - Validation successful, validated data:", validatedData);
+      
+      console.log("🔍 [DEBUG] POST /api/expenses - Creating expense via storage");
       const expense = await storage.createExpense(validatedData);
+      console.log("✅ [DEBUG] POST /api/expenses - Expense created successfully:", expense);
+      
       res.status(201).json(expense);
     } catch (error) {
-      res.status(400).json({ error: "Invalid expense data" });
+      console.error("❌ [DEBUG] POST /api/expenses - Error occurred:", error);
+      console.error("❌ [DEBUG] POST /api/expenses - Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      res.status(400).json({ error: "Invalid expense data", details: error.message });
     }
   });
 
