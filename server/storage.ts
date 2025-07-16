@@ -37,6 +37,8 @@ export interface IStorage {
   getPayments(): Promise<Array<ClientPayment & { item: Item & { vendor: Vendor }, client: Client }>>;
   getPaymentsByItem(itemId: string): Promise<Array<ClientPayment & { client: Client }>>;
   createPayment(payment: InsertClientPayment): Promise<ClientPayment>;
+  updatePayment(id: string, payment: Partial<InsertClientPayment>): Promise<ClientPayment>;
+  deletePayment(id: string): Promise<void>;
   
   // Payout methods
   getPayouts(): Promise<Array<VendorPayout & { item: Item, vendor: Vendor }>>;
@@ -270,6 +272,81 @@ export class DatabaseStorage implements IStorage {
     }
     
     return result;
+  }
+
+  async updatePayment(id: string, updatePayment: Partial<InsertClientPayment>): Promise<ClientPayment> {
+    const [result] = await db.update(clientPayment)
+      .set(updatePayment)
+      .where(eq(clientPayment.paymentId, id))
+      .returning();
+    
+    if (!result) {
+      throw new Error("Payment not found");
+    }
+    
+    // If amount was updated, recalculate item payment status
+    if (updatePayment.amount !== undefined) {
+      const payments = await db.select({ amount: clientPayment.amount })
+        .from(clientPayment)
+        .where(eq(clientPayment.itemId, result.itemId));
+      
+      const itemData = await db.select({ listPrice: item.listPrice })
+        .from(item)
+        .where(eq(item.itemId, result.itemId));
+      
+      if (payments.length > 0 && itemData.length > 0) {
+        const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+        const listPrice = Number(itemData[0].listPrice);
+        
+        // Update item status based on payment completeness
+        if (totalPaid >= listPrice) {
+          await db.update(item).set({ status: 'sold' }).where(eq(item.itemId, result.itemId));
+        } else {
+          await db.update(item).set({ status: 'partial' }).where(eq(item.itemId, result.itemId));
+        }
+      }
+    }
+    
+    return result;
+  }
+
+  async deletePayment(id: string): Promise<void> {
+    // First get the payment info to know which item to update
+    const paymentToDelete = await db.select({ itemId: clientPayment.itemId })
+      .from(clientPayment)
+      .where(eq(clientPayment.paymentId, id));
+    
+    if (!paymentToDelete.length) {
+      throw new Error("Payment not found");
+    }
+    
+    const itemId = paymentToDelete[0].itemId;
+    
+    // Delete the payment
+    await db.delete(clientPayment).where(eq(clientPayment.paymentId, id));
+    
+    // Recalculate item payment status after deletion
+    const remainingPayments = await db.select({ amount: clientPayment.amount })
+      .from(clientPayment)
+      .where(eq(clientPayment.itemId, itemId));
+    
+    const itemData = await db.select({ listPrice: item.listPrice })
+      .from(item)
+      .where(eq(item.itemId, itemId));
+    
+    if (itemData.length > 0) {
+      const totalPaid = remainingPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const listPrice = Number(itemData[0].listPrice);
+      
+      // Update item status based on remaining payments
+      if (totalPaid >= listPrice) {
+        await db.update(item).set({ status: 'sold' }).where(eq(item.itemId, itemId));
+      } else if (totalPaid > 0) {
+        await db.update(item).set({ status: 'partial' }).where(eq(item.itemId, itemId));
+      } else {
+        await db.update(item).set({ status: 'available' }).where(eq(item.itemId, itemId));
+      }
+    }
   }
 
   // Payout methods

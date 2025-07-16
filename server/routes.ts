@@ -247,6 +247,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/payments/:id", async (req, res) => {
+    try {
+      const validatedData = insertClientPaymentSchema.partial().parse(req.body);
+      const payment = await storage.updatePayment(req.params.id, validatedData);
+      res.json(payment);
+    } catch (error) {
+      console.error("Payment update error:", error);
+      if (error.errors) {
+        res.status(400).json({ error: "Invalid payment data", details: error.errors });
+      } else {
+        res.status(400).json({ error: "Failed to update payment", details: error.message });
+      }
+    }
+  });
+
+  app.delete("/api/payments/:id", async (req, res) => {
+    try {
+      await storage.deletePayment(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Payment deletion error:", error);
+      res.status(500).json({ error: "Failed to delete payment" });
+    }
+  });
+
   // Payment metrics routes
   app.get("/api/payments/metrics", async (req, res) => {
     try {

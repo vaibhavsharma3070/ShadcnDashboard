@@ -72,9 +72,15 @@ const installmentFormSchema = insertInstallmentPlanSchema.extend({
   dueDate: z.string().min(1, "Due date is required")
 });
 
+const paymentFormSchema = insertClientPaymentSchema.extend({
+  amount: z.string().min(1, "Amount is required"),
+  paidAt: z.string().min(1, "Payment date is required")
+});
+
 type ItemFormData = z.infer<typeof itemFormSchema>;
 type ExpenseFormData = z.infer<typeof expenseFormSchema>;
 type InstallmentFormData = z.infer<typeof installmentFormSchema>;
+type PaymentFormData = z.infer<typeof paymentFormSchema>;
 
 function formatCurrency(amount: number | string) {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -147,6 +153,9 @@ export default function ItemDetails() {
   const [isEditInstallmentModalOpen, setIsEditInstallmentModalOpen] = useState(false);
   const [editingInstallment, setEditingInstallment] = useState<InstallmentPlan | null>(null);
   const [isSplitMode, setIsSplitMode] = useState(false);
+  const [isEditPaymentModalOpen, setIsEditPaymentModalOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<PaymentWithClient | null>(null);
+  const [isAddPaymentModalOpen, setIsAddPaymentModalOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
