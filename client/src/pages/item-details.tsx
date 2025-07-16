@@ -159,6 +159,11 @@ export default function ItemDetails() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Debug modal state changes
+  React.useEffect(() => {
+    console.log("🔍 [DEBUG] isAddPaymentModalOpen changed:", isAddPaymentModalOpen);
+  }, [isAddPaymentModalOpen]);
+
   const { data: item, isLoading: itemLoading } = useQuery<ItemWithVendor>({
     queryKey: ['/api/items', itemId],
     enabled: !!itemId,
@@ -619,6 +624,10 @@ export default function ItemDetails() {
   };
 
   const openAddPaymentModal = () => {
+    console.log("🔍 [DEBUG] openAddPaymentModal called");
+    console.log("🔍 [DEBUG] itemId:", itemId);
+    console.log("🔍 [DEBUG] assignedClient:", assignedClient);
+    
     paymentForm.reset({
       itemId: itemId || "",
       clientId: assignedClient?.clientId || "",
@@ -626,7 +635,10 @@ export default function ItemDetails() {
       paidAt: new Date().toISOString().split('T')[0],
       method: "bank_transfer"
     });
+    
+    console.log("🔍 [DEBUG] Setting modal open to true");
     setIsAddPaymentModalOpen(true);
+    console.log("🔍 [DEBUG] Modal should now be open");
   };
 
   const onPaymentSubmit = (data: PaymentFormData) => {
@@ -1013,7 +1025,13 @@ export default function ItemDetails() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Payment History</CardTitle>
-              <Button size="sm" onClick={openAddPaymentModal}>
+              <Button 
+                size="sm" 
+                onClick={() => {
+                  console.log("🔍 [DEBUG] Add Payment button clicked");
+                  openAddPaymentModal();
+                }}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Payment
               </Button>
