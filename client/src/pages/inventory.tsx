@@ -77,14 +77,40 @@ import {
 
 type ItemWithVendor = Item & { vendor: Vendor };
 
+// Helper for numeric field preprocessing
+const toOptionalNumber = z.preprocess(
+  (v) => (v === "" || v == null) ? undefined : (typeof v === "string" ? Number(v) : v),
+  z.number().nonnegative().optional()
+);
+
 const itemFormSchema = insertItemSchema.extend({
   vendorId: z.string().min(1, "Vendor is required"),
   title: z.string().min(1, "Title is required"),
   brand: z.string().min(1, "Brand is required"),
   model: z.string().min(1, "Model is required"),
-  agreedVendorPayout: z.string().min(1, "Vendor payout is required"),
-  listPrice: z.string().min(1, "List price is required"),
+  minCost: toOptionalNumber,
+  maxCost: toOptionalNumber,
+  minSalesPrice: toOptionalNumber,
+  maxSalesPrice: toOptionalNumber,
   acquisitionDate: z.string().min(1, "Acquisition date is required"),
+}).refine((data) => {
+  // Validate that min <= max for cost range
+  if (data.minCost !== undefined && data.maxCost !== undefined) {
+    return data.minCost <= data.maxCost;
+  }
+  return true;
+}, {
+  message: "Minimum cost cannot be greater than maximum cost",
+  path: ["maxCost"],
+}).refine((data) => {
+  // Validate that min <= max for sales price range  
+  if (data.minSalesPrice !== undefined && data.maxSalesPrice !== undefined) {
+    return data.minSalesPrice <= data.maxSalesPrice;
+  }
+  return true;
+}, {
+  message: "Minimum sales price cannot be greater than maximum sales price",
+  path: ["maxSalesPrice"],
 });
 
 const saleFormSchema = z
@@ -401,8 +427,10 @@ export default function Inventory() {
       model: "",
       serialNo: "",
       condition: "",
-      agreedVendorPayout: "",
-      listPrice: "",
+      minCost: undefined,
+      maxCost: undefined,
+      minSalesPrice: undefined,
+      maxSalesPrice: undefined,
       acquisitionDate: "",
       status: "in-store",
     },
@@ -484,8 +512,9 @@ export default function Inventory() {
 
   const handleSellItem = (item: ItemWithVendor) => {
     setSelectedItem(item);
-    saleForm.setValue("amount", item.listPrice?.toString() || "");
-    saleForm.setValue("listPrice", item.listPrice?.toString() || "");
+    const maxPrice = item.maxSalesPrice?.toString() || "";
+    saleForm.setValue("amount", maxPrice);
+    saleForm.setValue("listPrice", maxPrice);
     saleForm.setValue("paymentType", "full");
     const initialInstallments = [{ amount: "", dueDate: "" }];
     setInstallments(initialInstallments);
@@ -519,9 +548,9 @@ export default function Inventory() {
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
         case "price-high":
-          return Number(b.listPrice) - Number(a.listPrice);
+          return Number(b.maxSalesPrice || 0) - Number(a.maxSalesPrice || 0);
         case "price-low":
-          return Number(a.listPrice) - Number(b.listPrice);
+          return Number(a.maxSalesPrice || 0) - Number(b.maxSalesPrice || 0);
         case "brand":
           return (a.brand || "").localeCompare(b.brand || "");
         default:
@@ -537,7 +566,7 @@ export default function Inventory() {
     items?.filter((item) => item.status === "reserved").length || 0;
   const soldItems = items?.filter((item) => item.status === "sold").length || 0;
   const totalValue =
-    items?.reduce((sum, item) => sum + Number(item.listPrice || 0), 0) || 0;
+    items?.reduce((sum, item) => sum + Number(item.maxSalesPrice || 0), 0) || 0;
 
   return (
     <MainLayout title="Inventory" subtitle="Manage your luxury items inventory">
@@ -866,10 +895,10 @@ export default function Inventory() {
 
                       <FormField
                         control={form.control}
-                        name="agreedVendorPayout"
+                        name="minCost"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Vendor Payout ($)</FormLabel>
+                            <FormLabel>Min Cost ($)</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -885,10 +914,48 @@ export default function Inventory() {
 
                       <FormField
                         control={form.control}
-                        name="listPrice"
+                        name="maxCost"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>List Price ($)</FormLabel>
+                            <FormLabel>Max Cost ($)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="minSalesPrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Min Sales Price ($)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="maxSalesPrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Max Sales Price ($)</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -1029,11 +1096,15 @@ export default function Inventory() {
                           </div>
                           <div className="text-right sm:text-left">
                             <p className="text-lg font-bold text-foreground">
-                              {formatCurrency(item.listPrice || 0)}
+                              {item.minSalesPrice && item.maxSalesPrice 
+                                ? `${formatCurrency(item.minSalesPrice)} - ${formatCurrency(item.maxSalesPrice)}`
+                                : formatCurrency(item.maxSalesPrice || item.minSalesPrice || 0)}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              Payout:{" "}
-                              {formatCurrency(item.agreedVendorPayout || 0)}
+                              Cost:{" "}
+                              {item.minCost && item.maxCost 
+                                ? `${formatCurrency(item.minCost)} - ${formatCurrency(item.maxCost)}`
+                                : formatCurrency(item.maxCost || item.minCost || 0)}
                             </p>
                           </div>
                         </div>
@@ -1206,7 +1277,9 @@ export default function Inventory() {
                     {selectedItem.brand} {selectedItem.model}
                   </p>
                   <p className="text-sm font-medium">
-                    Price: {formatCurrency(selectedItem.listPrice || 0)}
+                    Price: {selectedItem.minSalesPrice && selectedItem.maxSalesPrice 
+                      ? `${formatCurrency(selectedItem.minSalesPrice)} - ${formatCurrency(selectedItem.maxSalesPrice)}`
+                      : formatCurrency(selectedItem.maxSalesPrice || selectedItem.minSalesPrice || 0)}
                   </p>
                 </div>
               </div>
@@ -1372,7 +1445,7 @@ export default function Inventory() {
                       <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
                         {formatCurrency(
                           parseFloat(
-                            selectedItem?.listPrice?.toString() || "0",
+                            selectedItem?.maxSalesPrice?.toString() || "0",
                           ) -
                             parseFloat(saleForm.watch("amount")) -
                             installments.reduce(
