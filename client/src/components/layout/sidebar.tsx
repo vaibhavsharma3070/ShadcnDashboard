@@ -40,6 +40,7 @@ const navigation = [
       { name: "Profitability", href: "/profitability", icon: TrendingUp },
     ],
   },
+  { name: "Configuracion", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {
