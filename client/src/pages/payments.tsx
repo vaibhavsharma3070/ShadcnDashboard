@@ -431,7 +431,7 @@ export default function Payments() {
                       <span className="text-sm">Payment Timeliness</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {financialHealth?.factors.paymentTimeliness.toFixed(1) || 0}%
+                      {(financialHealth?.factors.paymentTimeliness ?? 0).toFixed(1)}%
                     </span>
                   </div>
                   <Progress value={financialHealth?.factors.paymentTimeliness || 0} className="h-2" />
@@ -442,7 +442,7 @@ export default function Payments() {
                       <span className="text-sm">Cash Flow</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {financialHealth?.factors.cashFlow.toFixed(1) || 0}%
+                      {(financialHealth?.factors.cashFlow ?? 0).toFixed(1)}%
                     </span>
                   </div>
                   <Progress value={financialHealth?.factors.cashFlow || 0} className="h-2" />
@@ -453,7 +453,7 @@ export default function Payments() {
                       <span className="text-sm">Inventory Turnover</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {financialHealth?.factors.inventoryTurnover.toFixed(1) || 0}%
+                      {(financialHealth?.factors.inventoryTurnover ?? 0).toFixed(1)}%
                     </span>
                   </div>
                   <Progress value={financialHealth?.factors.inventoryTurnover || 0} className="h-2" />
@@ -464,7 +464,7 @@ export default function Payments() {
                       <span className="text-sm">Profit Margin</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {financialHealth?.factors.profitMargin.toFixed(1) || 0}%
+                      {(financialHealth?.factors.profitMargin ?? 0).toFixed(1)}%
                     </span>
                   </div>
                   <Progress value={financialHealth?.factors.profitMargin || 0} className="h-2" />
@@ -475,7 +475,7 @@ export default function Payments() {
                       <span className="text-sm">Client Retention</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {financialHealth?.factors.clientRetention.toFixed(1) || 0}%
+                      {(financialHealth?.factors.clientRetention ?? 0).toFixed(1)}%
                     </span>
                   </div>
                   <Progress value={financialHealth?.factors.clientRetention || 0} className="h-2" />
