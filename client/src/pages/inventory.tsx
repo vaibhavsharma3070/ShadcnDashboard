@@ -81,7 +81,7 @@ const saleFormSchema = z.object({
     // Check that initial payment + installment total doesn't exceed item price
     const initialPayment = parseFloat(data.amount) || 0;
     const installmentTotal = data.installments.reduce((sum, inst) => 
-      sum + (parseFloat(inst.amount) || 0), 0);
+      sum + (parseFloat(inst.amount || '0') || 0), 0);
     const itemPrice = parseFloat(data.listPrice || "0");
     
     return (initialPayment + installmentTotal) <= itemPrice;
@@ -652,7 +652,7 @@ export default function Inventory() {
                           <FormItem>
                             <FormLabel>Serial Number</FormLabel>
                             <FormControl>
-                              <Input placeholder="Serial number" {...field} />
+                              <Input placeholder="Serial number" {...field} value={field.value || ''} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -665,7 +665,7 @@ export default function Inventory() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Condition</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value || undefined}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select condition" />
@@ -820,7 +820,7 @@ export default function Inventory() {
                         </span>
                         <span className="flex items-center">
                           <Calendar className="h-3 w-3 mr-1" />
-                          {formatDate(item.createdAt)}
+                          {formatDate(item.createdAt.toString())}
                         </span>
                         {item.condition && (
                           <span className="flex items-center">
@@ -845,6 +845,7 @@ export default function Inventory() {
                           size="sm" 
                           onClick={() => handleSellItem(item)}
                           disabled={createSaleMutation.isPending}
+                          data-testid="button-sell-item"
                         >
                           <ShoppingCart className="h-4 w-4 mr-1" />
                           Sell
@@ -896,7 +897,7 @@ export default function Inventory() {
 
       {/* Sale Modal */}
       <Dialog open={isSaleModalOpen} onOpenChange={setIsSaleModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Sell Item</DialogTitle>
           </DialogHeader>
@@ -1088,42 +1089,18 @@ export default function Inventory() {
               )}
 
               <div className="flex justify-end space-x-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsSaleModalOpen(false)}>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsSaleModalOpen(false)}
+                  data-testid="button-cancel"
+                >
                   Cancel
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={createSaleMutation.isPending}
-                  onClick={(e) => {
-                    console.log('Record Sale button clicked');
-                    console.log('Form valid:', saleForm.formState.isValid);
-                    console.log('Form errors:', saleForm.formState.errors);
-                    console.log('Form values:', saleForm.getValues());
-                    console.log('Selected item:', selectedItem);
-                    
-                    // Try to trigger validation manually
-                    const values = saleForm.getValues();
-                    console.log('Manual validation attempt...');
-                    
-                    try {
-                      const validationResult = saleFormSchema.safeParse(values);
-                      console.log('Validation result:', validationResult);
-                      
-                      if (!validationResult.success) {
-                        console.log('Validation errors:', validationResult.error.issues);
-                      }
-                    } catch (err) {
-                      console.log('Validation error:', err);
-                    }
-                    
-                    // Check if form is valid - let it proceed for now to see what happens
-                    if (!saleForm.formState.isValid) {
-                      console.log('Form is invalid, but allowing submission for debugging');
-                      // Don't prevent the submission, let's see what happens
-                      // e.preventDefault();
-                      // return;
-                    }
-                  }}
+                  data-testid="button-record-sale"
                 >
                   {createSaleMutation.isPending ? "Processing..." : "Record Sale"}
                 </Button>

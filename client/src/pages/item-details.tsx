@@ -416,8 +416,7 @@ export default function ItemDetails() {
       itemId: itemId || "",
       clientId: assignedClient?.clientId || "",
       amount: "",
-      dueDate: "",
-      status: "pending"
+      dueDate: ""
     },
   });
 
@@ -468,8 +467,7 @@ export default function ItemDetails() {
       itemId: installment.itemId,
       clientId: installment.clientId,
       amount: installment.amount.toString(),
-      dueDate: installment.dueDate,
-      status: installment.status
+      dueDate: installment.dueDate
     });
     setIsEditInstallmentModalOpen(true);
   };
@@ -481,8 +479,7 @@ export default function ItemDetails() {
       itemId: installment.itemId,
       clientId: installment.clientId,
       amount: (parseFloat(installment.amount.toString()) / 2).toString(),
-      dueDate: installment.dueDate,
-      status: "pending"
+      dueDate: installment.dueDate
     });
     setIsEditInstallmentModalOpen(true);
   };
@@ -690,7 +687,7 @@ export default function ItemDetails() {
                         <FormItem>
                           <FormLabel>Serial Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="Serial number" {...field} />
+                            <Input placeholder="Serial number" {...field} value={field.value || ''} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -703,7 +700,7 @@ export default function ItemDetails() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Condition</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value || undefined}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select condition" />
@@ -860,10 +857,10 @@ export default function ItemDetails() {
                     </p>
                   )}
                   <p className="text-sm">
-                    <span className="font-medium">Acquired:</span> {formatDate(item.acquisitionDate || item.createdAt)}
+                    <span className="font-medium">Acquired:</span> {formatDate((item.acquisitionDate || item.createdAt).toString())}
                   </p>
                   <p className="text-sm">
-                    <span className="font-medium">Listed:</span> {formatDate(item.createdAt)}
+                    <span className="font-medium">Listed:</span> {formatDate(item.createdAt.toString())}
                   </p>
                 </div>
               </div>
@@ -943,7 +940,7 @@ export default function ItemDetails() {
                     <div className="flex-1">
                       <p className="font-medium">{payment.client.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {payment.paymentMethod} • {formatDateTime(payment.paidAt)}
+                        {payment.paymentMethod} • {formatDateTime(payment.paidAt.toString())}
                       </p>
                     </div>
                     <div className="text-right">
@@ -1102,7 +1099,7 @@ export default function ItemDetails() {
                     <div className="flex-1">
                       <p className="font-medium">{expense.expenseType}</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatDateTime(expense.incurredAt)}
+                        {formatDateTime(expense.incurredAt.toString())}
                       </p>
                       {expense.notes && (
                         <p className="text-sm text-muted-foreground italic">{expense.notes}</p>
