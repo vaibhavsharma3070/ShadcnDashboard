@@ -235,6 +235,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Data migration route
+  app.post("/api/migration/brands", async (req, res) => {
+    try {
+      const migrationResult = await storage.migrateLegacyBrands();
+      res.json({
+        success: true,
+        message: "Brand migration completed successfully",
+        result: migrationResult
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        error: "Migration failed", 
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // Client routes
   app.get("/api/clients", async (req, res) => {
     try {

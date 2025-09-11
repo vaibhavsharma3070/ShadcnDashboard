@@ -169,6 +169,13 @@ export interface IStorage {
   
   markInstallmentPaid(installmentId: string): Promise<InstallmentPlan>;
   sendPaymentReminder(installmentId: string): Promise<boolean>;
+  
+  // Data migration helper
+  migrateLegacyBrands(): Promise<{
+    brandsCreated: number;
+    itemsUpdated: number;
+    skippedItems: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1159,6 +1166,93 @@ export class DatabaseStorage implements IStorage {
       grade,
       factors,
       recommendations: recommendations.length > 0 ? recommendations : ["Maintain current performance levels"]
+    };
+  }
+
+  // Data migration helper - backfill brandId from legacy brand text field
+  async migrateLegacyBrands(): Promise<{
+    brandsCreated: number;
+    itemsUpdated: number;
+    skippedItems: number;
+  }> {
+    // Get all distinct brand names from existing items that have text brand values but no brandId
+    const distinctBrands = await db
+      .selectDistinct({ brand: item.brand })
+      .from(item)
+      .where(
+        and(
+          isNotNull(item.brand),
+          sql`${item.brand} != ''`,
+          isNull(item.brandId)
+        )
+      );
+
+    let brandsCreated = 0;
+    let itemsUpdated = 0;
+    let skippedItems = 0;
+
+    for (const brandRecord of distinctBrands) {
+      if (!brandRecord.brand) continue;
+
+      const brandName = brandRecord.brand.trim();
+      if (!brandName) continue;
+
+      // Check if this brand already exists
+      const [existingBrand] = await db
+        .select()
+        .from(brand)
+        .where(eq(brand.name, brandName));
+
+      let brandId: string;
+
+      if (existingBrand) {
+        // Use existing brand
+        brandId = existingBrand.brandId;
+      } else {
+        // Create new brand
+        const [newBrand] = await db
+          .insert(brand)
+          .values({
+            name: brandName,
+            active: "true"
+          })
+          .returning();
+        
+        brandId = newBrand.brandId;
+        brandsCreated++;
+      }
+
+      // Update all items with this brand name to reference the brandId
+      const updateResult = await db
+        .update(item)
+        .set({ brandId: brandId })
+        .where(
+          and(
+            eq(item.brand, brandRecord.brand),
+            isNull(item.brandId)
+          )
+        );
+
+      itemsUpdated += updateResult.rowCount || 0;
+    }
+
+    // Count items that couldn't be migrated (null or empty brand)
+    const [skippedCount] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(item)
+      .where(
+        and(
+          isNull(item.brandId),
+          sql`(${item.brand} IS NULL OR ${item.brand} = '')`
+        )
+      );
+
+    skippedItems = skippedCount.count;
+
+    return {
+      brandsCreated,
+      itemsUpdated,
+      skippedItems
     };
   }
 
