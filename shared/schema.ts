@@ -74,6 +74,9 @@ export const vendorPayout = pgTable("vendor_payout", {
   vendorId: uuid("vendor_id").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   paidAt: timestamp("paid_at", { withTimezone: true }).notNull(),
+  bankAccount: text("bank_account"),
+  transferId: text("transfer_id"),
+  notes: text("notes"),
 }, (table) => ({
   itemIdx: index("idx_vp_item").on(table.itemId),
   vendorIdx: index("idx_vp_vendor").on(table.vendorId),

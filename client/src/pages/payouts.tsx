@@ -11,8 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -44,6 +50,16 @@ import {
   Banknote,
   HandCoins
 } from "lucide-react";
+
+// Payout form schema
+const payoutFormSchema = z.object({
+  amount: z.string().min(1, "Amount is required"),
+  bankAccount: z.string().min(1, "Bank account is required"),
+  transferId: z.string().min(1, "Transfer ID is required"),
+  notes: z.string().optional(),
+});
+
+type PayoutFormData = z.infer<typeof payoutFormSchema>;
 
 interface PayoutMetrics {
   totalPayoutsPaid: number;
@@ -166,6 +182,21 @@ export default function Payouts() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Payout modal state
+  const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
+  const [selectedPayout, setSelectedPayout] = useState<UpcomingPayout | null>(null);
+
+  // Payout form
+  const payoutForm = useForm<PayoutFormData>({
+    resolver: zodResolver(payoutFormSchema),
+    defaultValues: {
+      amount: "",
+      bankAccount: "",
+      transferId: "",
+      notes: "",
+    },
+  });
+
   const { data: payoutMetrics, isLoading: metricsLoading } = useQuery<PayoutMetrics>({
     queryKey: ['/api/payouts/metrics'],
     queryFn: async () => {
@@ -194,14 +225,15 @@ export default function Payouts() {
   });
 
   const createPayoutMutation = useMutation({
-    mutationFn: async (payout: UpcomingPayout) => {
+    mutationFn: async (formData: PayoutFormData & { payout: UpcomingPayout }) => {
       const payoutData = {
-        vendorId: payout.vendor.vendorId,
-        itemId: payout.itemId,
-        amount: payout.vendorPayoutAmount,
+        vendorId: formData.payout.vendor.vendorId,
+        itemId: formData.payout.itemId,
+        amount: parseFloat(formData.amount),
         paidAt: new Date().toISOString(),
-        paymentMethod: 'Bank Transfer',
-        notes: `Payout for ${payout.brand} ${payout.model}`
+        bankAccount: formData.bankAccount,
+        transferId: formData.transferId,
+        notes: formData.notes || `Payout for ${formData.payout.brand} ${formData.payout.model}`,
       };
       return await apiRequest(`/api/payouts`, 'POST', payoutData);
     },
@@ -209,19 +241,37 @@ export default function Payouts() {
       queryClient.invalidateQueries({ queryKey: ['/api/payouts/upcoming'] });
       queryClient.invalidateQueries({ queryKey: ['/api/payouts/recent'] });
       queryClient.invalidateQueries({ queryKey: ['/api/payouts/metrics'] });
+      setIsPayoutModalOpen(false);
+      setSelectedPayout(null);
+      payoutForm.reset();
       toast({
         title: "Success",
-        description: "Payout created successfully",
+        description: "Payout processed successfully",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to create payout",
+        description: "Failed to process payout",
         variant: "destructive",
       });
     },
   });
+
+  const openPayoutModal = (payout: UpcomingPayout) => {
+    setSelectedPayout(payout);
+    payoutForm.setValue('amount', payout.vendorPayoutAmount.toString());
+    setIsPayoutModalOpen(true);
+  };
+
+  const onPayoutSubmit = (data: PayoutFormData) => {
+    if (selectedPayout) {
+      createPayoutMutation.mutate({
+        ...data,
+        payout: selectedPayout,
+      });
+    }
+  };
 
   // Filter and sort recent payouts
   const filteredRecentPayouts = useMemo(() => {
@@ -807,7 +857,7 @@ export default function Payouts() {
                                     <Button 
                                       variant="outline" 
                                       size="sm"
-                                      onClick={() => createPayoutMutation.mutate(payout)}
+                                      onClick={() => openPayoutModal(payout)}
                                       disabled={createPayoutMutation.isPending}
                                     >
                                       <Send className="h-4 w-4 mr-1" />
@@ -828,6 +878,129 @@ export default function Payouts() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Payout Form Modal */}
+      <Dialog open={isPayoutModalOpen} onOpenChange={setIsPayoutModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Process Payout</DialogTitle>
+            <DialogDescription>
+              {selectedPayout && (
+                <>
+                  Processing payout for <strong>{selectedPayout.brand} {selectedPayout.model}</strong> to vendor <strong>{selectedPayout.vendor.name}</strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...payoutForm}>
+            <form onSubmit={payoutForm.handleSubmit(onPayoutSubmit)} className="space-y-4">
+              <FormField
+                control={payoutForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payout Amount</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00" 
+                        {...field}
+                        data-testid="input-payout-amount"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={payoutForm.control}
+                name="bankAccount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bank Account</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Which bank account did you send from?" 
+                        {...field}
+                        data-testid="input-bank-account"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={payoutForm.control}
+                name="transferId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Transfer ID / Reference</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Bank transfer reference or ID" 
+                        {...field}
+                        data-testid="input-transfer-id"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={payoutForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Additional notes about this payout..." 
+                        className="h-20"
+                        {...field}
+                        data-testid="textarea-payout-notes"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsPayoutModalOpen(false)}
+                  data-testid="button-cancel-payout"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createPayoutMutation.isPending}
+                  data-testid="button-process-payout"
+                >
+                  {createPayoutMutation.isPending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Process Payout
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
