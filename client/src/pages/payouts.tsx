@@ -194,8 +194,16 @@ export default function Payouts() {
   });
 
   const createPayoutMutation = useMutation({
-    mutationFn: async (itemId: string) => {
-      return await apiRequest(`/api/payouts`, 'POST', { itemId });
+    mutationFn: async (payout: UpcomingPayout) => {
+      const payoutData = {
+        vendorId: payout.vendor.vendorId,
+        itemId: payout.itemId,
+        amount: payout.vendorPayoutAmount,
+        paidAt: new Date().toISOString(),
+        paymentMethod: 'Bank Transfer',
+        notes: `Payout for ${payout.brand} ${payout.model}`
+      };
+      return await apiRequest(`/api/payouts`, 'POST', payoutData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/payouts/upcoming'] });
@@ -799,7 +807,7 @@ export default function Payouts() {
                                     <Button 
                                       variant="outline" 
                                       size="sm"
-                                      onClick={() => createPayoutMutation.mutate(payout.itemId)}
+                                      onClick={() => createPayoutMutation.mutate(payout)}
                                       disabled={createPayoutMutation.isPending}
                                     >
                                       <Send className="h-4 w-4 mr-1" />
