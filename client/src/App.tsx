@@ -16,6 +16,7 @@ import Payouts from "@/pages/payouts";
 import Expenses from "@/pages/expenses";
 import Reports from "@/pages/reports";
 import Profitability from "@/pages/profitability";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/expenses" component={Expenses} />
       <Route path="/reports" component={Reports} />
       <Route path="/profitability" component={Profitability} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
