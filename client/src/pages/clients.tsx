@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
@@ -35,7 +36,8 @@ import {
   Clock,
   AlertCircle,
   CreditCard,
-  Receipt
+  Receipt,
+  MoreVertical
 } from "lucide-react";
 
 const clientFormSchema = insertClientSchema.extend({
@@ -293,7 +295,7 @@ export default function Clients() {
         
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="hidden sm:flex" data-testid="button-add-client">
               <Plus className="h-4 w-4 mr-2" />
               Add Client
             </Button>
@@ -420,30 +422,66 @@ export default function Clients() {
         ) : (
           filteredClients.map((client) => (
             <Card key={client.clientId} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                      <User className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">{client.name}</h3>
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <div className="flex items-center space-x-1">
-                          <Mail className="h-3 w-3" />
-                          <span>{client.email}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Phone className="h-3 w-3" />
-                          <span>{client.phone}</span>
+              <CardContent className="p-4 md:p-6">
+                <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+                  {/* Mobile: Header row with name and actions */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                        <User className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-lg truncate">{client.name}</h3>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-sm text-muted-foreground">
+                          <div className="flex items-center space-x-1">
+                            <Mail className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{client.email}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Phone className="h-3 w-3 flex-shrink-0" />
+                            <span>{client.phone}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
+
+                    {/* Mobile actions dropdown */}
+                    <div className="md:hidden">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="button-client-actions">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/client/${client.clientId}`} className="flex items-center w-full">
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/client/${client.clientId}`} className="flex items-center w-full">
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Client
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteClient(client.clientId, client.name || "Client")}
+                            disabled={deleteClientMutation.isPending}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
 
-                  <div className="flex items-center space-x-8">
-                    {/* Stats */}
-                    <div className="text-right">
+                  {/* Stats section - responsive grid */}
+                  <div className="grid grid-cols-2 gap-4 md:flex md:items-center md:space-x-8 md:gap-0">
+                    <div className="text-center md:text-right">
                       <div className="text-sm font-medium">
                         {client.totalPurchases} purchases
                       </div>
@@ -452,7 +490,7 @@ export default function Clients() {
                       </div>
                     </div>
 
-                    <div className="text-right">
+                    <div className="text-center md:text-right">
                       <div className="text-sm font-medium">
                         {formatCurrency(client.totalSpent)}
                       </div>
@@ -462,7 +500,7 @@ export default function Clients() {
                     </div>
 
                     {client.outstandingBalance > 0 && (
-                      <div className="text-right">
+                      <div className="text-center md:text-right col-span-2 md:col-span-1">
                         <div className="text-sm font-medium text-amber-600">
                           {formatCurrency(client.outstandingBalance)}
                         </div>
@@ -471,28 +509,28 @@ export default function Clients() {
                         </div>
                       </div>
                     )}
+                  </div>
 
-                    {/* Actions */}
-                    <div className="flex space-x-2">
-                      <Link href={`/client/${client.clientId}`}>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Link href={`/client/${client.clientId}`}>
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => handleDeleteClient(client.clientId, client.name || "Client")}
-                        disabled={deleteClientMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
+                  {/* Desktop actions */}
+                  <div className="hidden md:flex space-x-2">
+                    <Link href={`/client/${client.clientId}`}>
+                      <Button variant="ghost" size="sm">
+                        <Eye className="h-4 w-4" />
                       </Button>
-                    </div>
+                    </Link>
+                    <Link href={`/client/${client.clientId}`}>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleDeleteClient(client.clientId, client.name || "Client")}
+                      disabled={deleteClientMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
 
@@ -532,6 +570,19 @@ export default function Clients() {
           ))
         )}
       </div>
+
+      {/* Mobile Floating Action Button */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogTrigger asChild>
+          <Button 
+            className="md:hidden fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full shadow-lg"
+            size="sm"
+            data-testid="fab-add-client"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </DialogTrigger>
+      </Dialog>
     </MainLayout>
   );
 }
