@@ -951,6 +951,7 @@ export default function Inventory() {
             <Plus className="h-6 w-6" />
           </Button>
         </DialogTrigger>
+      </Dialog>
 
       {/* Sale Modal */}
       <Dialog open={isSaleModalOpen} onOpenChange={setIsSaleModalOpen}>
