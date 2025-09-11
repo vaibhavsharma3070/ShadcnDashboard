@@ -380,53 +380,6 @@ export default function ItemDetails() {
     },
   });
 
-  const updatePaymentMutation = useMutation({
-    mutationFn: async (data: { id: string; updates: Partial<PaymentFormData> }) => {
-      return await apiRequest('PUT', `/api/payments/${data.id}`, data.updates);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/payments/item', itemId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
-      setIsEditPaymentModalOpen(false);
-      setEditingPayment(null);
-      paymentForm.reset();
-      toast({
-        title: "Success",
-        description: "Payment updated successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update payment",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const createPaymentMutation = useMutation({
-    mutationFn: async (data: PaymentFormData) => {
-      return await apiRequest('POST', '/api/payments', data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/payments/item', itemId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
-      setIsAddPaymentModalOpen(false);
-      paymentForm.reset();
-      toast({
-        title: "Success",
-        description: "Payment created successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to create payment",
-        variant: "destructive",
-      });
-    },
-  });
-
   const editForm = useForm<ItemFormData>({
     resolver: zodResolver(itemFormSchema),
     defaultValues: {
@@ -465,17 +418,6 @@ export default function ItemDetails() {
       amount: "",
       dueDate: "",
       status: "pending"
-    },
-  });
-
-  const paymentForm = useForm<PaymentFormData>({
-    resolver: zodResolver(paymentFormSchema),
-    defaultValues: {
-      itemId: itemId || "",
-      clientId: assignedClient?.clientId || "",
-      amount: "",
-      paidAt: "",
-      method: "bank_transfer"
     },
   });
 
@@ -603,42 +545,6 @@ export default function ItemDetails() {
         id: editingInstallment.installmentId,
         updates: data
       });
-    }
-  };
-
-  const openEditPaymentModal = (payment: PaymentWithClient) => {
-    setEditingPayment(payment);
-    paymentForm.reset({
-      itemId: payment.itemId,
-      clientId: payment.clientId,
-      amount: payment.amount.toString(),
-      paidAt: payment.paidAt.split('T')[0],
-      method: payment.method || 'bank_transfer'
-    });
-    setIsEditPaymentModalOpen(true);
-  };
-
-  const openAddPaymentModal = () => {
-    paymentForm.reset({
-      itemId: itemId || "",
-      clientId: assignedClient?.clientId || "",
-      amount: "",
-      paidAt: new Date().toISOString().split('T')[0],
-      method: "bank_transfer"
-    });
-    setIsAddPaymentModalOpen(true);
-  };
-
-  const onPaymentSubmit = (data: PaymentFormData) => {
-    if (editingPayment) {
-      // Edit mode: update existing payment
-      updatePaymentMutation.mutate({
-        id: editingPayment.paymentId,
-        updates: data
-      });
-    } else {
-      // Create mode: create new payment
-      createPaymentMutation.mutate(data);
     }
   };
 
@@ -1013,10 +919,6 @@ export default function ItemDetails() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Payment History</CardTitle>
-              <Button size="sm" onClick={openAddPaymentModal}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Payment
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1044,11 +946,8 @@ export default function ItemDetails() {
                         {payment.paymentMethod} • {formatDateTime(payment.paidAt)}
                       </p>
                     </div>
-                    <div className="text-right flex items-center gap-2">
+                    <div className="text-right">
                       <p className="font-bold text-green-600">{formatCurrency(payment.amount)}</p>
-                      <Button size="sm" variant="outline" onClick={() => openEditPaymentModal(payment)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                 ))
@@ -1431,181 +1330,6 @@ export default function ItemDetails() {
                     ? "Processing..." 
                     : (isSplitMode ? "Split Payment" : "Update Payment")
                   }
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Payment Modal */}
-      <Dialog open={isEditPaymentModalOpen} onOpenChange={setIsEditPaymentModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Payment</DialogTitle>
-          </DialogHeader>
-          <Form {...paymentForm}>
-            <form onSubmit={paymentForm.handleSubmit(onPaymentSubmit)} className="space-y-4">
-              <FormField
-                control={paymentForm.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Amount ($)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0.00" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={paymentForm.control}
-                name="paidAt"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={paymentForm.control}
-                name="method"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Method</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment method" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="credit_card">Credit Card</SelectItem>
-                        <SelectItem value="debit_card">Debit Card</SelectItem>
-                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="check">Check</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => {
-                    setIsEditPaymentModalOpen(false);
-                    setEditingPayment(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={updatePaymentMutation.isPending}
-                >
-                  {updatePaymentMutation.isPending ? "Updating..." : "Update Payment"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Payment Modal */}
-      <Dialog open={isAddPaymentModalOpen} onOpenChange={setIsAddPaymentModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Payment</DialogTitle>
-          </DialogHeader>
-          <Form {...paymentForm}>
-            <form onSubmit={paymentForm.handleSubmit(onPaymentSubmit)} className="space-y-4">
-              <FormField
-                control={paymentForm.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Amount ($)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0.00" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={paymentForm.control}
-                name="paidAt"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={paymentForm.control}
-                name="method"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Method</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment method" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="credit_card">Credit Card</SelectItem>
-                        <SelectItem value="debit_card">Debit Card</SelectItem>
-                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="check">Check</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setIsAddPaymentModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={createPaymentMutation.isPending}
-                >
-                  {createPaymentMutation.isPending ? "Adding..." : "Add Payment"}
                 </Button>
               </div>
             </form>

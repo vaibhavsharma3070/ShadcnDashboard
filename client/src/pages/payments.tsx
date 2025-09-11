@@ -413,8 +413,8 @@ export default function Payments() {
               <div className="space-y-4">
                 <div className="text-center">
                   <div className={`text-4xl font-bold ${
-                    (financialHealth?.score || 0) >= 80 ? 'text-green-600' :
-                    (financialHealth?.score || 0) >= 60 ? 'text-yellow-600' :
+                    financialHealth?.score >= 80 ? 'text-green-600' :
+                    financialHealth?.score >= 60 ? 'text-yellow-600' :
                     'text-red-600'
                   }`}>
                     {financialHealth?.score || 0}
@@ -431,10 +431,10 @@ export default function Payments() {
                       <span className="text-sm">Payment Timeliness</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {(financialHealth?.factors?.paymentTimeliness || 0).toFixed(1)}%
+                      {financialHealth?.factors.paymentTimeliness.toFixed(1) || 0}%
                     </span>
                   </div>
-                  <Progress value={financialHealth?.factors?.paymentTimeliness || 0} className="h-2" />
+                  <Progress value={financialHealth?.factors.paymentTimeliness || 0} className="h-2" />
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -442,10 +442,10 @@ export default function Payments() {
                       <span className="text-sm">Cash Flow</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {(financialHealth?.factors?.cashFlow || 0).toFixed(1)}%
+                      {financialHealth?.factors.cashFlow.toFixed(1) || 0}%
                     </span>
                   </div>
-                  <Progress value={financialHealth?.factors?.cashFlow || 0} className="h-2" />
+                  <Progress value={financialHealth?.factors.cashFlow || 0} className="h-2" />
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -453,10 +453,10 @@ export default function Payments() {
                       <span className="text-sm">Inventory Turnover</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {(financialHealth?.factors?.inventoryTurnover || 0).toFixed(1)}%
+                      {financialHealth?.factors.inventoryTurnover.toFixed(1) || 0}%
                     </span>
                   </div>
-                  <Progress value={financialHealth?.factors?.inventoryTurnover || 0} className="h-2" />
+                  <Progress value={financialHealth?.factors.inventoryTurnover || 0} className="h-2" />
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -464,10 +464,10 @@ export default function Payments() {
                       <span className="text-sm">Profit Margin</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {(financialHealth?.factors?.profitMargin || 0).toFixed(1)}%
+                      {financialHealth?.factors.profitMargin.toFixed(1) || 0}%
                     </span>
                   </div>
-                  <Progress value={financialHealth?.factors?.profitMargin || 0} className="h-2" />
+                  <Progress value={financialHealth?.factors.profitMargin || 0} className="h-2" />
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -475,10 +475,10 @@ export default function Payments() {
                       <span className="text-sm">Client Retention</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {(financialHealth?.factors?.clientRetention || 0).toFixed(1)}%
+                      {financialHealth?.factors.clientRetention.toFixed(1) || 0}%
                     </span>
                   </div>
-                  <Progress value={financialHealth?.factors?.clientRetention || 0} className="h-2" />
+                  <Progress value={financialHealth?.factors.clientRetention || 0} className="h-2" />
                 </div>
                 
                 {financialHealth?.recommendations && financialHealth.recommendations.length > 0 && (
