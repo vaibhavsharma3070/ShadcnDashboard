@@ -334,65 +334,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Top Performing Items */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Performing Items</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {performingLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4 p-3">
-                    <Skeleton className="w-12 h-12 rounded-lg" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-24" />
-                    </div>
-                    <div className="text-right space-y-2">
-                      <Skeleton className="h-4 w-16" />
-                      <Skeleton className="h-3 w-12" />
-                    </div>
-                  </div>
-                ))
-              ) : topPerforming && topPerforming.length > 0 ? (
-                topPerforming.map((item) => {
-                  const IconComponent = getItemIcon(item.brand);
-                  return (
-                    <div
-                      key={item.itemId}
-                      className="flex items-center space-x-4 p-3 hover:bg-accent rounded-lg"
-                    >
-                      <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
-                        <IconComponent className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-foreground">
-                          {item.title}
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                          {item.brand} • {item.model}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-foreground">
-                          {formatCurrency(item.profit)}
-                        </p>
-                        <p className="text-sm text-emerald-600">+15.2%</p>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    No performance data available
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        
       </div>
 
       {/* Recent Activity and Quick Actions */}
