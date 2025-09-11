@@ -88,7 +88,7 @@ const toOptionalNumber = z.preprocess(
 const itemFormSchema = insertItemSchema.extend({
   vendorId: z.string().min(1, "Vendor is required"),
   title: z.string().min(1, "Title is required"),
-  brand: z.string().min(1, "Brand is required"),
+  brandId: z.string().min(1, "Brand is required"),
   model: z.string().min(1, "Model is required"),
   minCost: toOptionalNumber,
   maxCost: toOptionalNumber,
@@ -262,11 +262,12 @@ export default function Inventory() {
     queryKey: ["/api/clients"],
   });
 
-  const { data: brands } = useQuery<Brand[]>({
+  const { data: brands, isLoading: brandsLoading } = useQuery<Brand[]>({
     queryKey: ["/api/brands"],
   });
 
-  const { data: categories } = useQuery<Category[]>({
+
+  const { data: categories, isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
   });
 
@@ -424,7 +425,8 @@ export default function Inventory() {
     defaultValues: {
       vendorId: "",
       title: "",
-      brand: "",
+      brandId: "",
+      categoryId: undefined,
       model: "",
       serialNo: "",
       condition: "",
@@ -529,7 +531,7 @@ export default function Inventory() {
       const matchesSearch =
         searchQuery === "" ||
         item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.brand || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.model?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.vendor.name?.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -559,7 +561,10 @@ export default function Inventory() {
         case "price-low":
           return Number(a.maxSalesPrice || 0) - Number(b.maxSalesPrice || 0);
         case "brand":
-          return (a.brand || "").localeCompare(b.brand || "");
+          // Sort by brand name using brand relation or fallback to legacy brand field
+          const aBrandName = a.brand || "";
+          const bBrandName = b.brand || "";
+          return aBrandName.localeCompare(bBrandName);
         default:
           return 0;
       }
@@ -784,7 +789,7 @@ export default function Inventory() {
                               value={field.value}
                             >
                               <FormControl>
-                                <SelectTrigger>
+                                <SelectTrigger data-testid="select-vendor">
                                   <SelectValue placeholder="Select vendor" />
                                 </SelectTrigger>
                               </FormControl>
@@ -826,13 +831,74 @@ export default function Inventory() {
 
                       <FormField
                         control={form.control}
-                        name="brand"
+                        name="brandId"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Brand</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Brand name" {...field} />
-                            </FormControl>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-brand">
+                                  <SelectValue placeholder="Select brand" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {brandsLoading ? (
+                                  <SelectItem value="loading" disabled>
+                                    Loading brands...
+                                  </SelectItem>
+                                ) : (
+                                  brands?.filter(brand => brand.active === "true").map((brand) => (
+                                    <SelectItem
+                                      key={brand.brandId}
+                                      value={brand.brandId}
+                                    >
+                                      {brand.name}
+                                    </SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="categoryId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Category (Optional)</FormLabel>
+                            <Select
+                              onValueChange={(value) => field.onChange(value === "none" ? undefined : value)}
+                              value={field.value || "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-category">
+                                  <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">No category</SelectItem>
+                                {categoriesLoading ? (
+                                  <SelectItem value="loading" disabled>
+                                    Loading categories...
+                                  </SelectItem>
+                                ) : (
+                                  categories?.filter(category => category.active === "true").map((category) => (
+                                    <SelectItem
+                                      key={category.categoryId}
+                                      value={category.categoryId}
+                                    >
+                                      {category.name}
+                                    </SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}

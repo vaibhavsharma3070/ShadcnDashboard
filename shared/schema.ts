@@ -272,7 +272,10 @@ export const insertItemSchema = createInsertSchema(item).omit({
   createdAt: true,
 }).extend({
   brandId: z.string().min(1, "Brand is required"),
-  categoryId: z.string().min(1, "Category is required"),
+  categoryId: z.preprocess((val) => 
+    val === null || val === undefined || val === '' || val === 'none' ? undefined : val,
+    z.string().uuid().optional()
+  ),
   minCost: z.preprocess((val) => 
     val === null || val === undefined || val === '' ? null : (typeof val === 'string' ? parseFloat(val) : val),
     z.number().nullable()
