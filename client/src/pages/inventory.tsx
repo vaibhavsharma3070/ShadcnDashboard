@@ -114,7 +114,7 @@ const itemFormSchema = insertItemSchema.extend({
 });
 
 // Create a function to generate the sale form schema with item context
-const createSaleFormSchema = (maxSalesPrice?: number) => z
+const saleFormSchema = z
   .object({
     clientId: z.string().min(1, "Client is required"),
     paymentType: z.enum(["full", "installment"]),
@@ -137,41 +137,19 @@ const createSaleFormSchema = (maxSalesPrice?: number) => z
           return false;
         }
         // Check that all installments have required fields
-        if (
-          !data.installments.every(
-            (inst) =>
-              inst.amount &&
-              inst.amount.length > 0 &&
-              inst.dueDate &&
-              inst.dueDate.length > 0,
-          )
-        ) {
-          return false;
-        }
-
-        // Check that initial payment + installment total doesn't exceed item price
-        const initialPayment = parseFloat(data.amount) || 0;
-        const installmentTotal = data.installments.reduce(
-          (sum, inst) => sum + (parseFloat(inst.amount || "0") || 0),
-          0,
+        return data.installments.every(
+          (inst) =>
+            inst.amount &&
+            inst.amount.length > 0 &&
+            inst.dueDate &&
+            inst.dueDate.length > 0,
         );
-        const itemPrice = maxSalesPrice || 0;
-
-        return initialPayment + installmentTotal <= itemPrice;
       }
-
-      // For full payment, check that amount doesn't exceed item price
-      if (data.paymentType === "full") {
-        const paymentAmount = parseFloat(data.amount) || 0;
-        const itemPrice = maxSalesPrice || 0;
-        return paymentAmount <= itemPrice;
-      }
-
       return true;
     },
     {
-      message: "Payment amount cannot exceed item price",
-      path: ["amount"],
+      message: "Please provide all installment amounts and due dates",
+      path: ["installments"],
     },
   );
 
@@ -477,36 +455,6 @@ export default function Inventory() {
       return;
     }
 
-    // Validate payment amount against selected item's price range
-    const maxSalesPrice = Number(selectedItem.maxSalesPrice) || 0;
-    
-    if (data.paymentType === "full") {
-      const paymentAmount = parseFloat(data.amount) || 0;
-      if (paymentAmount > maxSalesPrice) {
-        toast({
-          title: "Error",
-          description: `Payment amount ($${paymentAmount.toFixed(2)}) cannot exceed item's maximum sales price ($${maxSalesPrice.toFixed(2)})`,
-          variant: "destructive",
-        });
-        return;
-      }
-    } else if (data.paymentType === "installment") {
-      const initialPayment = parseFloat(data.amount) || 0;
-      const installmentTotal = data.installments?.reduce(
-        (sum, inst) => sum + (parseFloat(inst.amount || "0") || 0),
-        0,
-      ) || 0;
-      const totalPayment = initialPayment + installmentTotal;
-      
-      if (totalPayment > maxSalesPrice) {
-        toast({
-          title: "Error", 
-          description: `Total payment amount ($${totalPayment.toFixed(2)}) cannot exceed item's maximum sales price ($${maxSalesPrice.toFixed(2)})`,
-          variant: "destructive",
-        });
-        return;
-      }
-    }
 
     const formData = {
       ...data,
