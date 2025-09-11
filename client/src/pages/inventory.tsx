@@ -469,6 +469,37 @@ export default function Inventory() {
       return;
     }
 
+    // Validate payment amount against selected item's price range
+    const maxSalesPrice = Number(selectedItem.maxSalesPrice) || 0;
+    
+    if (data.paymentType === "full") {
+      const paymentAmount = parseFloat(data.amount) || 0;
+      if (paymentAmount > maxSalesPrice) {
+        toast({
+          title: "Error",
+          description: `Payment amount ($${paymentAmount.toFixed(2)}) cannot exceed item's maximum sales price ($${maxSalesPrice.toFixed(2)})`,
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (data.paymentType === "installment") {
+      const initialPayment = parseFloat(data.amount) || 0;
+      const installmentTotal = data.installments?.reduce(
+        (sum, inst) => sum + (parseFloat(inst.amount || "0") || 0),
+        0,
+      ) || 0;
+      const totalPayment = initialPayment + installmentTotal;
+      
+      if (totalPayment > maxSalesPrice) {
+        toast({
+          title: "Error", 
+          description: `Total payment amount ($${totalPayment.toFixed(2)}) cannot exceed item's maximum sales price ($${maxSalesPrice.toFixed(2)})`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     const formData = {
       ...data,
       installments:
