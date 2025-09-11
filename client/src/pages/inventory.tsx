@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
@@ -40,7 +41,8 @@ import {
   CheckCircle,
   ShoppingCart,
   CreditCard,
-  X
+  X,
+  MoreVertical
 } from "lucide-react";
 
 type ItemWithVendor = Item & { vendor: Vendor };
@@ -517,8 +519,8 @@ export default function Inventory() {
       {/* Controls */}
       <Card className="mb-6">
         <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-4 flex-1">
+          <div className="flex flex-col space-y-4 lg:flex-row lg:gap-4 lg:items-center lg:justify-between lg:space-y-0">
+            <div className="flex flex-col space-y-4 sm:flex-row sm:gap-4 sm:space-y-0 flex-1">
               {/* Search */}
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -564,7 +566,7 @@ export default function Inventory() {
             {/* Add Item Button */}
             <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="hidden md:flex" data-testid="button-add-item">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
                 </Button>
@@ -796,49 +798,56 @@ export default function Inventory() {
               {filteredAndSortedItems.map((item) => {
                 const IconComponent = getItemIcon(item.brand || "");
                 return (
-                  <div key={item.itemId} className="flex items-center space-x-4 p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
-                    <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
-                      <IconComponent className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="font-semibold text-foreground">{item.title}</h3>
-                        <StatusUpdateDropdown 
-                          itemId={item.itemId} 
-                          currentStatus={item.status}
-                        />
+                  <div key={item.itemId} className="flex flex-col md:flex-row md:items-center space-y-3 md:space-y-0 md:space-x-4 p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
+                    {/* Mobile: Row layout for item info and actions */}
+                    <div className="flex items-start space-x-4 w-full">
+                      <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                        <IconComponent className="h-8 w-8 text-muted-foreground" />
                       </div>
-                      <p className="text-sm text-muted-foreground mb-1">
-                        {item.brand} • {item.model}
-                        {item.serialNo && ` • S/N: ${item.serialNo}`}
-                      </p>
-                      <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                        <span className="flex items-center">
-                          <User className="h-3 w-3 mr-1" />
-                          {item.vendor.name}
-                        </span>
-                        <span className="flex items-center">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {formatDate(item.createdAt.toString())}
-                        </span>
-                        {item.condition && (
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-1">
+                          <div className="flex items-center space-x-2 mb-1 sm:mb-0">
+                            <h3 className="font-semibold text-foreground truncate">{item.title}</h3>
+                            <StatusUpdateDropdown 
+                              itemId={item.itemId} 
+                              currentStatus={item.status}
+                            />
+                          </div>
+                          <div className="text-right sm:text-left">
+                            <p className="text-lg font-bold text-foreground">{formatCurrency(item.listPrice || 0)}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Payout: {formatCurrency(item.agreedVendorPayout || 0)}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <p className="text-sm text-muted-foreground mb-1">
+                          {item.brand} • {item.model}
+                          {item.serialNo && ` • S/N: ${item.serialNo}`}
+                        </p>
+                        
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                           <span className="flex items-center">
-                            <Tag className="h-3 w-3 mr-1" />
-                            {item.condition}
+                            <User className="h-3 w-3 mr-1 flex-shrink-0" />
+                            {item.vendor.name}
                           </span>
-                        )}
+                          <span className="flex items-center">
+                            <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
+                            {formatDate(item.createdAt.toString())}
+                          </span>
+                          {item.condition && (
+                            <span className="flex items-center">
+                              <Tag className="h-3 w-3 mr-1 flex-shrink-0" />
+                              {item.condition}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-foreground">{formatCurrency(item.listPrice || 0)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Payout: {formatCurrency(item.agreedVendorPayout || 0)}
-                      </p>
-                    </div>
-                    
-                    <div className="flex space-x-2">
+                    {/* Desktop actions */}
+                    <div className="hidden md:flex space-x-2">
                       {item.status === 'in-store' && (
                         <Button 
                           variant="default" 
@@ -870,6 +879,42 @@ export default function Inventory() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
+
+                    {/* Mobile actions dropdown */}
+                    <div className="md:hidden">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="button-item-actions">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/item/${item.itemId}`} className="flex items-center w-full">
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </Link>
+                          </DropdownMenuItem>
+                          {item.status === 'in-store' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleSellItem(item)}
+                              disabled={createSaleMutation.isPending}
+                            >
+                              <ShoppingCart className="h-4 w-4 mr-2" />
+                              Sell Item
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteItem(item.itemId, item.title || "Item")}
+                            disabled={deleteItemMutation.isPending}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 );
               })}
@@ -894,6 +939,18 @@ export default function Inventory() {
           )}
         </CardContent>
       </Card>
+
+      {/* Mobile Floating Action Button */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogTrigger asChild>
+          <Button 
+            className="md:hidden fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full shadow-lg"
+            size="sm"
+            data-testid="fab-add-item"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </DialogTrigger>
 
       {/* Sale Modal */}
       <Dialog open={isSaleModalOpen} onOpenChange={setIsSaleModalOpen}>
