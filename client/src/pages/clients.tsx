@@ -355,7 +355,7 @@ export default function Clients() {
                     <FormItem>
                       <FormLabel>Billing Address</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Billing address" {...field} />
+                        <Textarea placeholder="Billing address" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -539,7 +539,7 @@ export default function Clients() {
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center space-x-4">
                       <span className="text-muted-foreground">
-                        Customer since: {formatDate(client.createdAt)}
+                        Customer since: {formatDate(client.createdAt.toString())}
                       </span>
                     </div>
                     
