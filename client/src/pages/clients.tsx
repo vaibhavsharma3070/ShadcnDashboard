@@ -53,7 +53,10 @@ interface ClientWithStats extends Client {
   activePurchases: number;
   completedPurchases: number;
   totalSpent: number;
-  outstandingBalance: number;
+  outstandingBalance: {
+    min: number;
+    max: number;
+  };
 }
 
 function formatCurrency(amount: number) {
@@ -71,6 +74,13 @@ function formatDate(dateString: string) {
   });
 }
 
+function formatCurrencyRange(min: number, max: number) {
+  if (min === max) {
+    return formatCurrency(min);
+  }
+  return `${formatCurrency(min)} - ${formatCurrency(max)}`;
+}
+
 export default function Clients() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -86,7 +96,7 @@ export default function Clients() {
         activePurchases: 0,
         completedPurchases: 0,
         totalSpent: 0,
-        outstandingBalance: 0
+        outstandingBalance: { min: 0, max: 0 }
       }));
     }
   });
@@ -179,13 +189,17 @@ export default function Clients() {
     }, {} as Record<string, { item: Item & { vendor: Vendor }, payments: ClientPayment[], totalPaid: number }>);
 
     const purchases = Object.values(itemPayments);
-    const activePurchases = purchases.filter(p => p.totalPaid < Number(p.item.listPrice || 0)).length;
-    const completedPurchases = purchases.filter(p => p.totalPaid >= Number(p.item.listPrice || 0)).length;
+    const activePurchases = purchases.filter(p => p.totalPaid < Number(p.item.maxSalesPrice || 0)).length;
+    const completedPurchases = purchases.filter(p => p.totalPaid >= Number(p.item.maxSalesPrice || 0)).length;
     const totalSpent = clientPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-    const outstandingBalance = purchases.reduce((sum, purchase) => {
-      const remaining = Number(purchase.item.listPrice || 0) - purchase.totalPaid;
-      return sum + Math.max(0, remaining);
-    }, 0);
+    const outstandingBalance = purchases.reduce((acc, purchase) => {
+      const minRemaining = Math.max(0, Number(purchase.item.minSalesPrice || 0) - purchase.totalPaid);
+      const maxRemaining = Math.max(0, Number(purchase.item.maxSalesPrice || 0) - purchase.totalPaid);
+      return {
+        min: acc.min + minRemaining,
+        max: acc.max + maxRemaining
+      };
+    }, { min: 0, max: 0 });
 
     return {
       ...client,
@@ -209,7 +223,10 @@ export default function Clients() {
   const activeClients = clientsWithStats.filter(c => c.activePurchases > 0).length;
   const totalPurchases = clientsWithStats.reduce((sum, c) => sum + c.totalPurchases, 0);
   const totalRevenue = clientsWithStats.reduce((sum, c) => sum + c.totalSpent, 0);
-  const totalOutstanding = clientsWithStats.reduce((sum, c) => sum + c.outstandingBalance, 0);
+  const totalOutstandingRange = clientsWithStats.reduce((acc, c) => ({
+    min: acc.min + c.outstandingBalance.min,
+    max: acc.max + c.outstandingBalance.max
+  }), { min: 0, max: 0 });
 
   return (
     <MainLayout title="Clients" subtitle="Manage client relationships and purchase history">
@@ -273,7 +290,7 @@ export default function Clients() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalOutstanding)}</div>
+            <div className="text-2xl font-bold">{formatCurrencyRange(totalOutstandingRange.min, totalOutstandingRange.max)}</div>
             <p className="text-xs text-muted-foreground">
               Awaiting payment
             </p>
@@ -499,10 +516,10 @@ export default function Clients() {
                       </div>
                     </div>
 
-                    {client.outstandingBalance > 0 && (
+                    {(client.outstandingBalance.min > 0 || client.outstandingBalance.max > 0) && (
                       <div className="text-center md:text-right col-span-2 md:col-span-1">
                         <div className="text-sm font-medium text-amber-600">
-                          {formatCurrency(client.outstandingBalance)}
+                          {formatCurrencyRange(client.outstandingBalance.min, client.outstandingBalance.max)}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Outstanding
@@ -550,7 +567,7 @@ export default function Clients() {
                           Active
                         </Badge>
                       )}
-                      {client.outstandingBalance > 0 && (
+                      {(client.outstandingBalance.min > 0 || client.outstandingBalance.max > 0) && (
                         <Badge variant="outline">
                           <Clock className="w-3 h-3 mr-1" />
                           Outstanding Balance

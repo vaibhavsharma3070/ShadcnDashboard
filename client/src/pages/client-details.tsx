@@ -68,7 +68,7 @@ type ClientWithPurchases = Client & {
     item: Item & { vendor: Vendor };
     payments: ClientPayment[];
     totalPaid: number;
-    remainingBalance: number;
+    remainingBalance: { min: number; max: number };
   }>;
 };
 
@@ -82,6 +82,13 @@ function formatCurrency(amount: number | string) {
     style: 'currency',
     currency: 'USD'
   }).format(num);
+}
+
+function formatCurrencyRange(min: number, max: number) {
+  if (min === max) {
+    return formatCurrency(min);
+  }
+  return `${formatCurrency(min)} - ${formatCurrency(max)}`;
 }
 
 function formatDate(dateString: string) {
@@ -135,7 +142,7 @@ export default function ClientDetails() {
     enabled: !!clientId,
   });
 
-  const { data: payments } = useQuery<Array<PaymentWithItem>>({
+  const { data: payments } = useQuery({
     queryKey: ['/api/payments'],
     select: (payments: Array<ClientPayment & { item: Item & { vendor: Vendor }, client: Client }>) => {
       return payments.filter(payment => payment.clientId === clientId);
@@ -321,20 +328,30 @@ export default function ClientDetails() {
     return acc;
   }, {} as Record<string, { item: Item & { vendor: Vendor }, payments: ClientPayment[], totalPaid: number }>);
 
-  const purchases = Object.values(itemPayments).map(purchase => ({
-    ...purchase,
-    remainingBalance: Number(purchase.item.listPrice || 0) - purchase.totalPaid
-  }));
+  const purchases = Object.values(itemPayments).map(purchase => {
+    const minPrice = Number(purchase.item.minSalesPrice || 0);
+    const maxPrice = Number(purchase.item.maxSalesPrice || minPrice);
+    return {
+      ...purchase,
+      remainingBalance: {
+        min: Math.max(minPrice - purchase.totalPaid, 0),
+        max: Math.max(maxPrice - purchase.totalPaid, 0)
+      }
+    };
+  });
 
-  const activePurchases = purchases.filter(p => p.remainingBalance > 0);
-  const completedPurchases = purchases.filter(p => p.remainingBalance <= 0);
+  const activePurchases = purchases.filter(p => p.remainingBalance.max > 0);
+  const completedPurchases = purchases.filter(p => p.remainingBalance.max <= 0);
   const totalSpent = clientPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-  const outstandingBalance = purchases.reduce((sum, purchase) => sum + Math.max(0, purchase.remainingBalance), 0);
+  const outstandingBalance = {
+    min: purchases.reduce((sum, purchase) => sum + purchase.remainingBalance.min, 0),
+    max: purchases.reduce((sum, purchase) => sum + purchase.remainingBalance.max, 0)
+  };
 
   // Get available items for new payments (items that aren't fully paid)
   const availableItems = items?.filter(item => {
     const itemPurchase = purchases.find(p => p.item.itemId === item.itemId);
-    return !itemPurchase || itemPurchase.remainingBalance > 0;
+    return !itemPurchase || itemPurchase.remainingBalance.max > 0;
   }) || [];
 
   return (
@@ -460,7 +477,7 @@ export default function ClientDetails() {
                   <Label className="text-sm font-medium text-muted-foreground">Customer Since</Label>
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <p>{formatDate(client.createdAt)}</p>
+                    <p>{formatDate(client.createdAt ? client.createdAt.toString() : new Date().toISOString())}</p>
                   </div>
                 </div>
                 <div>
@@ -517,7 +534,7 @@ export default function ClientDetails() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(outstandingBalance)}</div>
+              <div className="text-2xl font-bold">{formatCurrencyRange(outstandingBalance.min, outstandingBalance.max)}</div>
               <p className="text-xs text-muted-foreground">
                 Remaining to pay
               </p>
@@ -573,10 +590,15 @@ export default function ClientDetails() {
                                 <option value="">Select an item</option>
                                 {availableItems.map((item) => {
                                   const purchase = purchases.find(p => p.item.itemId === item.itemId);
-                                  const remaining = purchase ? purchase.remainingBalance : Number(item.listPrice || 0);
+                                  const remaining = purchase 
+                                    ? purchase.remainingBalance 
+                                    : { 
+                                        min: Number(item.minSalesPrice || 0), 
+                                        max: Number(item.maxSalesPrice || item.minSalesPrice || 0) 
+                                      };
                                   return (
                                     <option key={item.itemId} value={item.itemId}>
-                                      {item.title} - {formatCurrency(remaining)} remaining
+                                      {item.title} - {formatCurrencyRange(remaining.min, remaining.max)} remaining
                                     </option>
                                   );
                                 })}
@@ -645,7 +667,11 @@ export default function ClientDetails() {
 
                         <div className="flex items-center space-x-4">
                           <div className="text-right">
-                            <p className="font-medium">{formatCurrency(purchase.item.listPrice || 0)}</p>
+                            <p className="font-medium">
+                              {purchase.item.minSalesPrice && purchase.item.maxSalesPrice 
+                                ? `${formatCurrency(purchase.item.minSalesPrice)} - ${formatCurrency(purchase.item.maxSalesPrice)}`
+                                : formatCurrency(purchase.item.maxSalesPrice || purchase.item.minSalesPrice || 0)}
+                            </p>
                             <p className="text-sm text-muted-foreground">Total Price</p>
                           </div>
                           <div className="text-right">
@@ -653,15 +679,15 @@ export default function ClientDetails() {
                             <p className="text-sm text-muted-foreground">Paid</p>
                           </div>
                           <div className="text-right">
-                            <p className={`font-medium ${purchase.remainingBalance > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                              {formatCurrency(purchase.remainingBalance)}
+                            <p className={`font-medium ${purchase.remainingBalance.max > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                              {formatCurrencyRange(purchase.remainingBalance.min, purchase.remainingBalance.max)}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {purchase.remainingBalance > 0 ? 'Remaining' : 'Paid in Full'}
+                              {purchase.remainingBalance.max > 0 ? 'Remaining' : 'Paid in Full'}
                             </p>
                           </div>
                           <div className="text-right">
-                            {purchase.remainingBalance > 0 ? (
+                            {purchase.remainingBalance.max > 0 ? (
                               <Badge variant="outline">
                                 <Clock className="w-3 h-3 mr-1" />
                                 Partial
@@ -718,7 +744,7 @@ export default function ClientDetails() {
                   <TableBody>
                     {clientPayments.map((payment) => (
                       <TableRow key={payment.paymentId}>
-                        <TableCell>{formatDateTime(payment.createdAt)}</TableCell>
+                        <TableCell>{formatDateTime(payment.paidAt.toString())}</TableCell>
                         <TableCell>{payment.item.title}</TableCell>
                         <TableCell>{formatCurrency(payment.amount)}</TableCell>
                         <TableCell>
@@ -773,7 +799,7 @@ export default function ClientDetails() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm">Outstanding Balance</span>
-                      <span className="text-sm font-medium text-amber-600">{formatCurrency(outstandingBalance)}</span>
+                      <span className="text-sm font-medium text-amber-600">{formatCurrencyRange(outstandingBalance.min, outstandingBalance.max)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm">Average Payment</span>

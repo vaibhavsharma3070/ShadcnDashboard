@@ -113,13 +113,13 @@ const itemFormSchema = insertItemSchema.extend({
   path: ["maxSalesPrice"],
 });
 
-const saleFormSchema = z
+// Create a function to generate the sale form schema with item context
+const createSaleFormSchema = (maxSalesPrice?: number) => z
   .object({
     clientId: z.string().min(1, "Client is required"),
     paymentType: z.enum(["full", "installment"]),
     amount: z.string().min(1, "Amount is required"),
     paymentMethod: z.string().min(1, "Payment method is required"),
-    listPrice: z.string().optional(), // Added for validation
     installments: z
       .array(
         z.object({
@@ -155,7 +155,7 @@ const saleFormSchema = z
           (sum, inst) => sum + (parseFloat(inst.amount || "0") || 0),
           0,
         );
-        const itemPrice = parseFloat(data.listPrice || "0");
+        const itemPrice = maxSalesPrice || 0;
 
         return initialPayment + installmentTotal <= itemPrice;
       }
@@ -163,7 +163,7 @@ const saleFormSchema = z
       // For full payment, check that amount doesn't exceed item price
       if (data.paymentType === "full") {
         const paymentAmount = parseFloat(data.amount) || 0;
-        const itemPrice = parseFloat(data.listPrice || "0");
+        const itemPrice = maxSalesPrice || 0;
         return paymentAmount <= itemPrice;
       }
 
@@ -174,6 +174,9 @@ const saleFormSchema = z
       path: ["amount"],
     },
   );
+
+// Default schema for initial form setup
+const saleFormSchema = createSaleFormSchema();
 
 type ItemFormData = z.infer<typeof itemFormSchema>;
 type SaleFormData = z.infer<typeof saleFormSchema>;
@@ -514,7 +517,6 @@ export default function Inventory() {
     setSelectedItem(item);
     const maxPrice = item.maxSalesPrice?.toString() || "";
     saleForm.setValue("amount", maxPrice);
-    saleForm.setValue("listPrice", maxPrice);
     saleForm.setValue("paymentType", "full");
     const initialInstallments = [{ amount: "", dueDate: "" }];
     setInstallments(initialInstallments);

@@ -49,8 +49,14 @@ interface VendorWithStats extends Vendor {
   totalItems: number;
   activeItems: number;
   soldItems: number;
-  totalValue: number;
-  pendingPayouts: number;
+  totalValue: {
+    min: number;
+    max: number;
+  };
+  pendingPayouts: {
+    min: number;
+    max: number;
+  };
 }
 
 function formatCurrency(amount: number) {
@@ -68,6 +74,13 @@ function formatDate(dateString: string) {
   });
 }
 
+function formatCurrencyRange(min: number, max: number) {
+  if (min === max) {
+    return formatCurrency(min);
+  }
+  return `${formatCurrency(min)} - ${formatCurrency(max)}`;
+}
+
 export default function Vendors() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -82,8 +95,8 @@ export default function Vendors() {
         totalItems: 0,
         activeItems: 0,
         soldItems: 0,
-        totalValue: 0,
-        pendingPayouts: 0
+        totalValue: { min: 0, max: 0 },
+        pendingPayouts: { min: 0, max: 0 }
       }));
     }
   });
@@ -161,10 +174,16 @@ export default function Vendors() {
     const vendorItems = items?.filter(item => item.vendorId === vendor.vendorId) || [];
     const activeItems = vendorItems.filter(item => item.status === 'in-store' || item.status === 'reserved').length;
     const soldItems = vendorItems.filter(item => item.status === 'sold').length;
-    const totalValue = vendorItems.reduce((sum, item) => sum + Number(item.listPrice || 0), 0);
-    const pendingPayouts = vendorItems
-      .filter(item => item.status === 'sold')
-      .reduce((sum, item) => sum + Number(item.agreedVendorPayout || 0), 0);
+    const totalValue = vendorItems.reduce((acc, item) => ({
+      min: acc.min + Number(item.minSalesPrice || 0),
+      max: acc.max + Number(item.maxSalesPrice || 0)
+    }), { min: 0, max: 0 });
+    
+    const soldVendorItems = vendorItems.filter(item => item.status === 'sold');
+    const pendingPayouts = soldVendorItems.reduce((acc, item) => ({
+      min: acc.min + Number(item.minCost || 0),
+      max: acc.max + Number(item.maxCost || 0)
+    }), { min: 0, max: 0 });
 
     return {
       ...vendor,
@@ -187,8 +206,15 @@ export default function Vendors() {
   const totalVendors = vendors?.length || 0;
   const activeVendors = vendorsWithStats.filter(v => v.activeItems > 0).length;
   const totalItems = vendorsWithStats.reduce((sum, v) => sum + v.totalItems, 0);
-  const totalValue = vendorsWithStats.reduce((sum, v) => sum + v.totalValue, 0);
-  const totalPendingPayouts = vendorsWithStats.reduce((sum, v) => sum + v.pendingPayouts, 0);
+  const totalValueRange = vendorsWithStats.reduce((acc, v) => ({
+    min: acc.min + v.totalValue.min,
+    max: acc.max + v.totalValue.max
+  }), { min: 0, max: 0 });
+  
+  const totalPendingPayoutsRange = vendorsWithStats.reduce((acc, v) => ({
+    min: acc.min + v.pendingPayouts.min,
+    max: acc.max + v.pendingPayouts.max
+  }), { min: 0, max: 0 });
 
   return (
     <MainLayout title="Vendors" subtitle="Manage vendor relationships and consignment agreements">
@@ -239,7 +265,7 @@ export default function Vendors() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
+            <div className="text-2xl font-bold">{formatCurrencyRange(totalValueRange.min, totalValueRange.max)}</div>
             <p className="text-xs text-muted-foreground">
               Combined inventory value
             </p>
@@ -252,7 +278,7 @@ export default function Vendors() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalPendingPayouts)}</div>
+            <div className="text-2xl font-bold">{formatCurrencyRange(totalPendingPayoutsRange.min, totalPendingPayoutsRange.max)}</div>
             <p className="text-xs text-muted-foreground">
               Awaiting payment
             </p>
@@ -471,17 +497,17 @@ export default function Vendors() {
 
                     <div className="text-center md:text-right">
                       <div className="text-sm font-medium">
-                        {formatCurrency(vendor.totalValue)}
+                        {formatCurrencyRange(vendor.totalValue.min, vendor.totalValue.max)}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Total value
                       </div>
                     </div>
 
-                    {vendor.pendingPayouts > 0 && (
+                    {(vendor.pendingPayouts.min > 0 || vendor.pendingPayouts.max > 0) && (
                       <div className="text-center md:text-right col-span-2 md:col-span-1">
                         <div className="text-sm font-medium text-amber-600">
-                          {formatCurrency(vendor.pendingPayouts)}
+                          {formatCurrencyRange(vendor.pendingPayouts.min, vendor.pendingPayouts.max)}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Pending payout
@@ -532,7 +558,7 @@ export default function Vendors() {
                           Active
                         </Badge>
                       )}
-                      {vendor.pendingPayouts > 0 && (
+                      {(vendor.pendingPayouts.min > 0 || vendor.pendingPayouts.max > 0) && (
                         <Badge variant="outline">
                           <Clock className="w-3 h-3 mr-1" />
                           Payout Due

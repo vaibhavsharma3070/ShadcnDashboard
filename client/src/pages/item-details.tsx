@@ -52,9 +52,11 @@ const itemFormSchema = insertItemSchema.extend({
   title: z.string().min(1, "Title is required"),
   brand: z.string().min(1, "Brand is required"),
   model: z.string().min(1, "Model is required"),
-  agreedVendorPayout: z.string().min(1, "Vendor payout is required"),
-  listPrice: z.string().min(1, "List price is required"),
-  acquisitionDate: z.string().min(1, "Acquisition date is required")
+  minCost: z.string().optional(),
+  maxCost: z.string().optional(),
+  minSalesPrice: z.string().optional(),
+  maxSalesPrice: z.string().optional(),
+  acquisitionDate: z.string().optional()
 });
 
 
@@ -389,8 +391,10 @@ export default function ItemDetails() {
       model: "",
       serialNo: "",
       condition: "",
-      agreedVendorPayout: "",
-      listPrice: "",
+      minCost: "",
+      maxCost: "",
+      minSalesPrice: "",
+      maxSalesPrice: "",
       acquisitionDate: "",
       status: "in-store"
     },
@@ -437,8 +441,10 @@ export default function ItemDetails() {
         model: item.model || "",
         serialNo: item.serialNo || "",
         condition: item.condition || "",
-        agreedVendorPayout: item.agreedVendorPayout || "",
-        listPrice: item.listPrice || "",
+        minCost: item.minCost?.toString() || "",
+        maxCost: item.maxCost?.toString() || "",
+        minSalesPrice: item.minSalesPrice?.toString() || "",
+        maxSalesPrice: item.maxSalesPrice?.toString() || "",
         acquisitionDate: item.acquisitionDate || "",
         status: item.status
       });
@@ -505,10 +511,10 @@ export default function ItemDetails() {
     }
     
     // Check if new total would be below remaining balance
-    if (newTotalUpcoming < remainingBalance) {
+    if (newTotalUpcoming < maxRemainingBalance) {
       toast({
         title: "Invalid Amount",
-        description: `Total upcoming payments (${formatCurrency(newTotalUpcoming)}) cannot be less than the remaining balance (${formatCurrency(remainingBalance)}). You can increase amounts but not decrease them below the balance owed.`,
+        description: `Total upcoming payments (${formatCurrency(newTotalUpcoming)}) cannot be less than the remaining balance (${formatRange(minRemainingBalance, maxRemainingBalance)}). You can increase amounts but not decrease them below the balance owed.`,
         variant: "destructive",
       });
       return;
@@ -554,8 +560,24 @@ export default function ItemDetails() {
   // Calculate totals
   const totalPayments = payments?.reduce((sum, payment) => sum + Number(payment.amount), 0) || 0;
   const totalExpenses = expenses?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
-  const remainingBalance = Number(item?.listPrice || 0) - totalPayments;
-  const estimatedProfit = totalPayments - Number(item?.agreedVendorPayout || 0) - totalExpenses;
+  
+  // Calculate remaining balance range
+  const minRemainingBalance = Math.max(0, Number(item?.minSalesPrice || 0) - totalPayments);
+  const maxRemainingBalance = Math.max(0, Number(item?.maxSalesPrice || 0) - totalPayments);
+  
+  // Calculate estimated profit range
+  const minEstimatedProfit = totalPayments - Number(item?.maxCost || 0) - totalExpenses;
+  const maxEstimatedProfit = totalPayments - Number(item?.minCost || 0) - totalExpenses;
+  
+  // Helper function to format ranges
+  const formatRange = (min: number, max: number, showCurrency: boolean = true) => {
+    if (min === max) {
+      return showCurrency ? formatCurrency(min) : min.toString();
+    }
+    return showCurrency 
+      ? `${formatCurrency(min)} - ${formatCurrency(max)}`
+      : `${min} - ${max}`;
+  };
 
   if (itemLoading) {
     return (
@@ -722,10 +744,10 @@ export default function ItemDetails() {
 
                     <FormField
                       control={editForm.control}
-                      name="agreedVendorPayout"
+                      name="minCost"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Vendor Payout ($)</FormLabel>
+                          <FormLabel>Min Cost ($)</FormLabel>
                           <FormControl>
                             <Input type="number" step="0.01" placeholder="0.00" {...field} />
                           </FormControl>
@@ -736,10 +758,38 @@ export default function ItemDetails() {
 
                     <FormField
                       control={editForm.control}
-                      name="listPrice"
+                      name="maxCost"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>List Price ($)</FormLabel>
+                          <FormLabel>Max Cost ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="minSalesPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Min Sales Price ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="maxSalesPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Max Sales Price ($)</FormLabel>
                           <FormControl>
                             <Input type="number" step="0.01" placeholder="0.00" {...field} />
                           </FormControl>
@@ -876,12 +926,20 @@ export default function ItemDetails() {
           <CardContent>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">List Price</span>
-                <span className="font-bold">{formatCurrency(item.listPrice || 0)}</span>
+                <span className="text-sm font-medium">Sales Price</span>
+                <span className="font-bold">
+                  {item.minSalesPrice && item.maxSalesPrice 
+                    ? `${formatCurrency(item.minSalesPrice)} - ${formatCurrency(item.maxSalesPrice)}`
+                    : formatCurrency(item.maxSalesPrice || item.minSalesPrice || 0)}
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Vendor Payout</span>
-                <span className="text-red-600">{formatCurrency(item.agreedVendorPayout || 0)}</span>
+                <span className="text-sm font-medium">Cost Range</span>
+                <span className="text-red-600">
+                  {item.minCost && item.maxCost 
+                    ? `${formatCurrency(item.minCost)} - ${formatCurrency(item.maxCost)}`
+                    : formatCurrency(item.maxCost || item.minCost || 0)}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Total Payments</span>
@@ -894,14 +952,14 @@ export default function ItemDetails() {
               <Separator />
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Remaining Balance</span>
-                <span className={remainingBalance > 0 ? "text-amber-600" : "text-green-600"}>
-                  {formatCurrency(remainingBalance)}
+                <span className={maxRemainingBalance > 0 ? "text-amber-600" : "text-green-600"}>
+                  {formatRange(minRemainingBalance, maxRemainingBalance)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Estimated Profit</span>
-                <span className={estimatedProfit >= 0 ? "text-green-600" : "text-red-600"}>
-                  {formatCurrency(estimatedProfit)}
+                <span className={minEstimatedProfit >= 0 ? "text-green-600" : "text-red-600"}>
+                  {formatRange(minEstimatedProfit, maxEstimatedProfit)}
                 </span>
               </div>
             </div>
@@ -1208,7 +1266,7 @@ export default function ItemDetails() {
           <div className="bg-muted/50 p-4 rounded-lg space-y-2">
             <div className="flex justify-between text-sm">
               <span>Remaining Balance:</span>
-              <span className="font-medium">{formatCurrency(remainingBalance)}</span>
+              <span className="font-medium">{formatRange(minRemainingBalance, maxRemainingBalance)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span>Current Total Upcoming:</span>
@@ -1263,7 +1321,7 @@ export default function ItemDetails() {
                           (installmentPlans?.filter(plan => plan.status === 'pending')
                             .reduce((sum, plan) => sum + parseFloat(plan.amount.toString()), 0) || 0) -
                           parseFloat(editingInstallment.amount.toString()) +
-                          parseFloat(field.value || "0") < remainingBalance
+                          parseFloat(field.value || "0") < maxRemainingBalance
                         ) && (
                           <p className="text-destructive text-xs">
                             ⚠️ Cannot be less than remaining balance

@@ -96,6 +96,13 @@ function formatDateTime(dateString: string) {
   });
 }
 
+function formatCurrencyRange(min: number, max: number) {
+  if (min === max) {
+    return formatCurrency(min);
+  }
+  return `${formatCurrency(min)} - ${formatCurrency(max)}`;
+}
+
 function getStatusBadge(status: string) {
   switch (status) {
     case 'in-store':
@@ -304,10 +311,27 @@ export default function VendorDetails() {
   const returnedItems = vendorItems.filter(item => item.status === 'returned');
 
   // Calculate financial metrics
-  const totalValue = vendorItems.reduce((sum, item) => sum + Number(item.listPrice || 0), 0);
+  const totalValueRange = vendorItems.reduce((acc, item) => ({
+    min: acc.min + Number(item.minSalesPrice || 0),
+    max: acc.max + Number(item.maxSalesPrice || 0)
+  }), { min: 0, max: 0 });
+  
   const totalPayouts = payouts?.reduce((sum, payout) => sum + Number(payout.amount || 0), 0) || 0;
-  const pendingPayouts = soldItems.reduce((sum, item) => sum + Number(item.agreedVendorPayout || 0), 0) - totalPayouts;
-  const totalRevenue = soldItems.reduce((sum, item) => sum + Number(item.listPrice || 0), 0);
+  
+  const pendingPayoutsRange = soldItems.reduce((acc, item) => ({
+    min: acc.min + Number(item.minCost || 0),
+    max: acc.max + Number(item.maxCost || 0)
+  }), { min: 0, max: 0 });
+  
+  const pendingPayoutsAdjusted = {
+    min: Math.max(0, pendingPayoutsRange.min - totalPayouts),
+    max: Math.max(0, pendingPayoutsRange.max - totalPayouts)
+  };
+  
+  const totalRevenueRange = soldItems.reduce((acc, item) => ({
+    min: acc.min + Number(item.minSalesPrice || 0),
+    max: acc.max + Number(item.maxSalesPrice || 0)
+  }), { min: 0, max: 0 });
 
   return (
     <MainLayout title={vendor.name || "Vendor Details"} subtitle="Vendor information and consignment details">
@@ -479,7 +503,7 @@ export default function VendorDetails() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
+              <div className="text-2xl font-bold">{formatCurrencyRange(totalValueRange.min, totalValueRange.max)}</div>
               <p className="text-xs text-muted-foreground">
                 Combined inventory value
               </p>
@@ -505,7 +529,7 @@ export default function VendorDetails() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(pendingPayouts)}</div>
+              <div className="text-2xl font-bold">{formatCurrencyRange(pendingPayoutsAdjusted.min, pendingPayoutsAdjusted.max)}</div>
               <p className="text-xs text-muted-foreground">
                 Awaiting payment
               </p>
@@ -568,12 +592,20 @@ export default function VendorDetails() {
 
                         <div className="flex items-center space-x-4">
                           <div className="text-right">
-                            <p className="font-medium">{formatCurrency(item.listPrice || 0)}</p>
-                            <p className="text-sm text-muted-foreground">List Price</p>
+                            <p className="font-medium">
+                              {item.minSalesPrice && item.maxSalesPrice 
+                                ? `${formatCurrency(item.minSalesPrice)} - ${formatCurrency(item.maxSalesPrice)}`
+                                : formatCurrency(item.maxSalesPrice || item.minSalesPrice || 0)}
+                            </p>
+                            <p className="text-sm text-muted-foreground">Sales Price</p>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium">{formatCurrency(item.agreedVendorPayout || 0)}</p>
-                            <p className="text-sm text-muted-foreground">Vendor Payout</p>
+                            <p className="font-medium">
+                              {item.minCost && item.maxCost 
+                                ? `${formatCurrency(item.minCost)} - ${formatCurrency(item.maxCost)}`
+                                : formatCurrency(item.maxCost || item.minCost || 0)}
+                            </p>
+                            <p className="text-sm text-muted-foreground">Cost Range</p>
                           </div>
                           <div className="text-right">
                             {getStatusBadge(item.status || "")}
@@ -597,7 +629,7 @@ export default function VendorDetails() {
           <TabsContent value="payouts" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Payout History</h3>
-              {pendingPayouts > 0 && (
+              {(pendingPayoutsAdjusted.min > 0 || pendingPayoutsAdjusted.max > 0) && (
                 <Dialog open={isPayoutModalOpen} onOpenChange={setIsPayoutModalOpen}>
                   <DialogTrigger asChild>
                     <Button>
@@ -622,7 +654,7 @@ export default function VendorDetails() {
                                   <option value="">Select an item</option>
                                   {soldItems.map((item) => (
                                     <option key={item.itemId} value={item.itemId}>
-                                      {item.title} - {formatCurrency(item.agreedVendorPayout || 0)}
+                                      {item.title} - {formatCurrency(item.maxCost || 0)}
                                     </option>
                                   ))}
                                 </select>
@@ -667,14 +699,14 @@ export default function VendorDetails() {
                   <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-foreground mb-2">No payouts yet</h3>
                   <p className="text-muted-foreground mb-4">
-                    {pendingPayouts > 0 
+                    {(pendingPayoutsAdjusted.min > 0 || pendingPayoutsAdjusted.max > 0) 
                       ? "There are pending payouts to be processed."
                       : "No payouts have been made to this vendor yet."
                     }
                   </p>
-                  {pendingPayouts > 0 && (
+                  {(pendingPayoutsAdjusted.min > 0 || pendingPayoutsAdjusted.max > 0) && (
                     <p className="text-sm text-amber-600 mb-4">
-                      Pending: {formatCurrency(pendingPayouts)}
+                      Pending: {formatCurrencyRange(pendingPayoutsAdjusted.min, pendingPayoutsAdjusted.max)}
                     </p>
                   )}
                 </CardContent>
