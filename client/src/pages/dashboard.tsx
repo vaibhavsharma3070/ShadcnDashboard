@@ -36,8 +36,8 @@ import { useLocation } from "wouter";
 interface DashboardMetrics {
   totalRevenue: number;
   activeItems: number;
-  pendingPayouts: number;
-  netProfit: number;
+  pendingPayouts: { min: number; max: number };
+  netProfit: { min: number; max: number };
 }
 
 interface Item {
@@ -45,7 +45,8 @@ interface Item {
   title: string;
   brand: string;
   model: string;
-  listPrice: string;
+  minSalesPrice: number | null;
+  maxSalesPrice: number | null;
   status: string;
   createdAt: string;
   vendor: {
@@ -91,6 +92,13 @@ function formatCurrency(amount: number) {
     style: "currency",
     currency: "USD",
   }).format(amount);
+}
+
+function formatCurrencyRange(range: { min: number; max: number }) {
+  if (range.min === range.max) {
+    return formatCurrency(range.min);
+  }
+  return `${formatCurrency(range.min)} - ${formatCurrency(range.max)}`;
 }
 
 function formatDate(dateString: string) {
@@ -274,7 +282,10 @@ export default function Dashboard() {
                   <Skeleton className="h-8 w-24 mt-2" />
                 ) : (
                   <p className="text-2xl font-bold text-foreground">
-                    {formatCurrency(metrics?.pendingPayouts || 0)}
+                    {metrics?.pendingPayouts ? 
+                      formatCurrencyRange(metrics.pendingPayouts) : 
+                      formatCurrency(0)
+                    }
                   </p>
                 )}
                 <p className="text-sm text-amber-600 mt-1 flex items-center">
@@ -300,7 +311,10 @@ export default function Dashboard() {
                   <Skeleton className="h-8 w-24 mt-2" />
                 ) : (
                   <p className="text-2xl font-bold text-foreground">
-                    {formatCurrency(metrics?.netProfit || 0)}
+                    {metrics?.netProfit ? 
+                      formatCurrencyRange(metrics.netProfit) : 
+                      formatCurrency(0)
+                    }
                   </p>
                 )}
                 <p className="text-sm text-emerald-600 mt-1 flex items-center">
@@ -407,10 +421,10 @@ export default function Dashboard() {
                     {paymentMetrics.upcomingPayments > 0 && (
                       <p>{paymentMetrics.upcomingPayments} upcoming payments</p>
                     )}
-                    {metrics && metrics.pendingPayouts > 0 && (
+                    {metrics && metrics.pendingPayouts && metrics.pendingPayouts.max > 0 && (
                       <p>
                         Pending payouts:{" "}
-                        {formatCurrency(metrics.pendingPayouts)}
+                        {formatCurrencyRange(metrics.pendingPayouts)}
                       </p>
                     )}
                   </div>

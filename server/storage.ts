@@ -667,8 +667,8 @@ export class DatabaseStorage implements IStorage {
   async getDashboardMetrics(): Promise<{
     totalRevenue: number;
     activeItems: number;
-    pendingPayouts: number;
-    netProfit: number;
+    pendingPayouts: { min: number; max: number };
+    netProfit: { min: number; max: number };
   }> {
     const [revenueResult] = await db.select({ 
       total: sum(clientPayment.amount) 
@@ -679,8 +679,12 @@ export class DatabaseStorage implements IStorage {
     }).from(item).where(sql`${item.status} IN ('in-store', 'reserved')`);
     
     const pendingPayouts = await this.getPendingPayouts();
-    const pendingPayoutsTotal = pendingPayouts.reduce((sum, item) => 
-      sum + Number(item.maxCost || 0), 0);
+    
+    // Calculate min/max pending payouts using cost ranges
+    const pendingPayoutsMin = pendingPayouts.reduce((sum, item) => 
+      sum + Number(item.minCost || item.maxCost || 0), 0);
+    const pendingPayoutsMax = pendingPayouts.reduce((sum, item) => 
+      sum + Number(item.maxCost || item.minCost || 0), 0);
     
     const [expensesResult] = await db.select({ 
       total: sum(itemExpense.amount) 
@@ -688,13 +692,16 @@ export class DatabaseStorage implements IStorage {
     
     const totalRevenue = Number(revenueResult.total || 0);
     const totalExpenses = Number(expensesResult.total || 0);
-    const netProfit = totalRevenue - totalExpenses - pendingPayoutsTotal;
+    
+    // Calculate net profit ranges
+    const netProfitMin = totalRevenue - totalExpenses - pendingPayoutsMax;
+    const netProfitMax = totalRevenue - totalExpenses - pendingPayoutsMin;
 
     return {
       totalRevenue,
       activeItems: itemsResult.count,
-      pendingPayouts: pendingPayoutsTotal,
-      netProfit
+      pendingPayouts: { min: pendingPayoutsMin, max: pendingPayoutsMax },
+      netProfit: { min: netProfitMin, max: netProfitMax }
     };
   }
 
