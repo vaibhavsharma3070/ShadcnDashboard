@@ -235,7 +235,7 @@ export default function Payouts() {
         transferId: formData.transferId,
         notes: formData.notes || `Payout for ${formData.payout.brand} ${formData.payout.model}`,
       };
-      return await apiRequest(`/api/payouts`, 'POST', payoutData);
+      return await apiRequest('POST', '/api/payouts', payoutData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/payouts/upcoming'] });
