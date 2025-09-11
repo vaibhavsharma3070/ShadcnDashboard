@@ -25,11 +25,33 @@ export const client = pgTable("client", {
   emailIdx: index("idx_client_email").on(table.email),
 }));
 
+export const brand = pgTable("brand", {
+  brandId: uuid("brand_id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  active: text("active").notNull().default("true"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("idx_brand_name").on(table.name),
+  activeIdx: index("idx_brand_active").on(table.active),
+}));
+
+export const category = pgTable("category", {
+  categoryId: uuid("category_id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  active: text("active").notNull().default("true"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("idx_category_name").on(table.name),
+  activeIdx: index("idx_category_active").on(table.active),
+}));
+
 export const item = pgTable("item", {
   itemId: uuid("item_id").primaryKey().defaultRandom(),
   vendorId: uuid("vendor_id").notNull(),
+  brandId: uuid("brand_id"),
+  categoryId: uuid("category_id"),
   title: text("title"),
-  brand: text("brand"),
+  brand: text("brand"), // Legacy field for migration
   model: text("model"),
   serialNo: text("serial_no"),
   condition: text("condition"),
@@ -42,11 +64,21 @@ export const item = pgTable("item", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   vendorIdx: index("idx_item_vendor").on(table.vendorId),
+  brandIdx: index("idx_item_brand").on(table.brandId),
+  categoryIdx: index("idx_item_category").on(table.categoryId),
   statusIdx: index("idx_item_status").on(table.status),
   serialNoIdx: index("idx_item_serial").on(table.serialNo),
   vendorFk: foreignKey({
     columns: [table.vendorId],
     foreignColumns: [vendor.vendorId]
+  }),
+  brandFk: foreignKey({
+    columns: [table.brandId],
+    foreignColumns: [brand.brandId]
+  }),
+  categoryFk: foreignKey({
+    columns: [table.categoryId],
+    foreignColumns: [category.categoryId]
   }),
 }));
 
@@ -143,10 +175,26 @@ export const clientRelations = relations(client, ({ many }) => ({
   installmentPlans: many(installmentPlan),
 }));
 
+export const brandRelations = relations(brand, ({ many }) => ({
+  items: many(item),
+}));
+
+export const categoryRelations = relations(category, ({ many }) => ({
+  items: many(item),
+}));
+
 export const itemRelations = relations(item, ({ one, many }) => ({
   vendor: one(vendor, {
     fields: [item.vendorId],
     references: [vendor.vendorId]
+  }),
+  brand: one(brand, {
+    fields: [item.brandId],
+    references: [brand.brandId]
+  }),
+  category: one(category, {
+    fields: [item.categoryId],
+    references: [category.categoryId]
   }),
   payments: many(clientPayment),
   expenses: many(itemExpense),
@@ -208,10 +256,23 @@ export const insertClientSchema = createInsertSchema(client).omit({
   createdAt: true,
 });
 
+export const insertBrandSchema = createInsertSchema(brand).omit({
+  brandId: true,
+  createdAt: true,
+});
+
+export const insertCategorySchema = createInsertSchema(category).omit({
+  categoryId: true,
+  createdAt: true,
+});
+
 export const insertItemSchema = createInsertSchema(item).omit({
   itemId: true,
+  brand: true, // Omit legacy brand field
   createdAt: true,
 }).extend({
+  brandId: z.string().min(1, "Brand is required"),
+  categoryId: z.string().min(1, "Category is required"),
   minCost: z.preprocess((val) => 
     val === null || val === undefined || val === '' ? null : (typeof val === 'string' ? parseFloat(val) : val),
     z.number().nullable()
@@ -271,6 +332,12 @@ export type Vendor = typeof vendor.$inferSelect;
 
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof client.$inferSelect;
+
+export type InsertBrand = z.infer<typeof insertBrandSchema>;
+export type Brand = typeof brand.$inferSelect;
+
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
+export type Category = typeof category.$inferSelect;
 
 export type InsertItem = z.infer<typeof insertItemSchema>;
 export type Item = typeof item.$inferSelect;
