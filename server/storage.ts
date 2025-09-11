@@ -118,8 +118,8 @@ export interface IStorage {
   getDashboardMetrics(): Promise<{
     totalRevenue: number;
     activeItems: number;
-    pendingPayouts: number;
-    netProfit: number;
+    pendingPayouts: { min: number; max: number };
+    netProfit: { min: number; max: number };
   }>;
   
   getRecentItems(limit?: number): Promise<Array<Item & { vendor: Vendor }>>;

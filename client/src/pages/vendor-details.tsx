@@ -332,6 +332,10 @@ export default function VendorDetails() {
     min: acc.min + Number(item.minSalesPrice || 0),
     max: acc.max + Number(item.maxSalesPrice || 0)
   }), { min: 0, max: 0 });
+  
+  // Calculate single values for analytics
+  const totalRevenue = totalRevenueRange.max; // Use max value for revenue display
+  const pendingPayouts = pendingPayoutsAdjusted.max; // Use max value for pending payouts
 
   return (
     <MainLayout title={vendor.name || "Vendor Details"} subtitle="Vendor information and consignment details">
