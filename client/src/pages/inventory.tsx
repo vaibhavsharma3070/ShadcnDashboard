@@ -175,11 +175,19 @@ const createSaleFormSchema = (maxSalesPrice?: number) => z
     },
   );
 
-// Default schema for initial form setup
-const saleFormSchema = createSaleFormSchema();
+// Create a base type for sale form data
+type SaleFormData = {
+  clientId: string;
+  paymentType: "full" | "installment";
+  amount: string;
+  paymentMethod: string;
+  installments?: Array<{
+    amount?: string;
+    dueDate?: string;
+  }>;
+};
 
 type ItemFormData = z.infer<typeof itemFormSchema>;
-type SaleFormData = z.infer<typeof saleFormSchema>;
 
 function formatCurrency(amount: number | string) {
   const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
