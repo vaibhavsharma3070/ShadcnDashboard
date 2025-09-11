@@ -53,7 +53,10 @@ import {
 
 // Payout form schema
 const payoutFormSchema = z.object({
-  amount: z.string().min(1, "Amount is required"),
+  amount: z.preprocess(
+    (val) => parseFloat(val as string),
+    z.number().positive("Amount must be greater than 0")
+  ),
   bankAccount: z.string().min(1, "Bank account is required"),
   transferId: z.string().min(1, "Transfer ID is required"),
   notes: z.string().optional(),
@@ -229,7 +232,7 @@ export default function Payouts() {
       const payoutData = {
         vendorId: formData.payout.vendor.vendorId,
         itemId: formData.payout.itemId,
-        amount: parseFloat(formData.amount),
+        amount: formData.amount, // Already preprocessed to number
         paidAt: new Date().toISOString(),
         bankAccount: formData.bankAccount,
         transferId: formData.transferId,
