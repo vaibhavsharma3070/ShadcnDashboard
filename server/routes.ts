@@ -239,10 +239,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(payment);
     } catch (error) {
       console.error("Payment validation error:", error);
-      if (error.errors) {
-        res.status(400).json({ error: "Invalid payment data", details: error.errors });
-      } else {
+      if (error && typeof error === 'object' && 'errors' in error) {
+        res.status(400).json({ error: "Invalid payment data", details: (error as any).errors });
+      } else if (error instanceof Error) {
         res.status(400).json({ error: "Invalid payment data", details: error.message });
+      } else {
+        res.status(400).json({ error: "Invalid payment data" });
       }
     }
   });
@@ -254,10 +256,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(payment);
     } catch (error) {
       console.error("Payment update error:", error);
-      if (error.errors) {
-        res.status(400).json({ error: "Invalid payment data", details: error.errors });
-      } else {
+      if (error && typeof error === 'object' && 'errors' in error) {
+        res.status(400).json({ error: "Invalid payment data", details: (error as any).errors });
+      } else if (error instanceof Error) {
         res.status(400).json({ error: "Failed to update payment", details: error.message });
+      } else {
+        res.status(400).json({ error: "Failed to update payment" });
       }
     }
   });
@@ -432,12 +436,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(expense);
     } catch (error) {
       console.error("❌ [DEBUG] POST /api/expenses - Error occurred:", error);
-      console.error("❌ [DEBUG] POST /api/expenses - Error details:", {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
-      res.status(400).json({ error: "Invalid expense data", details: error.message });
+      if (error instanceof Error) {
+        console.error("❌ [DEBUG] POST /api/expenses - Error details:", {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        res.status(400).json({ error: "Invalid expense data", details: error.message });
+      } else {
+        res.status(400).json({ error: "Invalid expense data" });
+      }
     }
   });
 
@@ -476,10 +484,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(plan);
     } catch (error) {
       console.error("Installment plan validation error:", error);
-      if (error.errors) {
-        res.status(400).json({ error: "Invalid installment plan data", details: error.errors });
-      } else {
+      if (error && typeof error === 'object' && 'errors' in error) {
+        res.status(400).json({ error: "Invalid installment plan data", details: (error as any).errors });
+      } else if (error instanceof Error) {
         res.status(400).json({ error: "Invalid installment plan data", details: error.message });
+      } else {
+        res.status(400).json({ error: "Invalid installment plan data" });
       }
     }
   });
@@ -491,10 +501,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(plan);
     } catch (error) {
       console.error("Installment plan update error:", error);
-      if (error.errors) {
-        res.status(400).json({ error: "Invalid installment plan data", details: error.errors });
-      } else {
+      if (error && typeof error === 'object' && 'errors' in error) {
+        res.status(400).json({ error: "Invalid installment plan data", details: (error as any).errors });
+      } else if (error instanceof Error) {
         res.status(400).json({ error: "Failed to update installment plan", details: error.message });
+      } else {
+        res.status(400).json({ error: "Failed to update installment plan" });
       }
     }
   });
