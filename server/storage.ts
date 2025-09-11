@@ -6,6 +6,34 @@ import {
 import { db } from "./db";
 import { eq, desc, sum, count, sql, and, isNull, isNotNull } from "drizzle-orm";
 
+// Helper functions for type conversion to match Drizzle's expected types
+function toDbNumeric(v?: number | string | null): string {
+  if (v == null) return '0';
+  return typeof v === 'string' ? v : v.toFixed(2);
+}
+
+function toDbNumericOptional(v?: number | string | null): string | null {
+  if (v == null) return null;
+  return typeof v === 'string' ? v : v.toFixed(2);
+}
+
+function toDbDate(v?: string | Date | null): string {
+  if (v == null) return new Date().toISOString().slice(0, 10);
+  const d = v instanceof Date ? v : new Date(v);
+  return d.toISOString().slice(0, 10);
+}
+
+function toDbDateOptional(v?: string | Date | null): string | null {
+  if (v == null) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return d.toISOString().slice(0, 10);
+}
+
+function toDbTimestamp(v?: string | Date | null): Date {
+  if (v == null) return new Date();
+  return v instanceof Date ? v : new Date(v);
+}
+
 export interface IStorage {
   // Legacy user methods
   getUser(id: string): Promise<User | undefined>;
@@ -58,9 +86,11 @@ export interface IStorage {
     title: string;
     brand: string;
     model: string;
-    listPrice: number;
+    minSalesPrice: number;
+    maxSalesPrice: number;
     salePrice: number;
-    vendorPayoutAmount: number;
+    minCost: number;
+    maxCost: number;
     totalPaid: number;
     remainingBalance: number;
     paymentProgress: number;
@@ -212,12 +242,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createItem(insertItem: InsertItem): Promise<Item> {
-    const [result] = await db.insert(item).values(insertItem).returning();
+    const payload: typeof item.$inferInsert = {
+      ...insertItem,
+      minCost: toDbNumericOptional(insertItem.minCost),
+      maxCost: toDbNumericOptional(insertItem.maxCost),
+      minSalesPrice: toDbNumericOptional(insertItem.minSalesPrice),
+      maxSalesPrice: toDbNumericOptional(insertItem.maxSalesPrice),
+      acquisitionDate: toDbDateOptional(insertItem.acquisitionDate)
+    };
+    const [result] = await db.insert(item).values(payload).returning();
     return result;
   }
 
   async updateItem(id: string, updateItem: Partial<InsertItem>): Promise<Item> {
-    const [result] = await db.update(item).set(updateItem).where(eq(item.itemId, id)).returning();
+    const payload: Partial<typeof item.$inferInsert> = {};
+    // Only set fields that are defined and convert types
+    if (updateItem.vendorId !== undefined) payload.vendorId = updateItem.vendorId;
+    if (updateItem.title !== undefined) payload.title = updateItem.title;
+    if (updateItem.brand !== undefined) payload.brand = updateItem.brand;
+    if (updateItem.model !== undefined) payload.model = updateItem.model;
+    if (updateItem.serialNo !== undefined) payload.serialNo = updateItem.serialNo;
+    if (updateItem.condition !== undefined) payload.condition = updateItem.condition;
+    if (updateItem.status !== undefined) payload.status = updateItem.status;
+    if (updateItem.minCost !== undefined) payload.minCost = toDbNumericOptional(updateItem.minCost);
+    if (updateItem.maxCost !== undefined) payload.maxCost = toDbNumericOptional(updateItem.maxCost);
+    if (updateItem.minSalesPrice !== undefined) payload.minSalesPrice = toDbNumericOptional(updateItem.minSalesPrice);
+    if (updateItem.maxSalesPrice !== undefined) payload.maxSalesPrice = toDbNumericOptional(updateItem.maxSalesPrice);
+    if (updateItem.acquisitionDate !== undefined) payload.acquisitionDate = toDbDateOptional(updateItem.acquisitionDate);
+    
+    const [result] = await db.update(item).set(payload).where(eq(item.itemId, id)).returning();
     return result;
   }
 
@@ -251,20 +304,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPayment(insertPayment: InsertClientPayment): Promise<ClientPayment> {
-    const [result] = await db.insert(clientPayment).values(insertPayment).returning();
+    const payload: typeof clientPayment.$inferInsert = {
+      ...insertPayment,
+      amount: toDbNumeric(insertPayment.amount!),
+      paidAt: toDbTimestamp(insertPayment.paidAt!)
+    };
+    const [result] = await db.insert(clientPayment).values(payload).returning();
     
     // Check if item is fully paid and update status
     const payments = await db.select({ amount: clientPayment.amount })
       .from(clientPayment)
       .where(eq(clientPayment.itemId, insertPayment.itemId));
     
-    const itemData = await db.select({ listPrice: item.listPrice })
+    const itemData = await db.select({ maxSalesPrice: item.maxSalesPrice })
       .from(item)
       .where(eq(item.itemId, insertPayment.itemId));
     
     if (payments.length > 0 && itemData.length > 0) {
       const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
-      const listPrice = Number(itemData[0].listPrice);
+      const listPrice = Number(itemData[0].maxSalesPrice);
       
       if (totalPaid >= listPrice) {
         await db.update(item).set({ status: 'sold' }).where(eq(item.itemId, insertPayment.itemId));
@@ -275,8 +333,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePayment(id: string, updatePayment: Partial<InsertClientPayment>): Promise<ClientPayment> {
+    const payload: Partial<typeof clientPayment.$inferInsert> = {};
+    if (updatePayment.clientId !== undefined) payload.clientId = updatePayment.clientId;
+    if (updatePayment.itemId !== undefined) payload.itemId = updatePayment.itemId;
+    if (updatePayment.paymentMethod !== undefined) payload.paymentMethod = updatePayment.paymentMethod;
+    if (updatePayment.amount !== undefined) payload.amount = toDbNumeric(updatePayment.amount);
+    if (updatePayment.paidAt !== undefined) payload.paidAt = toDbTimestamp(updatePayment.paidAt);
+    
     const [result] = await db.update(clientPayment)
-      .set(updatePayment)
+      .set(payload)
       .where(eq(clientPayment.paymentId, id))
       .returning();
     
@@ -290,13 +355,13 @@ export class DatabaseStorage implements IStorage {
         .from(clientPayment)
         .where(eq(clientPayment.itemId, result.itemId));
       
-      const itemData = await db.select({ listPrice: item.listPrice })
+      const itemData = await db.select({ maxSalesPrice: item.maxSalesPrice })
         .from(item)
         .where(eq(item.itemId, result.itemId));
       
       if (payments.length > 0 && itemData.length > 0) {
         const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
-        const listPrice = Number(itemData[0].listPrice);
+        const listPrice = Number(itemData[0].maxSalesPrice);
         
         // Update item status based on payment completeness
         if (totalPaid >= listPrice) {
@@ -330,13 +395,13 @@ export class DatabaseStorage implements IStorage {
       .from(clientPayment)
       .where(eq(clientPayment.itemId, itemId));
     
-    const itemData = await db.select({ listPrice: item.listPrice })
+    const itemData = await db.select({ maxSalesPrice: item.maxSalesPrice })
       .from(item)
       .where(eq(item.itemId, itemId));
     
     if (itemData.length > 0) {
       const totalPaid = remainingPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-      const listPrice = Number(itemData[0].listPrice);
+      const listPrice = Number(itemData[0].maxSalesPrice);
       
       // Update item status based on remaining payments
       if (totalPaid >= listPrice) {
@@ -379,7 +444,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPayout(insertPayout: InsertVendorPayout): Promise<VendorPayout> {
-    const [result] = await db.insert(vendorPayout).values(insertPayout).returning();
+    const payload: typeof vendorPayout.$inferInsert = {
+      ...insertPayout,
+      amount: toDbNumeric(insertPayout.amount!),
+      paidAt: toDbTimestamp(insertPayout.paidAt!)
+    };
+    const [result] = await db.insert(vendorPayout).values(payload).returning();
     return result;
   }
 
@@ -409,7 +479,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(vendorPayout, eq(vendorPayout.itemId, item.itemId))
       .where(
         and(
-          sql`${item.listPrice} <= (
+          sql`${item.maxSalesPrice} <= (
             SELECT COALESCE(SUM(${clientPayment.amount}), 0) 
             FROM ${clientPayment} 
             WHERE ${clientPayment.itemId} = ${item.itemId}
@@ -428,7 +498,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(vendorPayout, eq(vendorPayout.itemId, item.itemId))
       .where(
         and(
-          sql`${item.listPrice} > (
+          sql`${item.maxSalesPrice} > (
             SELECT COALESCE(SUM(${clientPayment.amount}), 0) 
             FROM ${clientPayment} 
             WHERE ${clientPayment.itemId} = ${item.itemId}
@@ -476,9 +546,11 @@ export class DatabaseStorage implements IStorage {
     title: string;
     brand: string;
     model: string;
-    listPrice: number;
+    minSalesPrice: number;
+    maxSalesPrice: number;
     salePrice: number;
-    vendorPayoutAmount: number;
+    minCost: number;
+    maxCost: number;
     totalPaid: number;
     remainingBalance: number;
     paymentProgress: number;
@@ -494,9 +566,11 @@ export class DatabaseStorage implements IStorage {
         title: item.title,
         brand: item.brand,
         model: item.model,
-        listPrice: item.listPrice,
-        salePrice: item.listPrice,
-        vendorPayoutAmount: item.agreedVendorPayout,
+        minSalesPrice: item.minSalesPrice,
+        maxSalesPrice: item.maxSalesPrice,
+        salePrice: item.maxSalesPrice, // Use max sales price as the sale price
+        minCost: item.minCost,
+        maxCost: item.maxCost,
         totalPaid: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
         firstPaymentDate: sql<string>`MIN(${clientPayment.paidAt})`,
         lastPaymentDate: sql<string>`MAX(${clientPayment.paidAt})`,
@@ -524,11 +598,11 @@ export class DatabaseStorage implements IStorage {
           .orderBy(desc(installmentPlan.dueDate));
 
         const totalPaid = result.totalPaid;
-        const listPrice = parseFloat(result.listPrice || '0');
-        const vendorPayoutAmount = parseFloat(result.vendorPayoutAmount || '0');
-        const remainingBalance = listPrice - totalPaid;
-        const paymentProgress = listPrice > 0 ? (totalPaid / listPrice) * 100 : 0;
-        const isFullyPaid = totalPaid >= listPrice;
+        const salesPrice = parseFloat(result.maxSalesPrice || '0');
+        const vendorPayoutAmount = parseFloat(result.maxCost || '0');
+        const remainingBalance = salesPrice - totalPaid;
+        const paymentProgress = salesPrice > 0 ? (totalPaid / salesPrice) * 100 : 0;
+        const isFullyPaid = totalPaid >= salesPrice;
 
         // Determine the expected last payment date
         let expectedLastPaymentDate = result.lastPaymentDate;
@@ -542,9 +616,11 @@ export class DatabaseStorage implements IStorage {
           title: result.title || '',
           brand: result.brand || '',
           model: result.model || '',
-          listPrice: listPrice,
-          salePrice: listPrice,
-          vendorPayoutAmount: vendorPayoutAmount,
+          minSalesPrice: parseFloat(result.minSalesPrice || '0'),
+          maxSalesPrice: parseFloat(result.maxSalesPrice || '0'),
+          salePrice: salesPrice,
+          minCost: parseFloat(result.minCost || '0'),
+          maxCost: parseFloat(result.maxCost || '0'),
           totalPaid,
           remainingBalance: Math.max(0, remainingBalance),
           paymentProgress: Math.min(100, paymentProgress),
@@ -578,7 +654,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createExpense(insertExpense: InsertItemExpense): Promise<ItemExpense> {
-    const [result] = await db.insert(itemExpense).values(insertExpense).returning();
+    const payload: typeof itemExpense.$inferInsert = {
+      ...insertExpense,
+      amount: toDbNumeric(insertExpense.amount!),
+      incurredAt: toDbTimestamp(insertExpense.incurredAt!)
+    };
+    const [result] = await db.insert(itemExpense).values(payload).returning();
     return result;
   }
 
@@ -599,7 +680,7 @@ export class DatabaseStorage implements IStorage {
     
     const pendingPayouts = await this.getPendingPayouts();
     const pendingPayoutsTotal = pendingPayouts.reduce((sum, item) => 
-      sum + Number(item.agreedVendorPayout || 0), 0);
+      sum + Number(item.maxCost || 0), 0);
     
     const [expensesResult] = await db.select({ 
       total: sum(itemExpense.amount) 
@@ -649,7 +730,7 @@ export class DatabaseStorage implements IStorage {
         
         const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount), 0);
         const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-        const profit = totalPayments - Number(item.agreedVendorPayout || 0) - totalExpenses;
+        const profit = totalPayments - Number(item.maxCost || 0) - totalExpenses;
         
         return { ...item, profit };
       })
@@ -703,17 +784,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInstallmentPlan(insertPlan: InsertInstallmentPlan): Promise<InstallmentPlan> {
+    const payload: typeof installmentPlan.$inferInsert = {
+      ...insertPlan,
+      amount: toDbNumeric(insertPlan.amount!),
+      dueDate: toDbDate(insertPlan.dueDate!)
+    };
     const [plan] = await db
       .insert(installmentPlan)
-      .values(insertPlan)
+      .values(payload)
       .returning();
     return plan;
   }
 
   async updateInstallmentPlan(id: string, updatePlan: Partial<InsertInstallmentPlan>): Promise<InstallmentPlan> {
+    const payload: Partial<typeof installmentPlan.$inferInsert> = {};
+    if (updatePlan.clientId !== undefined) payload.clientId = updatePlan.clientId;
+    if (updatePlan.itemId !== undefined) payload.itemId = updatePlan.itemId;
+    if (updatePlan.amount !== undefined) payload.amount = toDbNumeric(updatePlan.amount);
+    if (updatePlan.dueDate !== undefined) payload.dueDate = toDbDate(updatePlan.dueDate);
+    
     const [plan] = await db
       .update(installmentPlan)
-      .set(updatePlan)
+      .set(payload)
       .where(eq(installmentPlan.installmentId, id))
       .returning();
     return plan;
