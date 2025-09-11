@@ -3,7 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DollarSign,
   Package,
@@ -161,11 +167,10 @@ export default function Dashboard() {
     queryKey: ["/api/payments/recent"],
   });
 
-  const { data: paymentMetrics, isLoading: paymentMetricsLoading } = useQuery<
-    PaymentMetrics
-  >({
-    queryKey: ["/api/payments/metrics"],
-  });
+  const { data: paymentMetrics, isLoading: paymentMetricsLoading } =
+    useQuery<PaymentMetrics>({
+      queryKey: ["/api/payments/metrics"],
+    });
 
   // Pagination logic for items
   const totalPages = Math.ceil((recentItems?.length || 0) / itemsPerPage);
@@ -174,10 +179,13 @@ export default function Dashboard() {
   const currentItems = recentItems?.slice(startIndex, endIndex) || [];
 
   // Pagination logic for payments
-  const totalPaymentPages = Math.ceil((recentPayments?.length || 0) / paymentsPerPage);
+  const totalPaymentPages = Math.ceil(
+    (recentPayments?.length || 0) / paymentsPerPage,
+  );
   const paymentsStartIndex = (paymentsPage - 1) * paymentsPerPage;
   const paymentsEndIndex = paymentsStartIndex + paymentsPerPage;
-  const currentPayments = recentPayments?.slice(paymentsStartIndex, paymentsEndIndex) || [];
+  const currentPayments =
+    recentPayments?.slice(paymentsStartIndex, paymentsEndIndex) || [];
 
   const handleQuickAction = (action: string) => {
     switch (action) {
@@ -333,8 +341,6 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-
-        
       </div>
 
       {/* Recent Activity and Quick Actions */}
@@ -344,7 +350,11 @@ export default function Dashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Recent Payments</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => handleQuickAction("record-payment")}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleQuickAction("record-payment")}
+              >
                 View all
               </Button>
             </div>
@@ -353,7 +363,10 @@ export default function Dashboard() {
             <div className="space-y-4">
               {paymentsLoading ? (
                 Array.from({ length: paymentsPerPage }).map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4 p-3 border border-border rounded-lg">
+                  <div
+                    key={i}
+                    className="flex items-center space-x-4 p-3 border border-border rounded-lg"
+                  >
                     <Skeleton className="w-10 h-10 rounded-full" />
                     <div className="flex-1 space-y-2">
                       <Skeleton className="h-4 w-48" />
@@ -364,22 +377,31 @@ export default function Dashboard() {
                 ))
               ) : currentPayments && currentPayments.length > 0 ? (
                 currentPayments.map((payment) => (
-                  <div key={payment.paymentId} className="flex items-center space-x-4 p-3 border border-border rounded-lg hover:bg-accent">
+                  <div
+                    key={payment.paymentId}
+                    className="flex items-center space-x-4 p-3 border border-border rounded-lg hover:bg-accent"
+                  >
                     <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
                       <CreditCard className="h-5 w-5 text-green-600" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        <span className="font-medium">{payment.client.name}</span>
+                        <span className="font-medium">
+                          {payment.client.name}
+                        </span>
                         <span className="text-sm text-muted-foreground">•</span>
-                        <span className="text-sm text-muted-foreground">{payment.item.title}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {payment.item.title}
+                        </span>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {payment.paymentMethod} • {formatDate(payment.paidAt)}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-green-600">{formatCurrency(payment.amount)}</p>
+                      <p className="font-bold text-green-600">
+                        {formatCurrency(payment.amount)}
+                      </p>
                     </div>
                   </div>
                 ))
@@ -395,20 +417,29 @@ export default function Dashboard() {
             {recentPayments && recentPayments.length > paymentsPerPage && (
               <div className="flex items-center justify-between pt-4 border-t border-border">
                 <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <span>Showing {paymentsStartIndex + 1} to {Math.min(paymentsEndIndex, recentPayments.length)} of {recentPayments.length} payments</span>
+                  <span>
+                    Showing {paymentsStartIndex + 1} to{" "}
+                    {Math.min(paymentsEndIndex, recentPayments.length)} of{" "}
+                    {recentPayments.length} payments
+                  </span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setPaymentsPage(Math.max(1, paymentsPage - 1))}
+                    onClick={() =>
+                      setPaymentsPage(Math.max(1, paymentsPage - 1))
+                    }
                     disabled={paymentsPage === 1}
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Previous
                   </Button>
                   <div className="flex items-center space-x-1">
-                    {Array.from({ length: totalPaymentPages }, (_, i) => i + 1).map((page) => (
+                    {Array.from(
+                      { length: totalPaymentPages },
+                      (_, i) => i + 1,
+                    ).map((page) => (
                       <Button
                         key={page}
                         variant={paymentsPage === page ? "default" : "outline"}
@@ -423,7 +454,11 @@ export default function Dashboard() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setPaymentsPage(Math.min(totalPaymentPages, paymentsPage + 1))}
+                    onClick={() =>
+                      setPaymentsPage(
+                        Math.min(totalPaymentPages, paymentsPage + 1),
+                      )
+                    }
                     disabled={paymentsPage === totalPaymentPages}
                   >
                     Next
@@ -442,259 +477,83 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <Button className="w-full" size="lg" onClick={() => handleQuickAction("add-item")}>
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => handleQuickAction("add-item")}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Add New Item
               </Button>
 
-              <Button className="w-full" variant="outline" size="lg" onClick={() => handleQuickAction("record-payment")}>
+              <Button
+                className="w-full"
+                variant="outline"
+                size="lg"
+                onClick={() => handleQuickAction("record-payment")}
+              >
                 <CreditCard className="mr-2 h-4 w-4" />
                 Record Payment
               </Button>
 
-              <Button className="w-full" variant="outline" size="lg" onClick={() => handleQuickAction("process-payout")}>
+              <Button
+                className="w-full"
+                variant="outline"
+                size="lg"
+                onClick={() => handleQuickAction("process-payout")}
+              >
                 <DollarSign className="mr-2 h-4 w-4" />
                 Process Payout
               </Button>
 
-              <Button className="w-full" variant="outline" size="lg" onClick={() => handleQuickAction("add-vendor")}>
+              <Button
+                className="w-full"
+                variant="outline"
+                size="lg"
+                onClick={() => handleQuickAction("add-vendor")}
+              >
                 <Handshake className="mr-2 h-4 w-4" />
                 Add Vendor
               </Button>
             </div>
 
             {/* Attention Required */}
-            {paymentMetrics && (paymentMetrics.overduePayments > 0 || paymentMetrics.upcomingPayments > 0) && (
-              <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <div className="flex items-center space-x-2 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                  <h4 className="font-medium text-destructive">
-                    Attention Required
-                  </h4>
+            {paymentMetrics &&
+              (paymentMetrics.overduePayments > 0 ||
+                paymentMetrics.upcomingPayments > 0) && (
+                <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                    <h4 className="font-medium text-destructive">
+                      Attention Required
+                    </h4>
+                  </div>
+                  <div className="space-y-1 text-sm text-destructive/80">
+                    {paymentMetrics.overduePayments > 0 && (
+                      <p>{paymentMetrics.overduePayments} overdue payments</p>
+                    )}
+                    {paymentMetrics.upcomingPayments > 0 && (
+                      <p>{paymentMetrics.upcomingPayments} upcoming payments</p>
+                    )}
+                    {metrics && metrics.pendingPayouts > 0 && (
+                      <p>
+                        Pending payouts:{" "}
+                        {formatCurrency(metrics.pendingPayouts)}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="link"
+                    className="mt-2 p-0 h-auto text-destructive"
+                    onClick={() => handleQuickAction("record-payment")}
+                  >
+                    Review payments →
+                  </Button>
                 </div>
-                <div className="space-y-1 text-sm text-destructive/80">
-                  {paymentMetrics.overduePayments > 0 && (
-                    <p>{paymentMetrics.overduePayments} overdue payments</p>
-                  )}
-                  {paymentMetrics.upcomingPayments > 0 && (
-                    <p>{paymentMetrics.upcomingPayments} upcoming payments</p>
-                  )}
-                  {metrics && metrics.pendingPayouts > 0 && (
-                    <p>Pending payouts: {formatCurrency(metrics.pendingPayouts)}</p>
-                  )}
-                </div>
-                <Button
-                  variant="link"
-                  className="mt-2 p-0 h-auto text-destructive"
-                  onClick={() => handleQuickAction("record-payment")}
-                >
-                  Review payments →
-                </Button>
-              </div>
-            )}
+              )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Recent Items Table */}
-      <Card className="mt-8">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Recent Items</CardTitle>
-            <div className="flex items-center space-x-3">
-              <select className="text-sm border border-input rounded-lg px-3 py-2 bg-background">
-                <option>All Status</option>
-                <option>In Store</option>
-                <option>Reserved</option>
-                <option>Sold</option>
-              </select>
-              <Select value={itemsPerPage.toString()} onValueChange={(value) => {
-                setItemsPerPage(parseInt(value));
-                setCurrentPage(1);
-              }}>
-                <SelectTrigger className="w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5</SelectItem>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="20">20</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="ghost" size="sm" onClick={() => setLocation('/inventory')}>
-                View all inventory
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
-                    Item
-                  </th>
-                  <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
-                    Vendor
-                  </th>
-                  <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
-                    List Price
-                  </th>
-                  <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
-                    Status
-                  </th>
-                  <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
-                    Added
-                  </th>
-                  <th className="text-left py-3 px-6 text-sm font-medium text-muted-foreground">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {itemsLoading ? (
-                  Array.from({ length: itemsPerPage }).map((_, i) => (
-                    <tr key={i} className="border-b border-border">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center space-x-3">
-                          <Skeleton className="w-10 h-10 rounded-lg" />
-                          <div className="space-y-2">
-                            <Skeleton className="h-4 w-32" />
-                            <Skeleton className="h-3 w-24" />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-3 w-32" />
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <Skeleton className="h-4 w-16" />
-                      </td>
-                      <td className="py-4 px-6">
-                        <Skeleton className="h-6 w-20 rounded-full" />
-                      </td>
-                      <td className="py-4 px-6">
-                        <Skeleton className="h-4 w-16" />
-                      </td>
-                      <td className="py-4 px-6">
-                        <Skeleton className="h-8 w-16" />
-                      </td>
-                    </tr>
-                  ))
-                ) : currentItems && currentItems.length > 0 ? (
-                  currentItems.map((item) => {
-                    const IconComponent = getItemIcon(item.brand);
-                    return (
-                      <tr
-                        key={item.itemId}
-                        className="border-b border-border hover:bg-accent"
-                      >
-                        <td className="py-4 px-6">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
-                              <IconComponent className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-foreground">
-                                {item.title}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                Model: {item.model}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <p className="text-sm font-medium text-foreground">
-                            {item.vendor.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {item.vendor.email}
-                          </p>
-                        </td>
-                        <td className="py-4 px-6">
-                          <p className="font-semibold text-foreground">
-                            {formatCurrency(Number(item.listPrice))}
-                          </p>
-                        </td>
-                        <td className="py-4 px-6">
-                          {getStatusBadge(item.status)}
-                        </td>
-                        <td className="py-4 px-6">
-                          <p className="text-sm text-muted-foreground">
-                            {formatDate(item.createdAt)}
-                          </p>
-                        </td>
-                        <td className="py-4 px-6">
-                          <Button variant="ghost" size="sm" onClick={() => setLocation(`/item/${item.itemId}`)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="py-8 text-center text-muted-foreground"
-                    >
-                      No items found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Pagination Controls */}
-          {recentItems && recentItems.length > 0 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <span>Showing {startIndex + 1} to {Math.min(endIndex, recentItems.length)} of {recentItems.length} items</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <div className="flex items-center space-x-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <Button
-                      key={page}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(page)}
-                      className="w-8 h-8"
-                    >
-                      {page}
-                    </Button>
-                  ))}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </MainLayout>
   );
 }
