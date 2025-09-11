@@ -1,45 +1,45 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { 
-  LayoutDashboard, 
-  Package, 
-  Handshake, 
-  Users, 
-  CreditCard, 
-  DollarSign, 
-  Receipt, 
-  TrendingUp, 
+import {
+  LayoutDashboard,
+  Package,
+  Handshake,
+  Users,
+  CreditCard,
+  DollarSign,
+  Receipt,
+  TrendingUp,
   BarChart3,
   Gem,
   Settings,
-  User
+  User,
 } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { 
-    name: "Management", 
+  {
+    name: "Operacion",
     items: [
-      { name: "Inventory", href: "/inventory", icon: Package },
-      { name: "Vendors", href: "/vendors", icon: Handshake },
-      { name: "Clients", href: "/clients", icon: Users },
-    ]
+      { name: "Inventario", href: "/inventory", icon: Package },
+      { name: "Consignadores", href: "/vendors", icon: Handshake },
+      { name: "Clientes", href: "/clients", icon: Users },
+    ],
   },
   {
-    name: "Financial",
+    name: "Finanzas",
     items: [
-      { name: "Payments", href: "/payments", icon: CreditCard },
+      { name: "Pagos Entrantes", href: "/payments", icon: CreditCard },
       { name: "Payouts", href: "/payouts", icon: DollarSign },
-      { name: "Expenses", href: "/expenses", icon: Receipt },
-    ]
+      { name: "Gastos", href: "/expenses", icon: Receipt },
+    ],
   },
   {
-    name: "Analytics",
+    name: "Analitica",
     items: [
-      { name: "Reports", href: "/reports", icon: BarChart3 },
+      { name: "Reportes", href: "/reports", icon: BarChart3 },
       { name: "Profitability", href: "/profitability", icon: TrendingUp },
-    ]
-  }
+    ],
+  },
 ];
 
 export function Sidebar() {
@@ -54,12 +54,12 @@ export function Sidebar() {
             <Gem className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">LuxeConsign</h1>
+            <h1 className="text-xl font-bold text-foreground">Luxette</h1>
             <p className="text-sm text-muted-foreground">Management System</p>
           </div>
         </div>
       </div>
-      
+
       {/* Navigation Menu */}
       <nav className="flex-1 py-6 space-y-1">
         {navigation.map((item) => (
@@ -71,7 +71,7 @@ export function Sidebar() {
                   "flex items-center px-4 py-3 mx-2 text-sm font-medium rounded-lg transition-colors",
                   location === item.href
                     ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )}
               >
                 <item.icon className="mr-3 h-5 w-5" />
@@ -92,7 +92,7 @@ export function Sidebar() {
                       "flex items-center px-4 py-3 mx-2 text-sm font-medium rounded-lg transition-colors",
                       location === subItem.href
                         ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     )}
                   >
                     <subItem.icon className="mr-3 h-5 w-5" />
@@ -104,7 +104,7 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
-      
+
       {/* User Profile */}
       <div className="p-4 border-t border-border">
         <div className="flex items-center space-x-3">

@@ -216,7 +216,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
-                  Total Revenue
+                  Ventas del Mes
                 </p>
                 {metricsLoading ? (
                   <Skeleton className="h-8 w-24 mt-2" />
@@ -242,7 +242,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
-                  Active Items
+                  Productos en Venta
                 </p>
                 {metricsLoading ? (
                   <Skeleton className="h-8 w-16 mt-2" />
@@ -268,7 +268,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
-                  Pending Payouts
+                  Dinero Entrante
                 </p>
                 {metricsLoading ? (
                   <Skeleton className="h-8 w-24 mt-2" />
@@ -279,7 +279,7 @@ export default function Dashboard() {
                 )}
                 <p className="text-sm text-amber-600 mt-1 flex items-center">
                   <AlertTriangle className="h-3 w-3 mr-1" />
-                  15 vendors waiting
+                  Dinero Saliente
                 </p>
               </div>
               <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
@@ -294,7 +294,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
-                  Net Profit
+                  Valor Mercancia
                 </p>
                 {metricsLoading ? (
                   <Skeleton className="h-8 w-24 mt-2" />
@@ -305,7 +305,7 @@ export default function Dashboard() {
                 )}
                 <p className="text-sm text-emerald-600 mt-1 flex items-center">
                   <ArrowUp className="h-3 w-3 mr-1" />
-                  35.5% margin
+                  Costo Mercancia
                 </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
