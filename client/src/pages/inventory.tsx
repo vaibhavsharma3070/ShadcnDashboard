@@ -47,6 +47,8 @@ import {
   type Item,
   type Vendor,
   type Client,
+  type Brand,
+  type Category,
 } from "@shared/schema";
 import { StatusUpdateDropdown } from "@/components/status-update-dropdown";
 import { z } from "zod";
@@ -236,6 +238,8 @@ function getItemIcon(brand: string) {
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [brandFilter, setBrandFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
@@ -256,6 +260,14 @@ export default function Inventory() {
 
   const { data: clients } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
+  });
+
+  const { data: brands } = useQuery<Brand[]>({
+    queryKey: ["/api/brands"],
+  });
+
+  const { data: categories } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
   });
 
   const createItemMutation = useMutation({
@@ -524,7 +536,13 @@ export default function Inventory() {
       const matchesStatus =
         statusFilter === "all" || item.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      const matchesBrand =
+        brandFilter === "all" || item.brandId === brandFilter;
+
+      const matchesCategory =
+        categoryFilter === "all" || item.categoryId === categoryFilter;
+
+      return matchesSearch && matchesStatus && matchesBrand && matchesCategory;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -684,28 +702,34 @@ export default function Inventory() {
               </Select>
 
               {/* Brand Filter */}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={brandFilter} onValueChange={setBrandFilter}>
                 <SelectTrigger className="w-48">
-                  <Filter className="h-4 w-4 mr-2" />
+                  <Tag className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Filter by brand" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">MARCA</SelectItem>
+                  <SelectItem value="all">All Brands</SelectItem>
+                  {brands?.filter(brand => brand.active === "true").map((brand) => (
+                    <SelectItem key={brand.brandId} value={brand.brandId}>
+                      {brand.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
               {/* Category Filter */}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="w-48">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Filter by status" />
+                  <Package className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Filter by category" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="in-store">Zapatos</SelectItem>
-                  <SelectItem value="reserved">Relojes</SelectItem>
-                  <SelectItem value="sold">ETC</SelectItem>
-                  <SelectItem value="returned">Returned</SelectItem>
+                  {categories?.filter(category => category.active === "true").map((category) => (
+                    <SelectItem key={category.categoryId} value={category.categoryId}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
