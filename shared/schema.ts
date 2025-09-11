@@ -34,8 +34,10 @@ export const item = pgTable("item", {
   serialNo: text("serial_no"),
   condition: text("condition"),
   acquisitionDate: date("acquisition_date"),
-  agreedVendorPayout: numeric("agreed_vendor_payout", { precision: 12, scale: 2 }),
-  listPrice: numeric("list_price", { precision: 12, scale: 2 }),
+  minCost: numeric("min_cost", { precision: 12, scale: 2 }),
+  maxCost: numeric("max_cost", { precision: 12, scale: 2 }),
+  minSalesPrice: numeric("min_sales_price", { precision: 12, scale: 2 }),
+  maxSalesPrice: numeric("max_sales_price", { precision: 12, scale: 2 }),
   status: text("status").notNull().default("in-store"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
@@ -210,11 +212,19 @@ export const insertItemSchema = createInsertSchema(item).omit({
   itemId: true,
   createdAt: true,
 }).extend({
-  agreedVendorPayout: z.preprocess((val) => 
+  minCost: z.preprocess((val) => 
     val === null || val === undefined || val === '' ? null : (typeof val === 'string' ? parseFloat(val) : val),
     z.number().nullable()
   ).optional(),
-  listPrice: z.preprocess((val) => 
+  maxCost: z.preprocess((val) => 
+    val === null || val === undefined || val === '' ? null : (typeof val === 'string' ? parseFloat(val) : val),
+    z.number().nullable()
+  ).optional(),
+  minSalesPrice: z.preprocess((val) => 
+    val === null || val === undefined || val === '' ? null : (typeof val === 'string' ? parseFloat(val) : val),
+    z.number().nullable()
+  ).optional(),
+  maxSalesPrice: z.preprocess((val) => 
     val === null || val === undefined || val === '' ? null : (typeof val === 'string' ? parseFloat(val) : val),
     z.number().nullable()
   ).optional(),
