@@ -3,8 +3,32 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertVendorSchema, insertClientSchema, insertItemSchema, 
-  insertClientPaymentSchema, insertVendorPayoutSchema, insertItemExpenseSchema, insertInstallmentPlanSchema 
+  insertClientPaymentSchema, insertVendorPayoutSchema, insertItemExpenseSchema, insertInstallmentPlanSchema,
+  insertBrandSchema, insertCategorySchema
 } from "@shared/schema";
+
+// Helper function to categorize errors
+function handleStorageError(error: unknown) {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    
+    // 404 - Not found errors
+    if (message.includes('not found')) {
+      return { status: 404, message: error.message };
+    }
+    
+    // 409 - Constraint violation errors
+    if (message.includes('cannot delete') || message.includes('referenced by')) {
+      return { status: 409, message: error.message };
+    }
+    
+    // 500 - Other errors
+    return { status: 500, message: error.message };
+  }
+  
+  // 500 - Unknown errors
+  return { status: 500, message: "An unexpected error occurred" };
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard routes
@@ -73,7 +97,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendor = await storage.updateVendor(req.params.id, validatedData);
       res.json(vendor);
     } catch (error) {
-      res.status(400).json({ error: "Invalid vendor data" });
+      // Check if it's a Zod validation error
+      if (error && typeof error === 'object' && 'issues' in error) {
+        res.status(400).json({ error: "Invalid vendor data" });
+      } else {
+        // It's a storage error
+        const { status, message } = handleStorageError(error);
+        res.status(status).json({ error: message });
+      }
     }
   });
 
@@ -83,6 +114,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete vendor" });
+    }
+  });
+
+  // Brand routes
+  app.get("/api/brands", async (req, res) => {
+    try {
+      const brands = await storage.getBrands();
+      res.json(brands);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch brands" });
+    }
+  });
+
+  app.get("/api/brands/:id", async (req, res) => {
+    try {
+      const brand = await storage.getBrand(req.params.id);
+      if (!brand) {
+        return res.status(404).json({ error: "Brand not found" });
+      }
+      res.json(brand);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch brand" });
+    }
+  });
+
+  app.post("/api/brands", async (req, res) => {
+    try {
+      const validatedData = insertBrandSchema.parse(req.body);
+      const brand = await storage.createBrand(validatedData);
+      res.status(201).json(brand);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid brand data" });
+    }
+  });
+
+  app.put("/api/brands/:id", async (req, res) => {
+    try {
+      const validatedData = insertBrandSchema.partial().parse(req.body);
+      const brand = await storage.updateBrand(req.params.id, validatedData);
+      res.json(brand);
+    } catch (error) {
+      // Check if it's a Zod validation error
+      if (error && typeof error === 'object' && 'issues' in error) {
+        res.status(400).json({ error: "Invalid brand data" });
+      } else {
+        // It's a storage error
+        const { status, message } = handleStorageError(error);
+        res.status(status).json({ error: message });
+      }
+    }
+  });
+
+  app.delete("/api/brands/:id", async (req, res) => {
+    try {
+      await storage.deleteBrand(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  // Category routes
+  app.get("/api/categories", async (req, res) => {
+    try {
+      const categories = await storage.getCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  app.get("/api/categories/:id", async (req, res) => {
+    try {
+      const category = await storage.getCategory(req.params.id);
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch category" });
+    }
+  });
+
+  app.post("/api/categories", async (req, res) => {
+    try {
+      const validatedData = insertCategorySchema.parse(req.body);
+      const category = await storage.createCategory(validatedData);
+      res.status(201).json(category);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid category data" });
+    }
+  });
+
+  app.put("/api/categories/:id", async (req, res) => {
+    try {
+      const validatedData = insertCategorySchema.partial().parse(req.body);
+      const category = await storage.updateCategory(req.params.id, validatedData);
+      res.json(category);
+    } catch (error) {
+      // Check if it's a Zod validation error
+      if (error && typeof error === 'object' && 'issues' in error) {
+        res.status(400).json({ error: "Invalid category data" });
+      } else {
+        // It's a storage error
+        const { status, message } = handleStorageError(error);
+        res.status(status).json({ error: message });
+      }
+    }
+  });
+
+  app.delete("/api/categories/:id", async (req, res) => {
+    try {
+      await storage.deleteCategory(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
     }
   });
 
@@ -124,7 +273,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const client = await storage.updateClient(req.params.id, validatedData);
       res.json(client);
     } catch (error) {
-      res.status(400).json({ error: "Invalid client data" });
+      // Check if it's a Zod validation error
+      if (error && typeof error === 'object' && 'issues' in error) {
+        res.status(400).json({ error: "Invalid client data" });
+      } else {
+        // It's a storage error
+        const { status, message } = handleStorageError(error);
+        res.status(status).json({ error: message });
+      }
     }
   });
 
@@ -180,7 +336,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const item = await storage.updateItem(req.params.id, validatedData);
       res.json(item);
     } catch (error) {
-      res.status(400).json({ error: "Invalid item data" });
+      // Check if it's a Zod validation error
+      if (error && typeof error === 'object' && 'issues' in error) {
+        res.status(400).json({ error: "Invalid item data" });
+      } else {
+        // It's a storage error
+        const { status, message } = handleStorageError(error);
+        res.status(status).json({ error: message });
+      }
     }
   });
 

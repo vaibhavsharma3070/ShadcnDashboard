@@ -1,7 +1,7 @@
 import { 
-  vendor, client, item, clientPayment, vendorPayout, itemExpense, installmentPlan, users,
-  type Vendor, type Client, type Item, type ClientPayment, type VendorPayout, type ItemExpense, type InstallmentPlan, type User,
-  type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser
+  vendor, client, item, clientPayment, vendorPayout, itemExpense, installmentPlan, users, brand, category,
+  type Vendor, type Client, type Item, type ClientPayment, type VendorPayout, type ItemExpense, type InstallmentPlan, type User, type Brand, type Category,
+  type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser, type InsertBrand, type InsertCategory
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sum, count, sql, and, isNull, isNotNull } from "drizzle-orm";
@@ -53,6 +53,20 @@ export interface IStorage {
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client>;
   deleteClient(id: string): Promise<void>;
+  
+  // Brand methods
+  getBrands(): Promise<Brand[]>;
+  getBrand(id: string): Promise<Brand | undefined>;
+  createBrand(brand: InsertBrand): Promise<Brand>;
+  updateBrand(id: string, brand: Partial<InsertBrand>): Promise<Brand>;
+  deleteBrand(id: string): Promise<void>;
+  
+  // Category methods
+  getCategories(): Promise<Category[]>;
+  getCategory(id: string): Promise<Category | undefined>;
+  createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: string, category: Partial<InsertCategory>): Promise<Category>;
+  deleteCategory(id: string): Promise<void>;
   
   // Item methods
   getItems(): Promise<Array<Item & { vendor: Vendor }>>;
@@ -191,6 +205,9 @@ export class DatabaseStorage implements IStorage {
 
   async updateVendor(id: string, updateVendor: Partial<InsertVendor>): Promise<Vendor> {
     const [result] = await db.update(vendor).set(updateVendor).where(eq(vendor.vendorId, id)).returning();
+    if (!result) {
+      throw new Error("Vendor not found");
+    }
     return result;
   }
 
@@ -215,11 +232,86 @@ export class DatabaseStorage implements IStorage {
 
   async updateClient(id: string, updateClient: Partial<InsertClient>): Promise<Client> {
     const [result] = await db.update(client).set(updateClient).where(eq(client.clientId, id)).returning();
+    if (!result) {
+      throw new Error("Client not found");
+    }
     return result;
   }
 
   async deleteClient(id: string): Promise<void> {
     await db.delete(client).where(eq(client.clientId, id));
+  }
+
+  // Brand methods
+  async getBrands(): Promise<Brand[]> {
+    return await db.select().from(brand).orderBy(desc(brand.createdAt));
+  }
+
+  async getBrand(id: string): Promise<Brand | undefined> {
+    const [result] = await db.select().from(brand).where(eq(brand.brandId, id));
+    return result || undefined;
+  }
+
+  async createBrand(insertBrand: InsertBrand): Promise<Brand> {
+    const [result] = await db.insert(brand).values(insertBrand).returning();
+    return result;
+  }
+
+  async updateBrand(id: string, updateBrand: Partial<InsertBrand>): Promise<Brand> {
+    const [result] = await db.update(brand).set(updateBrand).where(eq(brand.brandId, id)).returning();
+    if (!result) {
+      throw new Error("Brand not found");
+    }
+    return result;
+  }
+
+  async deleteBrand(id: string): Promise<void> {
+    // Check if brand is referenced by any items
+    const [referencedItems] = await db.select({ count: sql<number>`COUNT(*)` })
+      .from(item)
+      .where(eq(item.brandId, id));
+    
+    if (Number(referencedItems.count) > 0) {
+      throw new Error("Cannot delete brand. It is referenced by existing items.");
+    }
+    
+    await db.delete(brand).where(eq(brand.brandId, id));
+  }
+
+  // Category methods
+  async getCategories(): Promise<Category[]> {
+    return await db.select().from(category).orderBy(desc(category.createdAt));
+  }
+
+  async getCategory(id: string): Promise<Category | undefined> {
+    const [result] = await db.select().from(category).where(eq(category.categoryId, id));
+    return result || undefined;
+  }
+
+  async createCategory(insertCategory: InsertCategory): Promise<Category> {
+    const [result] = await db.insert(category).values(insertCategory).returning();
+    return result;
+  }
+
+  async updateCategory(id: string, updateCategory: Partial<InsertCategory>): Promise<Category> {
+    const [result] = await db.update(category).set(updateCategory).where(eq(category.categoryId, id)).returning();
+    if (!result) {
+      throw new Error("Category not found");
+    }
+    return result;
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    // Check if category is referenced by any items
+    const [referencedItems] = await db.select({ count: sql<number>`COUNT(*)` })
+      .from(item)
+      .where(eq(item.categoryId, id));
+    
+    if (Number(referencedItems.count) > 0) {
+      throw new Error("Cannot delete category. It is referenced by existing items.");
+    }
+    
+    await db.delete(category).where(eq(category.categoryId, id));
   }
 
   // Item methods
@@ -258,8 +350,9 @@ export class DatabaseStorage implements IStorage {
     const payload: Partial<typeof item.$inferInsert> = {};
     // Only set fields that are defined and convert types
     if (updateItem.vendorId !== undefined) payload.vendorId = updateItem.vendorId;
+    if (updateItem.brandId !== undefined) payload.brandId = updateItem.brandId;
+    if (updateItem.categoryId !== undefined) payload.categoryId = updateItem.categoryId;
     if (updateItem.title !== undefined) payload.title = updateItem.title;
-    if (updateItem.brand !== undefined) payload.brand = updateItem.brand;
     if (updateItem.model !== undefined) payload.model = updateItem.model;
     if (updateItem.serialNo !== undefined) payload.serialNo = updateItem.serialNo;
     if (updateItem.condition !== undefined) payload.condition = updateItem.condition;
@@ -271,6 +364,9 @@ export class DatabaseStorage implements IStorage {
     if (updateItem.acquisitionDate !== undefined) payload.acquisitionDate = toDbDateOptional(updateItem.acquisitionDate);
     
     const [result] = await db.update(item).set(payload).where(eq(item.itemId, id)).returning();
+    if (!result) {
+      throw new Error("Item not found");
+    }
     return result;
   }
 
