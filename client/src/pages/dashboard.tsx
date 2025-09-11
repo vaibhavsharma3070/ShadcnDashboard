@@ -341,134 +341,6 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Recent Activity and Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Payments */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Recent Payments</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleQuickAction("record-payment")}
-              >
-                View all
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {paymentsLoading ? (
-                Array.from({ length: paymentsPerPage }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center space-x-4 p-3 border border-border rounded-lg"
-                  >
-                    <Skeleton className="w-10 h-10 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-48" />
-                      <Skeleton className="h-3 w-32" />
-                    </div>
-                    <Skeleton className="h-4 w-20" />
-                  </div>
-                ))
-              ) : currentPayments && currentPayments.length > 0 ? (
-                currentPayments.map((payment) => (
-                  <div
-                    key={payment.paymentId}
-                    className="flex items-center space-x-4 p-3 border border-border rounded-lg hover:bg-accent"
-                  >
-                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                      <CreditCard className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium">
-                          {payment.client.name}
-                        </span>
-                        <span className="text-sm text-muted-foreground">•</span>
-                        <span className="text-sm text-muted-foreground">
-                          {payment.item.title}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {payment.paymentMethod} • {formatDate(payment.paidAt)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-green-600">
-                        {formatCurrency(payment.amount)}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No recent payments</p>
-                </div>
-              )}
-            </div>
-
-            {/* Payments Pagination Controls */}
-            {recentPayments && recentPayments.length > paymentsPerPage && (
-              <div className="flex items-center justify-between pt-4 border-t border-border">
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <span>
-                    Showing {paymentsStartIndex + 1} to{" "}
-                    {Math.min(paymentsEndIndex, recentPayments.length)} of{" "}
-                    {recentPayments.length} payments
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setPaymentsPage(Math.max(1, paymentsPage - 1))
-                    }
-                    disabled={paymentsPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  <div className="flex items-center space-x-1">
-                    {Array.from(
-                      { length: totalPaymentPages },
-                      (_, i) => i + 1,
-                    ).map((page) => (
-                      <Button
-                        key={page}
-                        variant={paymentsPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setPaymentsPage(page)}
-                        className="w-8 h-8"
-                      >
-                        {page}
-                      </Button>
-                    ))}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setPaymentsPage(
-                        Math.min(totalPaymentPages, paymentsPage + 1),
-                      )
-                    }
-                    disabled={paymentsPage === totalPaymentPages}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Quick Actions */}
         <Card>
@@ -554,6 +426,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Activity and Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8"></div>
     </MainLayout>
   );
 }
