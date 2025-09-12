@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  BarChart,
+  BarChart as BarChartIcon,
   Calendar,
   Download,
   Filter,
@@ -35,7 +35,8 @@ import {
   Activity,
   Target,
 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Vendor, Client, Brand, Category } from "@shared/schema";
 
 // TypeScript interfaces for report data structures
@@ -156,6 +157,91 @@ function formatDate(dateString: string): string {
   return date.toLocaleDateString();
 }
 
+// Performance helper functions
+function sortPerformanceData(data: GroupPerformance[], key: string, direction: 'asc' | 'desc'): GroupPerformance[] {
+  if (!data) return [];
+  
+  return [...data].sort((a, b) => {
+    let aValue: number = 0;
+    let bValue: number = 0;
+    
+    switch (key) {
+      case 'name':
+        return direction === 'asc' 
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
+      case 'revenue':
+        aValue = a.revenue || 0;
+        bValue = b.revenue || 0;
+        break;
+      case 'profit':
+        aValue = a.profit || 0;
+        bValue = b.profit || 0;
+        break;
+      case 'profitMargin':
+        aValue = a.profitMargin || 0;
+        bValue = b.profitMargin || 0;
+        break;
+      case 'itemCount':
+        aValue = a.itemCount || 0;
+        bValue = b.itemCount || 0;
+        break;
+      case 'change':
+        aValue = a.change || 0;
+        bValue = b.change || 0;
+        break;
+      default:
+        return 0;
+    }
+    
+    return direction === 'asc' ? aValue - bValue : bValue - aValue;
+  });
+}
+
+function getPerformanceColor(profitMargin: number): string {
+  if (profitMargin >= 0.25) return 'text-green-600';
+  if (profitMargin >= 0.15) return 'text-yellow-600';
+  return 'text-red-600';
+}
+
+function getPerformanceBadgeVariant(profitMargin: number): 'default' | 'secondary' | 'destructive' {
+  if (profitMargin >= 0.25) return 'default';
+  if (profitMargin >= 0.15) return 'secondary';
+  return 'destructive';
+}
+
+function calculateSummaryStats(data: GroupPerformance[]): {
+  totalRevenue: number;
+  totalProfit: number;
+  averageMargin: number;
+  topPerformer: GroupPerformance | null;
+  totalCount: number;
+} {
+  if (!data || data.length === 0) {
+    return {
+      totalRevenue: 0,
+      totalProfit: 0,
+      averageMargin: 0,
+      topPerformer: null,
+      totalCount: 0,
+    };
+  }
+
+  const totalRevenue = data.reduce((sum, item) => sum + (item.revenue || 0), 0);
+  const totalProfit = data.reduce((sum, item) => sum + (item.profit || 0), 0);
+  const averageMargin = data.reduce((sum, item) => sum + (item.profitMargin || 0), 0) / data.length;
+  const topPerformer = data.reduce((max, item) => 
+    (item.revenue || 0) > (max.revenue || 0) ? item : max, data[0]);
+
+  return {
+    totalRevenue,
+    totalProfit,
+    averageMargin,
+    topPerformer,
+    totalCount: data.length,
+  };
+}
+
 export default function Reports() {
   // State management
   const [activeTab, setActiveTab] = useState("overview");
@@ -168,6 +254,15 @@ export default function Reports() {
     brandIds: [],
     categoryIds: [],
   });
+
+  // Performance tab state management
+  const [performanceView, setPerformanceView] = useState<'revenue' | 'profit'>('revenue');
+  const [sortConfig, setSortConfig] = useState<{
+    key: string;
+    direction: 'asc' | 'desc';
+    groupType: 'vendor' | 'brand' | 'category' | 'client';
+  }>({ key: 'revenue', direction: 'desc', groupType: 'vendor' });
+  const [showCharts, setShowCharts] = useState(true);
 
   // Filter entity data queries
   const { data: vendors, isLoading: vendorsLoading } = useQuery<Vendor[]>({
@@ -562,7 +657,7 @@ export default function Reports() {
             Overview
           </TabsTrigger>
           <TabsTrigger value="performance" data-testid="tab-performance">
-            <BarChart className="h-4 w-4 mr-2" />
+            <BarChartIcon className="h-4 w-4 mr-2" />
             Performance by Groups
           </TabsTrigger>
           <TabsTrigger value="profitability" data-testid="tab-profitability">
@@ -994,97 +1089,508 @@ export default function Reports() {
 
         {/* Performance by Groups Tab */}
         <TabsContent value="performance" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Vendor Performance */}
-            <Card data-testid="card-vendor-performance">
-              <CardHeader>
-                <CardTitle>Vendor Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {vendorPerfLoading ? (
-                  <div className="space-y-3">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-4 w-20" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {vendorPerformance?.slice(0, 5).map((vendor) => (
-                      <div key={vendor.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
-                        <div className="flex-1">
-                          <p className="font-medium">{vendor.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {vendor.itemCount} items • {((vendor.profitMargin || 0) * 100).toFixed(1)}% margin
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">{formatCurrencyAbbreviated(vendor.revenue)}</p>
-                          <p className={`text-sm flex items-center ${vendor.change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {vendor.change >= 0 ? (
-                              <TrendingUp className="h-3 w-3 mr-1" />
-                            ) : (
-                              <TrendingDown className="h-3 w-3 mr-1" />
-                            )}
-                            {formatPercentage(vendor.change)}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          {/* Performance Controls */}
+          <Card data-testid="card-performance-controls">
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardTitle className="flex items-center space-x-2">
+                  <BarChartIcon className="h-5 w-5" />
+                  <span>Grouped Performance Analysis</span>
+                </CardTitle>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Select 
+                    value={performanceView} 
+                    onValueChange={(value: 'revenue' | 'profit') => setPerformanceView(value)}
+                  >
+                    <SelectTrigger className="w-full sm:w-40" data-testid="select-performance-view">
+                      <SelectValue placeholder="View by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="revenue">By Revenue</SelectItem>
+                      <SelectItem value="profit">By Profit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setShowCharts(!showCharts)}
+                    data-testid="button-toggle-charts"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    {showCharts ? 'Hide Charts' : 'Show Charts'}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
 
-            {/* Brand Performance */}
-            <Card data-testid="card-brand-performance">
-              <CardHeader>
-                <CardTitle>Brand Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {brandPerfLoading ? (
-                  <div className="space-y-3">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-4 w-20" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {brandPerformance?.slice(0, 5).map((brand) => (
-                      <div key={brand.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
-                        <div className="flex-1">
-                          <p className="font-medium">{brand.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {brand.itemCount} items • {((brand.profitMargin || 0) * 100).toFixed(1)}% margin
+          {/* Vendor Performance Section */}
+          <div className="space-y-4">
+            {/* Vendor Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {vendorPerfLoading ? (
+                [...Array(4)].map((_, i) => (
+                  <Card key={i}>
+                    <CardContent className="p-4">
+                      <Skeleton className="h-4 w-24 mb-2" />
+                      <Skeleton className="h-6 w-16 mb-1" />
+                      <Skeleton className="h-3 w-20" />
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                (() => {
+                  const stats = calculateSummaryStats(vendorPerformance || []);
+                  return (
+                    <>
+                      <Card className="hover-lift" data-testid="card-vendor-summary-count">
+                        <CardContent className="p-4">
+                          <p className="text-sm font-medium text-muted-foreground">Active Vendors</p>
+                          <p className="text-2xl font-bold text-foreground">{stats.totalCount}</p>
+                          <p className="text-xs text-blue-600">Total suppliers</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="hover-lift" data-testid="card-vendor-summary-revenue">
+                        <CardContent className="p-4">
+                          <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                          <p className="text-2xl font-bold text-foreground">{formatCurrencyAbbreviated(stats.totalRevenue)}</p>
+                          <p className="text-xs text-green-600">From all vendors</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="hover-lift" data-testid="card-vendor-summary-profit">
+                        <CardContent className="p-4">
+                          <p className="text-sm font-medium text-muted-foreground">Total Profit</p>
+                          <p className="text-2xl font-bold text-foreground">{formatCurrencyAbbreviated(stats.totalProfit)}</p>
+                          <p className="text-xs text-emerald-600">{(stats.averageMargin * 100).toFixed(1)}% avg margin</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="hover-lift" data-testid="card-vendor-summary-top">
+                        <CardContent className="p-4">
+                          <p className="text-sm font-medium text-muted-foreground">Top Performer</p>
+                          <p className="text-lg font-bold text-foreground truncate">{stats.topPerformer?.name || 'N/A'}</p>
+                          <p className="text-xs text-amber-600">
+                            {stats.topPerformer ? formatCurrencyAbbreviated(stats.topPerformer.revenue) : 'No data'}
                           </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">{formatCurrencyAbbreviated(brand.revenue)}</p>
-                          <p className={`text-sm flex items-center ${brand.change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {brand.change >= 0 ? (
-                              <TrendingUp className="h-3 w-3 mr-1" />
-                            ) : (
-                              <TrendingDown className="h-3 w-3 mr-1" />
-                            )}
-                            {formatPercentage(brand.change)}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                        </CardContent>
+                      </Card>
+                    </>
+                  );
+                })()
+              )}
+            </div>
 
+            {/* Vendor Performance Table and Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Vendor Table */}
+              <Card data-testid="card-vendor-performance-table">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Vendor Performance</span>
+                    <Badge variant="outline">{vendorPerformance?.length || 0} vendors</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {vendorPerfLoading ? (
+                    <div className="space-y-3">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-4 w-20" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50" 
+                              onClick={() => {
+                                const newDirection = sortConfig.key === 'name' && sortConfig.direction === 'asc' ? 'desc' : 'asc';
+                                setSortConfig({ key: 'name', direction: newDirection, groupType: 'vendor' });
+                              }}
+                              data-testid="th-vendor-name"
+                            >
+                              <div className="flex items-center space-x-1">
+                                <span>Vendor</span>
+                                {sortConfig.key === 'name' && sortConfig.groupType === 'vendor' && (
+                                  sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 text-right" 
+                              onClick={() => {
+                                const newDirection = sortConfig.key === 'revenue' && sortConfig.direction === 'desc' ? 'asc' : 'desc';
+                                setSortConfig({ key: 'revenue', direction: newDirection, groupType: 'vendor' });
+                              }}
+                              data-testid="th-vendor-revenue"
+                            >
+                              <div className="flex items-center justify-end space-x-1">
+                                <span>Revenue</span>
+                                {sortConfig.key === 'revenue' && sortConfig.groupType === 'vendor' && (
+                                  sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 text-right" 
+                              onClick={() => {
+                                const newDirection = sortConfig.key === 'profitMargin' && sortConfig.direction === 'desc' ? 'asc' : 'desc';
+                                setSortConfig({ key: 'profitMargin', direction: newDirection, groupType: 'vendor' });
+                              }}
+                              data-testid="th-vendor-margin"
+                            >
+                              <div className="flex items-center justify-end space-x-1">
+                                <span>Margin</span>
+                                {sortConfig.key === 'profitMargin' && sortConfig.groupType === 'vendor' && (
+                                  sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead className="text-right">Trend</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sortPerformanceData(
+                            vendorPerformance || [], 
+                            sortConfig.groupType === 'vendor' ? sortConfig.key : 'revenue', 
+                            sortConfig.groupType === 'vendor' ? sortConfig.direction : 'desc'
+                          ).slice(0, 10).map((vendor) => (
+                            <TableRow key={vendor.id} className="hover:bg-muted/50" data-testid={`row-vendor-${vendor.id}`}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{vendor.name}</p>
+                                  <p className="text-sm text-muted-foreground">{vendor.itemCount} items</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div>
+                                  <p className="font-semibold">{formatCurrency(vendor.revenue)}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {formatCurrency((vendor.revenue || 0) / Math.max(vendor.itemCount || 1, 1))} avg
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge 
+                                  variant={getPerformanceBadgeVariant(vendor.profitMargin || 0)}
+                                  className={getPerformanceColor(vendor.profitMargin || 0)}
+                                >
+                                  {((vendor.profitMargin || 0) * 100).toFixed(1)}%
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className={`flex items-center justify-end ${vendor.change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {vendor.change >= 0 ? (
+                                    <TrendingUp className="h-3 w-3 mr-1" />
+                                  ) : (
+                                    <TrendingDown className="h-3 w-3 mr-1" />
+                                  )}
+                                  <span className="text-sm font-medium">{formatPercentage(vendor.change)}</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Vendor Chart */}
+              {showCharts && (
+                <Card data-testid="card-vendor-performance-chart">
+                  <CardHeader>
+                    <CardTitle>Top 10 Vendors by {performanceView === 'revenue' ? 'Revenue' : 'Profit'}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {vendorPerfLoading ? (
+                      <div className="h-64 flex items-center justify-center">
+                        <Skeleton className="h-full w-full" />
+                      </div>
+                    ) : (
+                      <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={sortPerformanceData(
+                              vendorPerformance || [], 
+                              performanceView, 
+                              'desc'
+                            ).slice(0, 10).map(vendor => ({
+                              name: vendor.name.length > 15 ? vendor.name.substring(0, 15) + '...' : vendor.name,
+                              value: performanceView === 'revenue' ? vendor.revenue : vendor.profit,
+                              margin: vendor.profitMargin || 0
+                            }))}
+                            layout="horizontal"
+                            margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" tickFormatter={(value) => formatCurrencyAbbreviated(value)} />
+                            <YAxis type="category" dataKey="name" width={80} />
+                            <Tooltip 
+                              formatter={(value: number) => [formatCurrency(value), performanceView === 'revenue' ? 'Revenue' : 'Profit']}
+                              labelFormatter={(label) => `Vendor: ${label}`}
+                            />
+                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                              {sortPerformanceData(
+                                vendorPerformance || [], 
+                                performanceView, 
+                                'desc'
+                              ).slice(0, 10).map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={index < 3 ? '#22c55e' : index < 6 ? '#eab308' : '#ef4444'} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+
+          {/* Brand Performance Section */}
+          <div className="space-y-4">
+            {/* Brand Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {brandPerfLoading ? (
+                [...Array(4)].map((_, i) => (
+                  <Card key={i}>
+                    <CardContent className="p-4">
+                      <Skeleton className="h-4 w-24 mb-2" />
+                      <Skeleton className="h-6 w-16 mb-1" />
+                      <Skeleton className="h-3 w-20" />
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                (() => {
+                  const stats = calculateSummaryStats(brandPerformance || []);
+                  return (
+                    <>
+                      <Card className="hover-lift" data-testid="card-brand-summary-count">
+                        <CardContent className="p-4">
+                          <p className="text-sm font-medium text-muted-foreground">Active Brands</p>
+                          <p className="text-2xl font-bold text-foreground">{stats.totalCount}</p>
+                          <p className="text-xs text-purple-600">Total brands</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="hover-lift" data-testid="card-brand-summary-revenue">
+                        <CardContent className="p-4">
+                          <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                          <p className="text-2xl font-bold text-foreground">{formatCurrencyAbbreviated(stats.totalRevenue)}</p>
+                          <p className="text-xs text-green-600">From all brands</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="hover-lift" data-testid="card-brand-summary-profit">
+                        <CardContent className="p-4">
+                          <p className="text-sm font-medium text-muted-foreground">Total Profit</p>
+                          <p className="text-2xl font-bold text-foreground">{formatCurrencyAbbreviated(stats.totalProfit)}</p>
+                          <p className="text-xs text-emerald-600">{(stats.averageMargin * 100).toFixed(1)}% avg margin</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="hover-lift" data-testid="card-brand-summary-top">
+                        <CardContent className="p-4">
+                          <p className="text-sm font-medium text-muted-foreground">Top Performer</p>
+                          <p className="text-lg font-bold text-foreground truncate">{stats.topPerformer?.name || 'N/A'}</p>
+                          <p className="text-xs text-amber-600">
+                            {stats.topPerformer ? formatCurrencyAbbreviated(stats.topPerformer.revenue) : 'No data'}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </>
+                  );
+                })()
+              )}
+            </div>
+
+            {/* Brand Performance Table and Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Brand Table */}
+              <Card data-testid="card-brand-performance-table">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Brand Performance</span>
+                    <Badge variant="outline">{brandPerformance?.length || 0} brands</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {brandPerfLoading ? (
+                    <div className="space-y-3">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-4 w-20" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50" 
+                              onClick={() => {
+                                const newDirection = sortConfig.key === 'name' && sortConfig.direction === 'asc' ? 'desc' : 'asc';
+                                setSortConfig({ key: 'name', direction: newDirection, groupType: 'brand' });
+                              }}
+                              data-testid="th-brand-name"
+                            >
+                              <div className="flex items-center space-x-1">
+                                <span>Brand</span>
+                                {sortConfig.key === 'name' && sortConfig.groupType === 'brand' && (
+                                  sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 text-right" 
+                              onClick={() => {
+                                const newDirection = sortConfig.key === 'revenue' && sortConfig.direction === 'desc' ? 'asc' : 'desc';
+                                setSortConfig({ key: 'revenue', direction: newDirection, groupType: 'brand' });
+                              }}
+                              data-testid="th-brand-revenue"
+                            >
+                              <div className="flex items-center justify-end space-x-1">
+                                <span>Revenue</span>
+                                {sortConfig.key === 'revenue' && sortConfig.groupType === 'brand' && (
+                                  sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 text-right" 
+                              onClick={() => {
+                                const newDirection = sortConfig.key === 'profitMargin' && sortConfig.direction === 'desc' ? 'asc' : 'desc';
+                                setSortConfig({ key: 'profitMargin', direction: newDirection, groupType: 'brand' });
+                              }}
+                              data-testid="th-brand-margin"
+                            >
+                              <div className="flex items-center justify-end space-x-1">
+                                <span>Margin</span>
+                                {sortConfig.key === 'profitMargin' && sortConfig.groupType === 'brand' && (
+                                  sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead className="text-right">Trend</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sortPerformanceData(
+                            brandPerformance || [], 
+                            sortConfig.groupType === 'brand' ? sortConfig.key : 'revenue', 
+                            sortConfig.groupType === 'brand' ? sortConfig.direction : 'desc'
+                          ).slice(0, 10).map((brand) => (
+                            <TableRow key={brand.id} className="hover:bg-muted/50" data-testid={`row-brand-${brand.id}`}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{brand.name}</p>
+                                  <p className="text-sm text-muted-foreground">{brand.itemCount} items</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div>
+                                  <p className="font-semibold">{formatCurrency(brand.revenue)}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {formatCurrency((brand.revenue || 0) / Math.max(brand.itemCount || 1, 1))} avg
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge 
+                                  variant={getPerformanceBadgeVariant(brand.profitMargin || 0)}
+                                  className={getPerformanceColor(brand.profitMargin || 0)}
+                                >
+                                  {((brand.profitMargin || 0) * 100).toFixed(1)}%
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className={`flex items-center justify-end ${brand.change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {brand.change >= 0 ? (
+                                    <TrendingUp className="h-3 w-3 mr-1" />
+                                  ) : (
+                                    <TrendingDown className="h-3 w-3 mr-1" />
+                                  )}
+                                  <span className="text-sm font-medium">{formatPercentage(brand.change)}</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Brand Chart */}
+              {showCharts && (
+                <Card data-testid="card-brand-performance-chart">
+                  <CardHeader>
+                    <CardTitle>Top 10 Brands by {performanceView === 'revenue' ? 'Revenue' : 'Profit'}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {brandPerfLoading ? (
+                      <div className="h-64 flex items-center justify-center">
+                        <Skeleton className="h-full w-full" />
+                      </div>
+                    ) : (
+                      <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={sortPerformanceData(
+                              brandPerformance || [], 
+                              performanceView, 
+                              'desc'
+                            ).slice(0, 10).map(brand => ({
+                              name: brand.name.length > 15 ? brand.name.substring(0, 15) + '...' : brand.name,
+                              value: performanceView === 'revenue' ? brand.revenue : brand.profit,
+                              margin: brand.profitMargin || 0
+                            }))}
+                            layout="horizontal"
+                            margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" tickFormatter={(value) => formatCurrencyAbbreviated(value)} />
+                            <YAxis type="category" dataKey="name" width={80} />
+                            <Tooltip 
+                              formatter={(value: number) => [formatCurrency(value), performanceView === 'revenue' ? 'Revenue' : 'Profit']}
+                              labelFormatter={(label) => `Brand: ${label}`}
+                            />
+                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                              {sortPerformanceData(
+                                brandPerformance || [], 
+                                performanceView, 
+                                'desc'
+                              ).slice(0, 10).map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={index < 3 ? '#22c55e' : index < 6 ? '#eab308' : '#ef4444'} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+
+          {/* Category and Client Performance Row */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {/* Category Performance */}
-            <Card data-testid="card-category-performance">
+            <Card data-testid="card-category-performance-full">
               <CardHeader>
-                <CardTitle>Category Performance</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Category Performance</span>
+                  <Badge variant="outline">{categoryPerformance?.length || 0} categories</Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {categoryPerfLoading ? (
@@ -1098,8 +1604,8 @@ export default function Reports() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {categoryPerformance?.slice(0, 3).map((category) => (
-                      <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                    {sortPerformanceData(categoryPerformance || [], 'revenue', 'desc').map((category) => (
+                      <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50" data-testid={`row-category-${category.id}`}>
                         <div className="flex-1">
                           <p className="font-medium">{category.name}</p>
                           <p className="text-sm text-muted-foreground">
@@ -1108,14 +1614,14 @@ export default function Reports() {
                         </div>
                         <div className="text-right">
                           <p className="font-semibold">{formatCurrencyAbbreviated(category.revenue)}</p>
-                          <p className={`text-sm flex items-center ${category.change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          <div className={`text-sm flex items-center justify-end ${category.change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                             {category.change >= 0 ? (
                               <TrendingUp className="h-3 w-3 mr-1" />
                             ) : (
                               <TrendingDown className="h-3 w-3 mr-1" />
                             )}
-                            {formatPercentage(category.change)}
-                          </p>
+                            <span>{formatPercentage(category.change)}</span>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1125,9 +1631,12 @@ export default function Reports() {
             </Card>
 
             {/* Client Performance */}
-            <Card data-testid="card-client-performance">
+            <Card data-testid="card-client-performance-full">
               <CardHeader>
-                <CardTitle>Client Performance</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Client Performance</span>
+                  <Badge variant="outline">{clientPerformance?.length || 0} clients</Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {clientPerfLoading ? (
@@ -1141,8 +1650,8 @@ export default function Reports() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {clientPerformance?.slice(0, 3).map((client) => (
-                      <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                    {sortPerformanceData(clientPerformance || [], 'revenue', 'desc').map((client) => (
+                      <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50" data-testid={`row-client-${client.id}`}>
                         <div className="flex-1">
                           <p className="font-medium">{client.name}</p>
                           <p className="text-sm text-muted-foreground">
@@ -1151,6 +1660,9 @@ export default function Reports() {
                         </div>
                         <div className="text-right">
                           <p className="font-semibold">{formatCurrencyAbbreviated(client.revenue)}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatCurrency((client.revenue || 0) / Math.max(client.itemCount || 1, 1))} avg
+                          </p>
                         </div>
                       </div>
                     ))}
