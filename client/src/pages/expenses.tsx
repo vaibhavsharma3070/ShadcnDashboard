@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +24,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { 
   Search,
   DollarSign,
@@ -32,13 +50,50 @@ import {
   Camera,
   Sparkles,
   Shield,
-  Car
+  Car,
+  Plus,
+  Building2
 } from "lucide-react";
-import { ItemExpense, Item } from "@shared/schema";
+import { ItemExpense, Item, insertItemExpenseSchema } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface ExpenseWithItem extends ItemExpense {
   item: Item;
 }
+
+// Operations item ID for general business expenses
+const OPERATIONS_ITEM_ID = "2ed3f209-3f65-4269-916b-f3368a346b03";
+
+// Schema for general business expenses
+const generalExpenseSchema = z.object({
+  expenseType: z.string().min(1, "Expense type is required"),
+  amount: z.string().min(1, "Amount is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+    message: "Amount must be a positive number"
+  }),
+  incurredAt: z.string().min(1, "Date is required"),
+  notes: z.string().optional(),
+});
+
+type GeneralExpenseFormData = z.infer<typeof generalExpenseSchema>;
+
+// Common business expense types
+const BUSINESS_EXPENSE_TYPES = [
+  "Payroll",
+  "Rent", 
+  "Electricity",
+  "Internet",
+  "Phone",
+  "Office Supplies",
+  "Insurance",
+  "Legal Fees",
+  "Accounting",
+  "Marketing",
+  "Software Subscriptions",
+  "Equipment Maintenance",
+  "Travel",
+  "Other"
+];
 
 function formatCurrency(amount: number | string) {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -106,11 +161,61 @@ export default function Expenses() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("date");
+  const [isGeneralExpenseModalOpen, setIsGeneralExpenseModalOpen] = useState(false);
+  
+  const { toast } = useToast();
 
   const { data: expenses, isLoading } = useQuery<ExpenseWithItem[]>({
     queryKey: ['/api/expenses'],
     select: (data) => data || []
   });
+
+  // Form for general business expenses
+  const generalExpenseForm = useForm<GeneralExpenseFormData>({
+    resolver: zodResolver(generalExpenseSchema),
+    defaultValues: {
+      expenseType: "",
+      amount: "",
+      incurredAt: new Date().toISOString().split('T')[0], // Today's date
+      notes: "",
+    },
+  });
+
+  // Mutation for creating general business expenses
+  const createGeneralExpenseMutation = useMutation({
+    mutationFn: (data: GeneralExpenseFormData) => {
+      // Transform to match the API schema
+      const expenseData = {
+        itemId: OPERATIONS_ITEM_ID,
+        expenseType: data.expenseType,
+        amount: data.amount,
+        incurredAt: data.incurredAt,
+        notes: data.notes || "",
+      };
+      return apiRequest('POST', '/api/expenses', expenseData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses'] });
+      setIsGeneralExpenseModalOpen(false);
+      generalExpenseForm.reset();
+      toast({
+        title: "Success",
+        description: "General business expense recorded successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Error creating general expense:', error);
+      toast({
+        title: "Error", 
+        description: "Failed to record expense. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onGeneralExpenseSubmit = (data: GeneralExpenseFormData) => {
+    createGeneralExpenseMutation.mutate(data);
+  };
 
   // Calculate metrics
   const totalExpenses = expenses?.length || 0;
@@ -299,7 +404,125 @@ export default function Expenses() {
         {/* Expenses Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Expense History</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Expense History</CardTitle>
+              <Dialog open={isGeneralExpenseModalOpen} onOpenChange={setIsGeneralExpenseModalOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-add-general-expense">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Business Expense
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5" />
+                      Record General Business Expense
+                    </DialogTitle>
+                  </DialogHeader>
+                  <Form {...generalExpenseForm}>
+                    <form onSubmit={generalExpenseForm.handleSubmit(onGeneralExpenseSubmit)} className="space-y-4">
+                      <FormField
+                        control={generalExpenseForm.control}
+                        name="expenseType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Expense Type</FormLabel>
+                            <FormControl>
+                              <Select value={field.value} onValueChange={field.onChange}>
+                                <SelectTrigger data-testid="select-expense-type">
+                                  <SelectValue placeholder="Select expense type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {BUSINESS_EXPENSE_TYPES.map(type => (
+                                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={generalExpenseForm.control}
+                        name="amount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Amount ($)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                data-testid="input-amount"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={generalExpenseForm.control}
+                        name="incurredAt"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Date</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                data-testid="input-date"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={generalExpenseForm.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Notes (Optional)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Additional notes..."
+                                data-testid="input-notes"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex justify-end space-x-2 pt-4">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => setIsGeneralExpenseModalOpen(false)}
+                          data-testid="button-cancel-expense"
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit" 
+                          disabled={createGeneralExpenseMutation.isPending}
+                          data-testid="button-submit-expense"
+                        >
+                          {createGeneralExpenseMutation.isPending ? "Recording..." : "Record Expense"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardHeader>
           <CardContent>
             {filteredExpenses.length === 0 ? (
@@ -328,10 +551,10 @@ export default function Expenses() {
                     <TableRow key={expense.expenseId}>
                       <TableCell>
                         <div className="font-medium">
-                          {formatDate(expense.incurredAt)}
+                          {formatDate(expense.incurredAt.toString())}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {formatDateTime(expense.incurredAt)}
+                          {formatDateTime(expense.incurredAt.toString())}
                         </div>
                       </TableCell>
                       <TableCell>
