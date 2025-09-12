@@ -133,20 +133,20 @@ function formatDate(dateString: string) {
   const diffTime = Math.abs(now.getTime() - date.getTime());
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "1 day ago";
-  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays === 0) return "Hoy";
+  if (diffDays === 1) return "Hace 1 día";
+  if (diffDays < 7) return `Hace ${diffDays} días`;
   if (diffDays < 30)
-    return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) !== 1 ? "s" : ""} ago`;
-  return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) !== 1 ? "s" : ""} ago`;
+    return `Hace ${Math.floor(diffDays / 7)} semana${Math.floor(diffDays / 7) !== 1 ? "s" : ""}`;
+  return `Hace ${Math.floor(diffDays / 30)} mes${Math.floor(diffDays / 30) !== 1 ? "es" : ""}`;
 }
 
 function getStatusBadge(status: string) {
   const statusConfig = {
-    "in-store": { label: "In Store", className: "status-in-store" },
-    reserved: { label: "Reserved", className: "status-reserved" },
-    sold: { label: "Sold", className: "status-sold" },
-    returned: { label: "Returned", className: "status-returned" },
+    "in-store": { label: "En Tienda", className: "status-in-store" },
+    reserved: { label: "Reservado", className: "status-reserved" },
+    sold: { label: "Vendido", className: "status-sold" },
+    returned: { label: "Devuelto", className: "status-returned" },
   };
 
   const config =
@@ -293,8 +293,8 @@ export default function Dashboard() {
 
   return (
     <MainLayout
-      title="Dashboard"
-      subtitle="Welcome back, here's what's happening today!"
+      title="Panel Principal"
+      subtitle="¡Bienvenido de vuelta! Aquí tienes lo que está pasando hoy"
     >
       {/* Key Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
@@ -314,7 +314,7 @@ export default function Dashboard() {
                 )}
                 <p className="text-sm text-emerald-600 mt-1 flex items-center">
                   <ArrowUp className="h-3 w-3 mr-1" />
-                  +12.5% from last month
+                  +12.5% del mes pasado
                 </p>
               </div>
               <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
@@ -340,7 +340,7 @@ export default function Dashboard() {
                 )}
                 <p className="text-sm text-blue-600 mt-1 flex items-center">
                   <Plus className="h-3 w-3 mr-1" />
-                  23 new this week
+                  23 nuevos esta semana
                 </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
@@ -425,7 +425,7 @@ export default function Dashboard() {
                 ) : (
                   <div className="mt-2">
                     <p className="text-2xl font-bold text-foreground" data-testid="text-luxette-item-count">
-                      {luxetteInventory?.itemCount || 0} items
+                      {luxetteInventory?.itemCount || 0} artículos
                     </p>
                     <p className="text-sm text-blue-600 mt-1" data-testid="text-luxette-total-cost">
                       Costo Total: {formatCurrencyAbbreviated(luxetteInventory?.totalCost || 0)}
@@ -452,16 +452,16 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Revenue Overview</CardTitle>
+              <CardTitle>Resumen de Ingresos</CardTitle>
               <select 
                 className="text-sm border border-input rounded-lg px-3 py-2 bg-background"
                 value={dateRange}
                 onChange={(e) => handleDateRangeChange(e.target.value)}
               >
-                <option value="7">Last 7 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="90">Last 90 days</option>
-                <option value="365">Last 12 months</option>
+                <option value="7">Últimos 7 días</option>
+                <option value="30">Últimos 30 días</option>
+                <option value="90">Últimos 90 días</option>
+                <option value="365">Últimos 12 meses</option>
               </select>
             </div>
           </CardHeader>
@@ -487,30 +487,30 @@ export default function Dashboard() {
                     <div className="text-2xl font-bold text-green-700 dark:text-green-300">
                       {formatCurrencyAbbreviated(financialData?.totalRevenue || 0)}
                     </div>
-                    <div className="text-sm text-green-600 dark:text-green-400">Revenue</div>
+                    <div className="text-sm text-green-600 dark:text-green-400">Ingresos</div>
                   </div>
                   <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                     <div className="text-2xl font-bold text-red-700 dark:text-red-300">
                       {formatCurrencyAbbreviated((financialData?.totalCosts || 0) + (financialData?.totalExpenses || 0))}
                     </div>
-                    <div className="text-sm text-red-600 dark:text-red-400">Total Costs</div>
+                    <div className="text-sm text-red-600 dark:text-red-400">Costos Totales</div>
                   </div>
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                     <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
                       {formatCurrencyAbbreviated(financialData?.totalProfit || 0)}
                     </div>
-                    <div className="text-sm text-blue-600 dark:text-blue-400">Profit</div>
+                    <div className="text-sm text-blue-600 dark:text-blue-400">Ganancia</div>
                   </div>
                 </div>
 
                 {/* Additional Metrics */}
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Items Sold:</span>
+                    <span className="text-sm text-muted-foreground">Artículos Vendidos:</span>
                     <span className="font-semibold">{financialData?.itemsSold || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Avg Order Value:</span>
+                    <span className="text-sm text-muted-foreground">Valor Promedio Orden:</span>
                     <span className="font-semibold">{formatCurrencyAbbreviated(financialData?.averageOrderValue || 0)}</span>
                   </div>
                 </div>
@@ -518,11 +518,11 @@ export default function Dashboard() {
                 {/* Cost Breakdown */}
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Item Costs:</span>
+                    <span className="text-sm text-muted-foreground">Costo Artículos:</span>
                     <span className="font-semibold text-orange-600">{formatCurrencyAbbreviated(financialData?.totalCosts || 0)}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Expenses:</span>
+                    <span className="text-sm text-muted-foreground">Gastos:</span>
                     <span className="font-semibold text-orange-600">{formatCurrencyAbbreviated(financialData?.totalExpenses || 0)}</span>
                   </div>
                 </div>
@@ -534,7 +534,7 @@ export default function Dashboard() {
         {/* Quick Actions */}
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>Acciones Rápidas</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -544,7 +544,7 @@ export default function Dashboard() {
                 onClick={() => handleQuickAction("add-item")}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Add New Item
+                Agregar Nuevo Artículo
               </Button>
 
               <Button
@@ -554,7 +554,7 @@ export default function Dashboard() {
                 onClick={() => handleQuickAction("record-payment")}
               >
                 <CreditCard className="mr-2 h-4 w-4" />
-                Record Payment
+                Registrar Pago
               </Button>
 
               <Button
@@ -564,7 +564,7 @@ export default function Dashboard() {
                 onClick={() => handleQuickAction("process-payout")}
               >
                 <DollarSign className="mr-2 h-4 w-4" />
-                Process Payout
+                Procesar Pago Saliente
               </Button>
 
               <Button
@@ -574,7 +574,7 @@ export default function Dashboard() {
                 onClick={() => handleQuickAction("add-vendor")}
               >
                 <Handshake className="mr-2 h-4 w-4" />
-                Add Vendor
+                Agregar Consignador
               </Button>
             </div>
 
@@ -586,19 +586,19 @@ export default function Dashboard() {
                   <div className="flex items-center space-x-2 mb-2">
                     <AlertTriangle className="h-4 w-4 text-destructive" />
                     <h4 className="font-medium text-destructive">
-                      Attention Required
+                      Atención Requerida
                     </h4>
                   </div>
                   <div className="space-y-1 text-sm text-destructive/80">
                     {paymentMetrics.overduePayments > 0 && (
-                      <p>{paymentMetrics.overduePayments} overdue payments</p>
+                      <p>{paymentMetrics.overduePayments} pagos vencidos</p>
                     )}
                     {paymentMetrics.upcomingPayments > 0 && (
-                      <p>{paymentMetrics.upcomingPayments} upcoming payments</p>
+                      <p>{paymentMetrics.upcomingPayments} pagos próximos</p>
                     )}
                     {metrics && metrics.pendingPayouts && metrics.pendingPayouts.max > 0 && (
                       <p>
-                        Pending payouts:{" "}
+                        Pagos salientes pendientes:{" "}
                         {formatCurrencyRange(metrics.pendingPayouts)}
                       </p>
                     )}
@@ -608,7 +608,7 @@ export default function Dashboard() {
                     className="mt-2 p-0 h-auto text-destructive"
                     onClick={() => handleQuickAction("record-payment")}
                   >
-                    Review payments →
+                    Revisar pagos →
                   </Button>
                 </div>
               )}

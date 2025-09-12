@@ -16,9 +16,9 @@ import {
 } from "lucide-react";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Panel Principal", href: "/", icon: LayoutDashboard },
   {
-    name: "Operacion",
+    name: "Operación",
     items: [
       { name: "Inventario", href: "/inventory", icon: Package },
       { name: "Consignadores", href: "/vendors", icon: Handshake },
@@ -29,18 +29,18 @@ const navigation = [
     name: "Finanzas",
     items: [
       { name: "Pagos Entrantes", href: "/payments", icon: CreditCard },
-      { name: "Payouts", href: "/payouts", icon: DollarSign },
+      { name: "Pagos Salientes", href: "/payouts", icon: DollarSign },
       { name: "Gastos", href: "/expenses", icon: Receipt },
     ],
   },
   {
-    name: "Analitica",
+    name: "Analítica",
     items: [
       { name: "Reportes", href: "/reports", icon: BarChart3 },
-      { name: "Profitability", href: "/profitability", icon: TrendingUp },
+      { name: "Rentabilidad", href: "/profitability", icon: TrendingUp },
     ],
   },
-  { name: "Configuracion", href: "/settings", icon: Settings },
+  { name: "Configuración", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -56,7 +56,7 @@ export function Sidebar() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-foreground">Luxette</h1>
-            <p className="text-sm text-muted-foreground">Management System</p>
+            <p className="text-sm text-muted-foreground">Sistema de Gestión</p>
           </div>
         </div>
       </div>
@@ -114,7 +114,7 @@ export function Sidebar() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-medium text-foreground">Salomón Cohen</p>
-            <p className="text-xs text-muted-foreground">Owner</p>
+            <p className="text-xs text-muted-foreground">Propietario</p>
           </div>
           <button className="text-muted-foreground hover:text-foreground">
             <Settings className="h-4 w-4" />
