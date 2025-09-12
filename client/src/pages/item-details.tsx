@@ -19,6 +19,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertItemSchema, insertClientPaymentSchema, insertItemExpenseSchema, insertInstallmentPlanSchema, type Item, type Vendor, type Client, type ClientPayment, type ItemExpense, type InstallmentPlan } from "@shared/schema";
 import { StatusUpdateDropdown } from "@/components/status-update-dropdown";
+import { ImageUploader } from "@/components/ImageUploader";
 import { z } from "zod";
 import { 
   ArrowLeft,
@@ -396,6 +397,7 @@ export default function ItemDetails() {
       minSalesPrice: "",
       maxSalesPrice: "",
       acquisitionDate: "",
+      imageUrl: "",
       status: "in-store"
     },
   });
@@ -446,6 +448,7 @@ export default function ItemDetails() {
         minSalesPrice: item.minSalesPrice?.toString() || "",
         maxSalesPrice: item.maxSalesPrice?.toString() || "",
         acquisitionDate: item.acquisitionDate || "",
+        imageUrl: item.imageUrl || "",
         status: item.status
       });
     }
@@ -834,6 +837,17 @@ export default function ItemDetails() {
                           <FormMessage />
                         </FormItem>
                       )}
+                    />
+                  </div>
+
+                  {/* Product Image Upload */}
+                  <div className="space-y-2">
+                    <Label>Product Image</Label>
+                    <ImageUploader
+                      onImageUploaded={(url) => editForm.setValue('imageUrl', url)}
+                      currentImageUrl={editForm.watch('imageUrl') || undefined}
+                      onImageRemoved={() => editForm.setValue('imageUrl', '')}
+                      className="w-full"
                     />
                   </div>
 

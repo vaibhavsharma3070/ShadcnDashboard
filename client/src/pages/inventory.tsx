@@ -51,6 +51,7 @@ import {
   type Category,
 } from "@shared/schema";
 import { StatusUpdateDropdown } from "@/components/status-update-dropdown";
+import { ImageUploader } from "@/components/ImageUploader";
 import { z } from "zod";
 import {
   Package,
@@ -435,6 +436,7 @@ export default function Inventory() {
       minSalesPrice: undefined,
       maxSalesPrice: undefined,
       acquisitionDate: "",
+      imageUrl: "",
       status: "in-store",
     },
   });
@@ -1093,6 +1095,17 @@ export default function Inventory() {
                             <FormMessage />
                           </FormItem>
                         )}
+                      />
+                    </div>
+
+                    {/* Product Image Upload */}
+                    <div className="space-y-2">
+                      <Label>Product Image</Label>
+                      <ImageUploader
+                        onImageUploaded={(url) => form.setValue('imageUrl', url)}
+                        currentImageUrl={form.watch('imageUrl') || undefined}
+                        onImageRemoved={() => form.setValue('imageUrl', '')}
+                        className="w-full"
                       />
                     </div>
 
