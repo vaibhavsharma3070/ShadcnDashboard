@@ -23,6 +23,7 @@ export const client = pgTable("client", {
   phone: text("phone"),
   email: text("email"),
   billingAddr: text("billing_addr"),
+  idNumber: text("id_number"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   emailIdx: index("idx_client_email").on(table.email),

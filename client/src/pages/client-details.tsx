@@ -233,7 +233,8 @@ export default function ClientDetails() {
       name: client?.name || "",
       phone: client?.phone || "",
       email: client?.email || "",
-      billingAddr: client?.billingAddr || ""
+      billingAddr: client?.billingAddr || "",
+      idNumber: client?.idNumber || ""
     },
   });
 
@@ -250,7 +251,8 @@ export default function ClientDetails() {
       name: client?.name || "",
       phone: client?.phone || "",
       email: client?.email || "",
-      billingAddr: client?.billingAddr || ""
+      billingAddr: client?.billingAddr || "",
+      idNumber: client?.idNumber || ""
     });
   };
 
@@ -422,6 +424,20 @@ export default function ClientDetails() {
                       )}
                     />
 
+                    <FormField
+                      control={editForm.control}
+                      name="idNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>ID Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Client ID number" {...field} value={field.value || ""} data-testid="input-client-id-number" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <div className="flex justify-end space-x-2 pt-4">
                       <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
                         Cancel
@@ -471,6 +487,15 @@ export default function ClientDetails() {
                     <p>{client.phone}</p>
                   </div>
                 </div>
+                {client.idNumber && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">ID Number</Label>
+                    <div className="flex items-center space-x-2">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      <p>{client.idNumber}</p>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
                 <div>

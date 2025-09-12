@@ -155,7 +155,8 @@ export default function Clients() {
       name: "",
       phone: "",
       email: "",
-      billingAddr: ""
+      billingAddr: "",
+      idNumber: ""
     },
   });
 
@@ -367,6 +368,20 @@ export default function Clients() {
 
                 <FormField
                   control={form.control}
+                  name="idNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ID Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Client ID number" {...field} value={field.value || ""} data-testid="input-client-id-number" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="billingAddr"
                   render={({ field }) => (
                     <FormItem>
@@ -458,6 +473,14 @@ export default function Clients() {
                             <Phone className="h-3 w-3 flex-shrink-0" />
                             <span>{client.phone}</span>
                           </div>
+                          {client.idNumber && (
+                            <div className="flex items-center space-x-1">
+                              <CreditCard className="h-3 w-3 flex-shrink-0" />
+                              <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
+                                ID: {client.idNumber}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
