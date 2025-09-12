@@ -1171,8 +1171,16 @@ export default function Inventory() {
                   >
                     {/* Mobile: Row layout for item info and actions */}
                     <div className="flex items-start space-x-4 w-full">
-                      <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
-                        <IconComponent className="h-8 w-8 text-muted-foreground" />
+                      <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {item.imageUrl ? (
+                          <img 
+                            src={item.imageUrl} 
+                            alt={item.title} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <IconComponent className="h-8 w-8 text-muted-foreground" />
+                        )}
                       </div>
 
                       <div className="flex-1 min-w-0">

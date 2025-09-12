@@ -877,8 +877,16 @@ export default function ItemDetails() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
-                <IconComponent className="h-8 w-8 text-muted-foreground" />
+              <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+                {item.imageUrl ? (
+                  <img 
+                    src={item.imageUrl} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <IconComponent className="h-8 w-8 text-muted-foreground" />
+                )}
               </div>
               <div>
                 <div className="flex items-center space-x-2 mb-1">
