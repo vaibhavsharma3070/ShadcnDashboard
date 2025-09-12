@@ -1,7 +1,7 @@
 import { 
-  vendor, client, item, clientPayment, vendorPayout, itemExpense, installmentPlan, users, brand, category, paymentMethod,
-  type Vendor, type Client, type Item, type ClientPayment, type VendorPayout, type ItemExpense, type InstallmentPlan, type User, type Brand, type Category, type PaymentMethod,
-  type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser, type InsertBrand, type InsertCategory, type InsertPaymentMethod
+  vendor, client, item, clientPayment, vendorPayout, itemExpense, installmentPlan, users, brand, category, paymentMethod, contract, contractTemplate,
+  type Vendor, type Client, type Item, type ClientPayment, type VendorPayout, type ItemExpense, type InstallmentPlan, type User, type Brand, type Category, type PaymentMethod, type Contract, type ContractTemplate, type ContractItemSnapshot,
+  type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser, type InsertBrand, type InsertCategory, type InsertPaymentMethod, type InsertContract, type InsertContractTemplate
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sum, count, sql, and, isNull, isNotNull, inArray } from "drizzle-orm";
@@ -315,6 +315,23 @@ export interface IStorage {
     percentage: number;
     avgTransactionAmount: number;
   }>>;
+
+  // Contract Template methods
+  getContractTemplates(): Promise<ContractTemplate[]>;
+  getContractTemplate(id: string): Promise<ContractTemplate | undefined>;
+  createContractTemplate(template: InsertContractTemplate): Promise<ContractTemplate>;
+  updateContractTemplate(id: string, template: Partial<InsertContractTemplate>): Promise<ContractTemplate>;
+  deleteContractTemplate(id: string): Promise<void>;
+  getDefaultContractTemplate(): Promise<ContractTemplate | undefined>;
+
+  // Contract methods
+  getContracts(): Promise<Array<Contract & { vendor: Vendor, template?: ContractTemplate }>>;
+  getContract(id: string): Promise<(Contract & { vendor: Vendor, template?: ContractTemplate }) | undefined>;
+  getContractsByVendor(vendorId: string): Promise<Array<Contract & { vendor: Vendor, template?: ContractTemplate }>>;
+  createContract(contract: InsertContract): Promise<Contract>;
+  updateContract(id: string, contract: Partial<InsertContract>): Promise<Contract>;
+  deleteContract(id: string): Promise<void>;
+  finalizeContract(id: string, pdfUrl: string): Promise<Contract>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2471,6 +2488,282 @@ export class DatabaseStorage implements IStorage {
         avgTransactionAmount: Math.round(Number(row.avgTransactionAmount || 0) * 100) / 100
       };
     });
+  }
+
+  // Contract Template methods
+  async getContractTemplates(): Promise<ContractTemplate[]> {
+    return await db.select().from(contractTemplate).orderBy(desc(contractTemplate.createdAt));
+  }
+
+  async getContractTemplate(id: string): Promise<ContractTemplate | undefined> {
+    const [result] = await db.select().from(contractTemplate).where(eq(contractTemplate.templateId, id));
+    return result || undefined;
+  }
+
+  async createContractTemplate(insertTemplate: InsertContractTemplate): Promise<ContractTemplate> {
+    // Use transaction to ensure only one template can be default
+    const result = await db.transaction(async (tx) => {
+      // If this template should be default, unset all other defaults first
+      if (insertTemplate.isDefault) {
+        await tx.update(contractTemplate)
+          .set({ isDefault: false })
+          .where(eq(contractTemplate.isDefault, true));
+      }
+      
+      const [newTemplate] = await tx.insert(contractTemplate).values(insertTemplate).returning();
+      return newTemplate;
+    });
+    
+    return result;
+  }
+
+  async updateContractTemplate(id: string, updateTemplate: Partial<InsertContractTemplate>): Promise<ContractTemplate> {
+    // Use transaction to ensure only one template can be default
+    const result = await db.transaction(async (tx) => {
+      // If setting this template as default, unset all other defaults first
+      if (updateTemplate.isDefault) {
+        await tx.update(contractTemplate)
+          .set({ isDefault: false })
+          .where(and(eq(contractTemplate.isDefault, true), sql`${contractTemplate.templateId} != ${id}`));
+      }
+      
+      const [updatedTemplate] = await tx.update(contractTemplate)
+        .set(updateTemplate)
+        .where(eq(contractTemplate.templateId, id))
+        .returning();
+        
+      if (!updatedTemplate) {
+        throw new Error("Contract template not found");
+      }
+      
+      return updatedTemplate;
+    });
+    
+    return result;
+  }
+
+  async deleteContractTemplate(id: string): Promise<void> {
+    // Check if template is referenced by any contracts
+    const [referencedContracts] = await db.select({ count: sql<number>`COUNT(*)` })
+      .from(contract)
+      .where(eq(contract.templateId, id));
+    
+    if (Number(referencedContracts.count) > 0) {
+      throw new Error("Cannot delete contract template. It is referenced by existing contracts.");
+    }
+    
+    await db.delete(contractTemplate).where(eq(contractTemplate.templateId, id));
+  }
+
+  async getDefaultContractTemplate(): Promise<ContractTemplate | undefined> {
+    const [result] = await db.select().from(contractTemplate).where(eq(contractTemplate.isDefault, true));
+    return result || undefined;
+  }
+
+  // Contract methods
+  async getContracts(): Promise<Array<Contract & { vendor: Vendor, template?: ContractTemplate }>> {
+    const results = await db
+      .select({
+        // Contract fields
+        contractId: contract.contractId,
+        vendorId: contract.vendorId,
+        templateId: contract.templateId,
+        status: contract.status,
+        termsText: contract.termsText,
+        itemSnapshots: contract.itemSnapshots,
+        pdfUrl: contract.pdfUrl,
+        createdAt: contract.createdAt,
+        // Vendor fields
+        vendor: {
+          vendorId: vendor.vendorId,
+          name: vendor.name,
+          phone: vendor.phone,
+          email: vendor.email,
+          taxId: vendor.taxId,
+          bankAccountNumber: vendor.bankAccountNumber,
+          bankName: vendor.bankName,
+          accountType: vendor.accountType,
+          createdAt: vendor.createdAt,
+        },
+        // Template fields (optional)
+        template: {
+          templateId: contractTemplate.templateId,
+          name: contractTemplate.name,
+          termsText: contractTemplate.termsText,
+          isDefault: contractTemplate.isDefault,
+          createdAt: contractTemplate.createdAt,
+        }
+      })
+      .from(contract)
+      .innerJoin(vendor, eq(contract.vendorId, vendor.vendorId))
+      .leftJoin(contractTemplate, eq(contract.templateId, contractTemplate.templateId))
+      .orderBy(desc(contract.createdAt));
+
+    return results.map(row => ({
+      contractId: row.contractId,
+      vendorId: row.vendorId,
+      templateId: row.templateId,
+      status: row.status,
+      termsText: row.termsText,
+      itemSnapshots: row.itemSnapshots,
+      pdfUrl: row.pdfUrl,
+      createdAt: row.createdAt,
+      vendor: row.vendor,
+      template: row.template.templateId ? row.template : undefined
+    }));
+  }
+
+  async getContract(id: string): Promise<(Contract & { vendor: Vendor, template?: ContractTemplate }) | undefined> {
+    const [result] = await db
+      .select({
+        // Contract fields
+        contractId: contract.contractId,
+        vendorId: contract.vendorId,
+        templateId: contract.templateId,
+        status: contract.status,
+        termsText: contract.termsText,
+        itemSnapshots: contract.itemSnapshots,
+        pdfUrl: contract.pdfUrl,
+        createdAt: contract.createdAt,
+        // Vendor fields
+        vendor: {
+          vendorId: vendor.vendorId,
+          name: vendor.name,
+          phone: vendor.phone,
+          email: vendor.email,
+          taxId: vendor.taxId,
+          bankAccountNumber: vendor.bankAccountNumber,
+          bankName: vendor.bankName,
+          accountType: vendor.accountType,
+          createdAt: vendor.createdAt,
+        },
+        // Template fields (optional)
+        template: {
+          templateId: contractTemplate.templateId,
+          name: contractTemplate.name,
+          termsText: contractTemplate.termsText,
+          isDefault: contractTemplate.isDefault,
+          createdAt: contractTemplate.createdAt,
+        }
+      })
+      .from(contract)
+      .innerJoin(vendor, eq(contract.vendorId, vendor.vendorId))
+      .leftJoin(contractTemplate, eq(contract.templateId, contractTemplate.templateId))
+      .where(eq(contract.contractId, id));
+
+    if (!result) {
+      return undefined;
+    }
+
+    return {
+      contractId: result.contractId,
+      vendorId: result.vendorId,
+      templateId: result.templateId,
+      status: result.status,
+      termsText: result.termsText,
+      itemSnapshots: result.itemSnapshots,
+      pdfUrl: result.pdfUrl,
+      createdAt: result.createdAt,
+      vendor: result.vendor,
+      template: result.template.templateId ? result.template : undefined
+    };
+  }
+
+  async getContractsByVendor(vendorId: string): Promise<Array<Contract & { vendor: Vendor, template?: ContractTemplate }>> {
+    const results = await db
+      .select({
+        // Contract fields
+        contractId: contract.contractId,
+        vendorId: contract.vendorId,
+        templateId: contract.templateId,
+        status: contract.status,
+        termsText: contract.termsText,
+        itemSnapshots: contract.itemSnapshots,
+        pdfUrl: contract.pdfUrl,
+        createdAt: contract.createdAt,
+        // Vendor fields
+        vendor: {
+          vendorId: vendor.vendorId,
+          name: vendor.name,
+          phone: vendor.phone,
+          email: vendor.email,
+          taxId: vendor.taxId,
+          bankAccountNumber: vendor.bankAccountNumber,
+          bankName: vendor.bankName,
+          accountType: vendor.accountType,
+          createdAt: vendor.createdAt,
+        },
+        // Template fields (optional)
+        template: {
+          templateId: contractTemplate.templateId,
+          name: contractTemplate.name,
+          termsText: contractTemplate.termsText,
+          isDefault: contractTemplate.isDefault,
+          createdAt: contractTemplate.createdAt,
+        }
+      })
+      .from(contract)
+      .innerJoin(vendor, eq(contract.vendorId, vendor.vendorId))
+      .leftJoin(contractTemplate, eq(contract.templateId, contractTemplate.templateId))
+      .where(eq(contract.vendorId, vendorId))
+      .orderBy(desc(contract.createdAt));
+
+    return results.map(row => ({
+      contractId: row.contractId,
+      vendorId: row.vendorId,
+      templateId: row.templateId,
+      status: row.status,
+      termsText: row.termsText,
+      itemSnapshots: row.itemSnapshots,
+      pdfUrl: row.pdfUrl,
+      createdAt: row.createdAt,
+      vendor: row.vendor,
+      template: row.template.templateId ? row.template : undefined
+    }));
+  }
+
+  async createContract(insertContract: InsertContract): Promise<Contract> {
+    const [result] = await db.insert(contract).values(insertContract).returning();
+    return result;
+  }
+
+  async updateContract(id: string, updateContract: Partial<InsertContract>): Promise<Contract> {
+    const [result] = await db.update(contract).set(updateContract).where(eq(contract.contractId, id)).returning();
+    if (!result) {
+      throw new Error("Contract not found");
+    }
+    return result;
+  }
+
+  async deleteContract(id: string): Promise<void> {
+    await db.delete(contract).where(eq(contract.contractId, id));
+  }
+
+  async finalizeContract(id: string, pdfUrl: string): Promise<Contract> {
+    // First check that the contract exists and is in draft status
+    const [existingContract] = await db.select().from(contract).where(eq(contract.contractId, id));
+    
+    if (!existingContract) {
+      throw new Error("Contract not found");
+    }
+    
+    if (existingContract.status !== "draft") {
+      throw new Error("Only draft contracts can be finalized");
+    }
+    
+    const [result] = await db.update(contract)
+      .set({ 
+        status: "final" as const,
+        pdfUrl: pdfUrl
+      })
+      .where(eq(contract.contractId, id))
+      .returning();
+      
+    if (!result) {
+      throw new Error("Failed to finalize contract");
+    }
+    
+    return result;
   }
 }
 
