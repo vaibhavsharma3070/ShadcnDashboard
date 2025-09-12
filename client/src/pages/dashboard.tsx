@@ -38,6 +38,9 @@ interface DashboardMetrics {
   activeItems: number;
   pendingPayouts: { min: number; max: number };
   netProfit: { min: number; max: number };
+  incomingPayments: number;
+  upcomingPayouts: number;
+  costRange: { min: number; max: number };
 }
 
 interface Item {
@@ -100,11 +103,28 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+function formatCurrencyAbbreviated(amount: number) {
+  if (amount >= 1000000) {
+    return `$${(amount / 1000000).toFixed(1)}M`;
+  } else if (amount >= 1000) {
+    return `$${(amount / 1000).toFixed(1)}K`;
+  } else {
+    return formatCurrency(amount);
+  }
+}
+
 function formatCurrencyRange(range: { min: number; max: number }) {
   if (range.min === range.max) {
     return formatCurrency(range.min);
   }
   return `${formatCurrency(range.min)} - ${formatCurrency(range.max)}`;
+}
+
+function formatCurrencyRangeAbbreviated(min: number, max: number) {
+  if (min === max) {
+    return formatCurrencyAbbreviated(min);
+  }
+  return `${formatCurrencyAbbreviated(min)} - ${formatCurrencyAbbreviated(max)}`;
 }
 
 function formatDate(dateString: string) {
@@ -240,8 +260,8 @@ export default function Dashboard() {
                 {metricsLoading ? (
                   <Skeleton className="h-8 w-24 mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-foreground">
-                    {formatCurrency(metrics?.totalRevenue || 0)}
+                  <p className="text-xl font-bold text-foreground">
+                    {formatCurrencyAbbreviated(metrics?.totalRevenue || 0)}
                   </p>
                 )}
                 <p className="text-sm text-emerald-600 mt-1 flex items-center">
@@ -292,16 +312,13 @@ export default function Dashboard() {
                 {metricsLoading ? (
                   <Skeleton className="h-8 w-24 mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-foreground">
-                    {metrics?.pendingPayouts ? 
-                      formatCurrencyRange(metrics.pendingPayouts) : 
-                      formatCurrency(0)
-                    }
+                  <p className="text-xl font-bold text-foreground">
+                    {formatCurrencyAbbreviated(metrics?.incomingPayments || 0)}
                   </p>
                 )}
                 <p className="text-sm text-amber-600 mt-1 flex items-center">
                   <AlertTriangle className="h-3 w-3 mr-1" />
-                  Dinero Saliente
+                  Dinero Saliente: {formatCurrencyAbbreviated(metrics?.upcomingPayouts || 0)}
                 </p>
               </div>
               <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
@@ -321,16 +338,19 @@ export default function Dashboard() {
                 {metricsLoading ? (
                   <Skeleton className="h-8 w-24 mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-foreground">
+                  <p className="text-xl font-bold text-foreground">
                     {metrics?.netProfit ? 
-                      formatCurrencyRange(metrics.netProfit) : 
-                      formatCurrency(0)
+                      formatCurrencyRangeAbbreviated(metrics.netProfit.min, metrics.netProfit.max) : 
+                      formatCurrencyAbbreviated(0)
                     }
                   </p>
                 )}
                 <p className="text-sm text-emerald-600 mt-1 flex items-center">
                   <ArrowUp className="h-3 w-3 mr-1" />
-                  Costo Mercancia
+                  Costo Mercancia: {metrics?.costRange ? 
+                    formatCurrencyRangeAbbreviated(metrics.costRange.min, metrics.costRange.max) : 
+                    formatCurrencyAbbreviated(0)
+                  }
                 </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
@@ -360,12 +380,12 @@ export default function Dashboard() {
                       {luxetteInventory?.itemCount || 0} items
                     </p>
                     <p className="text-sm text-blue-600 mt-1" data-testid="text-luxette-total-cost">
-                      Costo Total: {formatCurrency(luxetteInventory?.totalCost || 0)}
+                      Costo Total: {formatCurrencyAbbreviated(luxetteInventory?.totalCost || 0)}
                     </p>
                     <p className="text-sm text-green-600 mt-1" data-testid="text-luxette-price-range">
                       Rango: {luxetteInventory?.priceRange ? 
-                        `${formatCurrency(luxetteInventory.priceRange.min)} - ${formatCurrency(luxetteInventory.priceRange.max)}` : 
-                        formatCurrency(0)}
+                        formatCurrencyRangeAbbreviated(luxetteInventory.priceRange.min, luxetteInventory.priceRange.max) : 
+                        formatCurrencyAbbreviated(0)}
                     </p>
                   </div>
                 )}

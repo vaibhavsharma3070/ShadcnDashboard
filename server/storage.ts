@@ -141,6 +141,9 @@ export interface IStorage {
     activeItems: number;
     pendingPayouts: { min: number; max: number };
     netProfit: { min: number; max: number };
+    incomingPayments: number;
+    upcomingPayouts: number;
+    costRange: { min: number; max: number };
   }>;
   
   getRecentItems(limit?: number): Promise<Array<Item & { vendor: Vendor }>>;
@@ -822,6 +825,9 @@ export class DatabaseStorage implements IStorage {
     activeItems: number;
     pendingPayouts: { min: number; max: number };
     netProfit: { min: number; max: number };
+    incomingPayments: number;
+    upcomingPayouts: number;
+    costRange: { min: number; max: number };
   }> {
     const [revenueResult] = await db.select({ 
       total: sum(clientPayment.amount) 
@@ -850,11 +856,52 @@ export class DatabaseStorage implements IStorage {
     const netProfitMin = totalRevenue - totalExpenses - pendingPayoutsMax;
     const netProfitMax = totalRevenue - totalExpenses - pendingPayoutsMin;
 
+    // Calculate incoming payments from sold items (fixed amounts, not ranges)
+    const soldItems = await db.select().from(item)
+      .where(eq(item.status, 'sold'));
+    
+    let incomingPayments = 0;
+    for (const soldItem of soldItems) {
+      const payments = await db.select({ amount: clientPayment.amount })
+        .from(clientPayment)
+        .where(eq(clientPayment.itemId, soldItem.itemId));
+      incomingPayments += payments.reduce((sum, p) => sum + Number(p.amount), 0);
+    }
+
+    // Calculate upcoming payouts using formula: (Actual sales price / highest market value) * highest item cost
+    let upcomingPayouts = 0;
+    for (const soldItem of soldItems) {
+      const payments = await db.select({ amount: clientPayment.amount })
+        .from(clientPayment)
+        .where(eq(clientPayment.itemId, soldItem.itemId));
+      
+      const actualSalesPrice = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const highestMarketValue = Number(soldItem.maxSalesPrice || soldItem.minSalesPrice || 0);
+      const highestItemCost = Number(soldItem.maxCost || soldItem.minCost || 0);
+      
+      if (highestMarketValue > 0) {
+        const payoutAmount = (actualSalesPrice / highestMarketValue) * highestItemCost;
+        upcomingPayouts += payoutAmount;
+      }
+    }
+
+    // Calculate cost ranges for active items
+    const activeItems = await db.select().from(item)
+      .where(sql`${item.status} IN ('in-store', 'reserved')`);
+    
+    const costRange = activeItems.reduce((acc, item) => ({
+      min: acc.min + Number(item.minCost || 0),
+      max: acc.max + Number(item.maxCost || item.minCost || 0)
+    }), { min: 0, max: 0 });
+
     return {
       totalRevenue,
       activeItems: itemsResult.count,
       pendingPayouts: { min: pendingPayoutsMin, max: pendingPayoutsMax },
-      netProfit: { min: netProfitMin, max: netProfitMax }
+      netProfit: { min: netProfitMin, max: netProfitMax },
+      incomingPayments,
+      upcomingPayouts,
+      costRange
     };
   }
 
