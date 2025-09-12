@@ -2338,7 +2338,7 @@ export class DatabaseStorage implements IStorage {
     // Get category breakdown
     const categoriesBreakdown = await db
       .select({
-        categoryId: sql<string>`COALESCE(${category.categoryId}, 'unknown')`,
+        categoryId: sql<string>`COALESCE(${category.categoryId}::text, 'unknown')`,
         categoryName: sql<string>`COALESCE(${category.name}, 'Unknown Category')`,
         itemCount: sql<number>`COUNT(*)`,
         totalValue: sql<number>`SUM(COALESCE(${item.maxSalesPrice}, ${item.minSalesPrice}, 0))`,
@@ -2349,7 +2349,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(brand, eq(item.brandId, brand.brandId))
       .leftJoin(category, eq(item.categoryId, category.categoryId))
       .where(whereConditions)
-      .groupBy(sql`COALESCE(${category.categoryId}, 'unknown')`, sql`COALESCE(${category.name}, 'Unknown Category')`)
+      .groupBy(sql`COALESCE(${category.categoryId}::text, 'unknown')`, sql`COALESCE(${category.name}, 'Unknown Category')`)
       .orderBy(desc(sql<number>`COUNT(*)`));
 
     // Get aging analysis
