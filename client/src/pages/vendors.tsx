@@ -76,11 +76,32 @@ function formatDate(dateString: string) {
   });
 }
 
+function formatNumber(amount: number) {
+  if (amount >= 1000) {
+    return `${(amount / 1000).toFixed(1)}K`;
+  }
+  return amount.toString();
+}
+
+function formatCurrencyAbbreviated(amount: number) {
+  if (amount >= 1000) {
+    return `$${(amount / 1000).toFixed(1)}K`;
+  }
+  return formatCurrency(amount);
+}
+
 function formatCurrencyRange(min: number, max: number) {
   if (min === max) {
     return formatCurrency(min);
   }
   return `${formatCurrency(min)} - ${formatCurrency(max)}`;
+}
+
+function formatCurrencyRangeAbbreviated(min: number, max: number) {
+  if (min === max) {
+    return formatCurrencyAbbreviated(min);
+  }
+  return `${formatCurrencyAbbreviated(min)} - ${formatCurrencyAbbreviated(max)}`;
 }
 
 export default function Vendors() {
@@ -221,6 +242,22 @@ export default function Vendors() {
     max: acc.max + v.pendingPayouts.max
   }), { min: 0, max: 0 });
 
+  // Calculate Luxette vendor active listings data
+  const luxetteVendor = vendorsWithStats.find(v => v.name?.toLowerCase().includes('luxette'));
+  const luxetteActiveItems = items?.filter(item => 
+    item.vendor.name?.toLowerCase().includes('luxette') && 
+    (item.status === 'in-store' || item.status === 'reserved')
+  ) || [];
+  
+  const luxetteStats = {
+    qtyItems: luxetteActiveItems.length,
+    totalCost: luxetteActiveItems.reduce((sum, item) => sum + Number(item.minCost || 0), 0),
+    valueRange: luxetteActiveItems.reduce((acc, item) => ({
+      min: acc.min + Number(item.minSalesPrice || 0),
+      max: acc.max + Number(item.maxSalesPrice || 0)
+    }), { min: 0, max: 0 })
+  };
+
   return (
     <MainLayout title="Vendors" subtitle="Manage vendor relationships and consignment agreements">
       {/* Key Metrics */}
@@ -240,13 +277,16 @@ export default function Vendors() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Vendors</CardTitle>
+            <CardTitle className="text-sm font-medium">Luxette Active Listings</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeVendors}</div>
+            <div className="text-xl font-bold">{luxetteStats.qtyItems} Items</div>
+            <div className="text-sm font-medium text-muted-foreground mb-1">
+              Cost: {formatCurrencyAbbreviated(luxetteStats.totalCost)}
+            </div>
             <p className="text-xs text-muted-foreground">
-              With items in store
+              Value: {formatCurrencyRangeAbbreviated(luxetteStats.valueRange.min, luxetteStats.valueRange.max)}
             </p>
           </CardContent>
         </Card>
@@ -270,7 +310,7 @@ export default function Vendors() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrencyRange(totalValueRange.min, totalValueRange.max)}</div>
+            <div className="text-lg font-bold">{formatCurrencyRangeAbbreviated(totalValueRange.min, totalValueRange.max)}</div>
             <p className="text-xs text-muted-foreground">
               Combined inventory value
             </p>
@@ -283,7 +323,7 @@ export default function Vendors() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrencyRange(totalPendingPayoutsRange.min, totalPendingPayoutsRange.max)}</div>
+            <div className="text-lg font-bold">{formatCurrencyRangeAbbreviated(totalPendingPayoutsRange.min, totalPendingPayoutsRange.max)}</div>
             <p className="text-xs text-muted-foreground">
               Awaiting payment
             </p>
