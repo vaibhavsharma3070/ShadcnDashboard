@@ -816,18 +816,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error('Failed to upload to object storage');
       }
 
-      // Set ACL policy for public access
-      const normalizedPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-      const finalPath = await objectStorageService.trySetObjectEntityAclPolicy(
+      // Extract the path from the upload URL for public serving
+      // uploadURL is like: https://storage.googleapis.com/bucket/public/uploads/uuid.jpg?...
+      const url = new URL(uploadURL);
+      const pathParts = url.pathname.split('/');
+      // Find the uploads part and create the public URL
+      const uploadsIndex = pathParts.findIndex(part => part === 'uploads');
+      if (uploadsIndex === -1) {
+        throw new Error('Invalid upload URL format');
+      }
+      
+      const filename = pathParts[uploadsIndex + 1];
+      const publicImageUrl = `/public-objects/uploads/${filename}`;
+      
+      console.log('Image uploaded successfully:', {
         uploadURL,
-        {
-          owner: "system", // For public product images
-          visibility: "public",
-        }
-      );
-
-      // Return the public URL for the image
-      const publicImageUrl = `/public-objects${finalPath.replace('/objects', '')}`;
+        publicImageUrl,
+        filename
+      });
       
       res.json({ 
         imageUrl: publicImageUrl,

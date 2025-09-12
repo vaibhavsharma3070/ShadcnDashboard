@@ -132,16 +132,18 @@ export class ObjectStorageService {
 
   // Gets the upload URL for an object entity.
   async getObjectEntityUploadURL(): Promise<string> {
-    const privateObjectDir = this.getPrivateObjectDir();
-    if (!privateObjectDir) {
+    const publicObjectSearchPaths = this.getPublicObjectSearchPaths();
+    if (!publicObjectSearchPaths || publicObjectSearchPaths.length === 0) {
       throw new Error(
-        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
-          "tool and set PRIVATE_OBJECT_DIR env var."
+        "PUBLIC_OBJECT_SEARCH_PATHS not set. Create a bucket in 'Object Storage' " +
+          "tool and set PUBLIC_OBJECT_SEARCH_PATHS env var."
       );
     }
 
+    // Use the first public search path for uploads
+    const publicPath = publicObjectSearchPaths[0];
     const objectId = randomUUID();
-    const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+    const fullPath = `${publicPath}/uploads/${objectId}.jpg`;
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
