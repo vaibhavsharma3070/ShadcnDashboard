@@ -72,6 +72,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dashboard/financial-data", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "Start date and end date are required" });
+      }
+      
+      const financialData = await storage.getFinancialDataByDateRange(
+        startDate as string,
+        endDate as string
+      );
+      res.json(financialData);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch financial data" });
+    }
+  });
+
   // Vendor routes
   app.get("/api/vendors", async (req, res) => {
     try {

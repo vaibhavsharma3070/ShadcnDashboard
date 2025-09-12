@@ -4,7 +4,7 @@ import {
   type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser, type InsertBrand, type InsertCategory, type InsertPaymentMethod
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sum, count, sql, and, isNull, isNotNull } from "drizzle-orm";
+import { eq, desc, sum, count, sql, and, isNull, isNotNull, inArray } from "drizzle-orm";
 
 // Helper functions for type conversion to match Drizzle's expected types
 function toDbNumeric(v?: number | string | null): string {
@@ -144,6 +144,15 @@ export interface IStorage {
     incomingPayments: number;
     upcomingPayouts: number;
     costRange: { min: number; max: number };
+  }>;
+  
+  getFinancialDataByDateRange(startDate: string, endDate: string): Promise<{
+    totalRevenue: number;
+    totalCosts: number;
+    totalProfit: number;
+    itemsSold: number;
+    averageOrderValue: number;
+    totalExpenses: number;
   }>;
   
   getRecentItems(limit?: number): Promise<Array<Item & { vendor: Vendor }>>;
@@ -946,6 +955,62 @@ export class DatabaseStorage implements IStorage {
     return itemsWithProfit
       .sort((a, b) => b.profit - a.profit)
       .slice(0, limit);
+  }
+
+  async getFinancialDataByDateRange(startDate: string, endDate: string): Promise<{
+    totalRevenue: number;
+    totalCosts: number;
+    totalProfit: number;
+    itemsSold: number;
+    averageOrderValue: number;
+    totalExpenses: number;
+  }> {
+    // Get payments within date range
+    const [revenueResult] = await db.select({ 
+      total: sum(clientPayment.amount),
+      count: count()
+    }).from(clientPayment)
+      .where(sql`${clientPayment.paidAt} >= ${startDate} AND ${clientPayment.paidAt} <= ${endDate}`);
+    
+    // Get expenses within date range 
+    const [expensesResult] = await db.select({ 
+      total: sum(itemExpense.amount) 
+    }).from(itemExpense)
+      .where(sql`${itemExpense.incurredAt} >= ${startDate} AND ${itemExpense.incurredAt} <= ${endDate}`);
+
+    // Get items that had payments within date range to calculate costs
+    const paymentsInRange = await db.select({
+      itemId: clientPayment.itemId,
+      amount: clientPayment.amount
+    }).from(clientPayment)
+      .where(sql`${clientPayment.paidAt} >= ${startDate} AND ${clientPayment.paidAt} <= ${endDate}`);
+
+    const uniqueItemIds = [...new Set(paymentsInRange.map(p => p.itemId))];
+    
+    let totalCosts = 0;
+    if (uniqueItemIds.length > 0) {
+      const itemsWithPayments = await db.select().from(item)
+        .where(inArray(item.itemId, uniqueItemIds));
+      
+      totalCosts = itemsWithPayments.reduce((sum, item) => 
+        sum + Number(item.maxCost || item.minCost || 0), 0);
+    }
+
+    const totalRevenue = Number(revenueResult.total || 0);
+    const totalExpenses = Number(expensesResult.total || 0);
+    const itemsSold = uniqueItemIds.length;
+    
+    const totalProfit = totalRevenue - totalCosts - totalExpenses;
+    const averageOrderValue = itemsSold > 0 ? totalRevenue / itemsSold : 0;
+
+    return {
+      totalRevenue,
+      totalCosts,
+      totalProfit,
+      itemsSold,
+      averageOrderValue,
+      totalExpenses
+    };
   }
 
   async getInstallmentPlans(): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor }, client: Client }>> {

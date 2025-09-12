@@ -211,6 +211,28 @@ export default function Dashboard() {
       queryKey: ["/api/dashboard/luxette-inventory"],
     });
 
+  // Revenue visualizer state
+  const [dateRange, setDateRange] = useState("30");
+  const [startDate, setStartDate] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+    return date.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+
+  const { data: financialData, isLoading: financialLoading } = useQuery<{
+    totalRevenue: number;
+    totalCosts: number;
+    totalProfit: number;
+    itemsSold: number;
+    averageOrderValue: number;
+    totalExpenses: number;
+  }>({
+    queryKey: [`/api/dashboard/financial-data?startDate=${startDate}&endDate=${endDate}`],
+  });
+
   // Pagination logic for items
   const totalPages = Math.ceil((recentItems?.length || 0) / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -241,6 +263,32 @@ export default function Dashboard() {
         setLocation("/vendors");
         break;
     }
+  };
+
+  const handleDateRangeChange = (range: string) => {
+    setDateRange(range);
+    const endDate = new Date();
+    const startDate = new Date();
+    
+    switch (range) {
+      case "7":
+        startDate.setDate(endDate.getDate() - 7);
+        break;
+      case "30":
+        startDate.setDate(endDate.getDate() - 30);
+        break;
+      case "90":
+        startDate.setDate(endDate.getDate() - 90);
+        break;
+      case "365":
+        startDate.setFullYear(endDate.getFullYear() - 1);
+        break;
+      default:
+        startDate.setDate(endDate.getDate() - 30);
+    }
+    
+    setStartDate(startDate.toISOString().split('T')[0]);
+    setEndDate(endDate.toISOString().split('T')[0]);
   };
 
   return (
@@ -400,27 +448,86 @@ export default function Dashboard() {
 
       {/* Charts and Tables Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Revenue Chart Placeholder */}
+        {/* Revenue Visualizer */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Revenue Overview</CardTitle>
-              <select className="text-sm border border-input rounded-lg px-3 py-2 bg-background">
-                <option>Last 30 days</option>
-                <option>Last 90 days</option>
-                <option>Last 12 months</option>
+              <select 
+                className="text-sm border border-input rounded-lg px-3 py-2 bg-background"
+                value={dateRange}
+                onChange={(e) => handleDateRangeChange(e.target.value)}
+              >
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="365">Last 12 months</option>
               </select>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-64 bg-muted rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                <p className="text-muted-foreground">
-                  Revenue chart will be implemented here
-                </p>
+            {financialLoading ? (
+              <div className="h-64 flex items-center justify-center">
+                <div className="text-center space-y-3">
+                  <Skeleton className="h-8 w-32 mx-auto" />
+                  <Skeleton className="h-6 w-24 mx-auto" />
+                  <div className="grid grid-cols-2 gap-4 mt-6">
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Main Financial Summary */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                      {formatCurrencyAbbreviated(financialData?.totalRevenue || 0)}
+                    </div>
+                    <div className="text-sm text-green-600 dark:text-green-400">Revenue</div>
+                  </div>
+                  <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <div className="text-2xl font-bold text-red-700 dark:text-red-300">
+                      {formatCurrencyAbbreviated((financialData?.totalCosts || 0) + (financialData?.totalExpenses || 0))}
+                    </div>
+                    <div className="text-sm text-red-600 dark:text-red-400">Total Costs</div>
+                  </div>
+                  <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                      {formatCurrencyAbbreviated(financialData?.totalProfit || 0)}
+                    </div>
+                    <div className="text-sm text-blue-600 dark:text-blue-400">Profit</div>
+                  </div>
+                </div>
+
+                {/* Additional Metrics */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Items Sold:</span>
+                    <span className="font-semibold">{financialData?.itemsSold || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Avg Order Value:</span>
+                    <span className="font-semibold">{formatCurrencyAbbreviated(financialData?.averageOrderValue || 0)}</span>
+                  </div>
+                </div>
+
+                {/* Cost Breakdown */}
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Item Costs:</span>
+                    <span className="font-semibold text-orange-600">{formatCurrencyAbbreviated(financialData?.totalCosts || 0)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Expenses:</span>
+                    <span className="font-semibold text-orange-600">{formatCurrencyAbbreviated(financialData?.totalExpenses || 0)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
