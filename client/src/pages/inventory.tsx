@@ -272,6 +272,10 @@ export default function Inventory() {
     queryKey: ["/api/categories"],
   });
 
+  const { data: paymentMethods } = useQuery<Array<{ paymentMethodId: string; name: string; type: string; isActive: boolean }>>({
+    queryKey: ["/api/payment-methods"],
+  });
+
   const createItemMutation = useMutation({
     mutationFn: async (data: any) => {
       return await apiRequest("POST", "/api/items", data);
@@ -447,7 +451,7 @@ export default function Inventory() {
       clientId: "",
       paymentType: "full",
       amount: "",
-      paymentMethod: "cash",
+      paymentMethod: "",
       installments: [{ amount: "", dueDate: "" }],
     },
   });
@@ -1484,13 +1488,11 @@ export default function Inventory() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="credit_card">Credit Card</SelectItem>
-                        <SelectItem value="debit_card">Debit Card</SelectItem>
-                        <SelectItem value="bank_transfer">
-                          Bank Transfer
-                        </SelectItem>
-                        <SelectItem value="check">Check</SelectItem>
+                        {paymentMethods?.filter(method => method.isActive).map((method) => (
+                          <SelectItem key={method.paymentMethodId} value={method.paymentMethodId}>
+                            {method.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
