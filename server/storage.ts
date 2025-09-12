@@ -2024,7 +2024,7 @@ export class DatabaseStorage implements IStorage {
       switch (groupBy) {
         case 'brand':
           return {
-            groupId: sql<string>`COALESCE(${brand.brandId}, 'unknown')`,
+            groupId: brand.brandId,
             groupName: sql<string>`COALESCE(${brand.name}, ${item.brand}, 'Unknown Brand')`
           };
         case 'vendor':
@@ -2039,7 +2039,7 @@ export class DatabaseStorage implements IStorage {
           };
         case 'category':
           return {
-            groupId: sql<string>`COALESCE(${category.categoryId}, 'unknown')`,
+            groupId: category.categoryId,
             groupName: sql<string>`COALESCE(${category.name}, 'Unknown Category')`
           };
         default:
@@ -2263,6 +2263,7 @@ export class DatabaseStorage implements IStorage {
         profit: Math.round(profit * 100) / 100,
         margin: Math.round(margin * 100) / 100,
         soldDate: item.firstSaleDate ? new Date(item.firstSaleDate).toISOString().split('T')[0] : undefined,
+        acquisitionDate: item.acquisitionDate ? new Date(item.acquisitionDate).toISOString().split('T')[0] : undefined,
         daysToSell
       };
     });

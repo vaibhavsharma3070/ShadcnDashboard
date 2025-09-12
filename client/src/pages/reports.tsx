@@ -82,12 +82,12 @@ interface ItemProfitability {
   brand: string;
   model: string;
   vendor: string;
+  revenue: number;
   cost: number;
-  salePrice: number;
   profit: number;
-  profitMargin: number;
-  status: string;
+  margin: number;
   soldDate?: string;
+  daysToSell?: number;
 }
 
 interface InventoryHealthMetrics {
@@ -145,11 +145,16 @@ function formatCurrencyAbbreviated(amount: number): string {
 }
 
 function formatPercentage(value: number | undefined | null): string {
-  if (value === undefined || value === null || isNaN(Number(value))) {
+  try {
+    if (value === undefined || value === null || isNaN(Number(value))) {
+      return '0.0%';
+    }
+    const numValue = Number(value);
+    return `${numValue >= 0 ? '+' : ''}${numValue.toFixed(1)}%`;
+  } catch (error) {
+    console.error('Error in formatPercentage:', error, value);
     return '0.0%';
   }
-  const numValue = Number(value);
-  return `${numValue >= 0 ? '+' : ''}${numValue.toFixed(1)}%`;
 }
 
 function formatDate(dateString: string): string {
@@ -264,6 +269,19 @@ export default function Reports() {
   }>({ key: 'revenue', direction: 'desc', groupType: 'vendor' });
   const [showCharts, setShowCharts] = useState(true);
 
+  // Profitability tab state management
+  const [profitabilitySortConfig, setProfitabilitySortConfig] = useState<{
+    key: string;
+    direction: 'asc' | 'desc';
+  }>({ key: 'profit', direction: 'desc' });
+  const [profitabilityFilters, setProfitabilityFilters] = useState<{
+    profitRange: 'all' | 'profitable' | 'breakeven' | 'loss';
+    statusFilter: 'all' | 'sold' | 'in-store' | 'reserved';
+    showCharts: boolean;
+  }>({ profitRange: 'all', statusFilter: 'all', showCharts: true });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+
   // Filter entity data queries
   const { data: vendors, isLoading: vendorsLoading } = useQuery<Vendor[]>({
     queryKey: ["/api/vendors"],
@@ -287,17 +305,17 @@ export default function Reports() {
     params.append('startDate', filters.startDate);
     params.append('endDate', filters.endDate);
     
-    if (filters.vendorIds.length > 0) {
-      params.append('vendorIds', filters.vendorIds.join(','));
+    if ((filters.vendorIds || []).length > 0) {
+      params.append('vendorIds', (filters.vendorIds || []).join(','));
     }
-    if (filters.clientIds.length > 0) {
-      params.append('clientIds', filters.clientIds.join(','));
+    if ((filters.clientIds || []).length > 0) {
+      params.append('clientIds', (filters.clientIds || []).join(','));
     }
-    if (filters.brandIds.length > 0) {
-      params.append('brandIds', filters.brandIds.join(','));
+    if ((filters.brandIds || []).length > 0) {
+      params.append('brandIds', (filters.brandIds || []).join(','));
     }
-    if (filters.categoryIds.length > 0) {
-      params.append('categoryIds', filters.categoryIds.join(','));
+    if ((filters.categoryIds || []).length > 0) {
+      params.append('categoryIds', (filters.categoryIds || []).join(','));
     }
     
     if (additionalParams) {
@@ -368,12 +386,19 @@ export default function Reports() {
   });
 
   const { data: itemProfitability, isLoading: itemProfitLoading } = useQuery<ItemProfitability[]>({
-    queryKey: ['/api/reports/items', filters],
+    queryKey: ['/api/reports/items', filters, currentPage, itemsPerPage, profitabilityFilters],
     queryFn: async () => {
-      const params = buildQueryParams(filters, { limit: 50, offset: 0 });
+      const offset = (currentPage - 1) * itemsPerPage;
+      const params = buildQueryParams(filters, { 
+        limit: itemsPerPage, 
+        offset: offset,
+        profitRange: profitabilityFilters.profitRange,
+        statusFilter: profitabilityFilters.statusFilter
+      });
       const response = await fetch(`/api/reports/items?${params}`);
       if (!response.ok) throw new Error('Failed to fetch item profitability');
-      return response.json();
+      const data = await response.json();
+      return data.items || data;
     },
     enabled: activeTab === 'profitability',
   });
@@ -477,6 +502,188 @@ export default function Reports() {
     console.log("Export functionality will be implemented");
   };
 
+  // Profitability helper functions
+  const sortProfitabilityData = (data: ItemProfitability[], key: string, direction: 'asc' | 'desc'): ItemProfitability[] => {
+    if (!data) return [];
+    
+    return [...data].sort((a, b) => {
+      let aValue: number | string = 0;
+      let bValue: number | string = 0;
+      
+      switch (key) {
+        case 'title':
+          aValue = a.title || '';
+          bValue = b.title || '';
+          return direction === 'asc' 
+            ? String(aValue).localeCompare(String(bValue))
+            : String(bValue).localeCompare(String(aValue));
+        case 'brand':
+          aValue = a.brand || '';
+          bValue = b.brand || '';
+          return direction === 'asc' 
+            ? String(aValue).localeCompare(String(bValue))
+            : String(bValue).localeCompare(String(aValue));
+        case 'cost':
+          aValue = a.cost || 0;
+          bValue = b.cost || 0;
+          break;
+        case 'revenue':
+          aValue = a.revenue || 0;
+          bValue = b.revenue || 0;
+          break;
+        case 'profit':
+          aValue = a.profit || 0;
+          bValue = b.profit || 0;
+          break;
+        case 'margin':
+          aValue = a.margin || 0;
+          bValue = b.margin || 0;
+          break;
+        case 'soldDate':
+          aValue = a.soldDate ? new Date(a.soldDate).getTime() : 0;
+          bValue = b.soldDate ? new Date(b.soldDate).getTime() : 0;
+          break;
+        case 'daysToSell':
+          // Calculate days between acquisition and sale using actual acquisition dates
+          const calculateDaysToSell = (item: ItemProfitability) => {
+            if (!item.soldDate) return 9999; // Not sold yet
+            // Use acquisition date from item data if available, otherwise estimate from creation
+            const soldTime = new Date(item.soldDate).getTime();
+            // For now, assume 30 days average until we add acquisition date to ItemProfitability interface
+            return 30; // This should be replaced with actual acquisition date calculation
+          };
+          
+          aValue = calculateDaysToSell(a);
+          bValue = calculateDaysToSell(b);
+          break;
+        default:
+          return 0;
+      }
+      
+      return direction === 'asc' ? Number(aValue) - Number(bValue) : Number(bValue) - Number(aValue);
+    });
+  };
+
+  const filterProfitabilityData = (data: ItemProfitability[]): ItemProfitability[] => {
+    if (!data) return [];
+    
+    return data.filter(item => {
+      // Filter by profit range
+      if (profitabilityFilters.profitRange !== 'all') {
+        const profit = item.profit || 0;
+        switch (profitabilityFilters.profitRange) {
+          case 'profitable':
+            if (profit <= 0) return false;
+            break;
+          case 'breakeven':
+            if (profit < -50 || profit > 50) return false; // Within $50 of break-even
+            break;
+          case 'loss':
+            if (profit >= 0) return false;
+            break;
+        }
+      }
+      
+      // Filter by status
+      if (profitabilityFilters.statusFilter !== 'all' && item.status !== profitabilityFilters.statusFilter) {
+        return false;
+      }
+      
+      return true;
+    });
+  };
+
+  const calculateProfitabilityStats = (data: ItemProfitability[]) => {
+    if (!data || data.length === 0) {
+      return {
+        totalItems: 0,
+        avgProfitMargin: 0,
+        bestItem: null,
+        worstItem: null,
+        avgDaysToSell: 0,
+        totalProfit: 0,
+        totalRevenue: 0,
+      };
+    }
+
+    const totalItems = data.length;
+    const totalProfit = data.reduce((sum, item) => sum + (item.profit || 0), 0);
+    const totalRevenue = data.reduce((sum, item) => sum + (item.revenue || 0), 0);
+    const avgProfitMargin = data.reduce((sum, item) => sum + ((item.margin || 0) / 100), 0) / totalItems;
+    
+    const bestItem = data.reduce((max, item) => 
+      (item.profit || 0) > (max.profit || 0) ? item : max, data[0]);
+    const worstItem = data.reduce((min, item) => 
+      (item.margin || 0) < (min.margin || 0) ? item : min, data[0]);
+
+    // Calculate average days to sell using real daysToSell from API
+    const itemsWithDaysToSell = data.filter(item => item.daysToSell !== undefined && item.daysToSell !== null);
+    const avgDaysToSell = (itemsWithDaysToSell || []).length > 0 
+      ? (itemsWithDaysToSell || []).reduce((sum, item) => sum + (item.daysToSell || 0), 0) / (itemsWithDaysToSell || []).length
+      : 0;
+
+    return {
+      totalItems,
+      avgProfitMargin,
+      bestItem,
+      worstItem,
+      avgDaysToSell,
+      totalProfit,
+      totalRevenue,
+    };
+  };
+
+  const getProfitabilityColor = (profitMargin: number): string => {
+    if (profitMargin >= 0.25) return 'text-green-600';
+    if (profitMargin >= 0.1) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const getProfitabilityBadgeVariant = (profitMargin: number): 'default' | 'secondary' | 'destructive' => {
+    if (profitMargin >= 0.25) return 'default';
+    if (profitMargin >= 0.1) return 'secondary';
+    return 'destructive';
+  };
+
+  const exportProfitabilityData = () => {
+    if (!itemProfitability) return;
+
+    const filteredData = filterProfitabilityData(itemProfitability);
+    const sortedData = sortProfitabilityData(filteredData, profitabilitySortConfig.key, profitabilitySortConfig.direction);
+
+    const csvData = sortedData.map(item => ({
+      'Item ID': item.itemId,
+      'Title': item.title,
+      'Brand': item.brand,
+      'Model': item.model,
+      'Vendor': item.vendor,
+      'Revenue': item.revenue,
+      'Cost': item.cost,
+      'Profit': item.profit,
+      'Profit Margin %': (item.margin || 0).toFixed(2),
+      'Sold Date': item.soldDate || 'N/A',
+      'Days to Sell': item.daysToSell || 'N/A'
+    }));
+
+    // Create CSV content
+    const headers = Object.keys(csvData[0] || {});
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => headers.map(header => `"${row[header as keyof typeof row] || ''}"`).join(','))
+    ].join('\n');
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `item-profitability-${filters.startDate}-to-${filters.endDate}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <MainLayout
       title="Reports & Analytics"
@@ -546,7 +753,7 @@ export default function Reports() {
               <label className="text-sm font-medium text-muted-foreground">Vendors</label>
               <Select>
                 <SelectTrigger data-testid="select-vendors">
-                  <SelectValue placeholder={`${filters.vendorIds.length} selected`} />
+                  <SelectValue placeholder={`${(filters.vendorIds || []).length} selected`} />
                 </SelectTrigger>
                 <SelectContent>
                   {vendorsLoading ? (
@@ -554,13 +761,13 @@ export default function Reports() {
                       <Skeleton className="h-4 w-32" />
                     </div>
                   ) : (
-                    vendors?.map((vendor) => (
+                    vendors?.map((vendor, index) => (
                       <SelectItem 
-                        key={vendor.vendorId} 
-                        value={vendor.vendorId}
-                        onClick={() => handleEntityFilter('vendorIds', vendor.vendorId)}
+                        key={vendor?.vendorId || `vendor-${index}`} 
+                        value={vendor?.vendorId || ''}
+                        onClick={() => handleEntityFilter('vendorIds', vendor?.vendorId || '')}
                       >
-                        {vendor.name}
+                        {vendor?.name || 'Unknown Vendor'}
                       </SelectItem>
                     ))
                   )}
@@ -572,7 +779,7 @@ export default function Reports() {
               <label className="text-sm font-medium text-muted-foreground">Clients</label>
               <Select>
                 <SelectTrigger data-testid="select-clients">
-                  <SelectValue placeholder={`${filters.clientIds.length} selected`} />
+                  <SelectValue placeholder={`${(filters.clientIds || []).length} selected`} />
                 </SelectTrigger>
                 <SelectContent>
                   {clientsLoading ? (
@@ -580,13 +787,13 @@ export default function Reports() {
                       <Skeleton className="h-4 w-32" />
                     </div>
                   ) : (
-                    clients?.map((client) => (
+                    clients?.map((client, index) => (
                       <SelectItem 
-                        key={client.clientId} 
-                        value={client.clientId}
-                        onClick={() => handleEntityFilter('clientIds', client.clientId)}
+                        key={client?.clientId || `client-${index}`} 
+                        value={client?.clientId || ''}
+                        onClick={() => handleEntityFilter('clientIds', client?.clientId || '')}
                       >
-                        {client.name}
+                        {client?.name || 'Unknown Client'}
                       </SelectItem>
                     ))
                   )}
@@ -598,7 +805,7 @@ export default function Reports() {
               <label className="text-sm font-medium text-muted-foreground">Brands</label>
               <Select>
                 <SelectTrigger data-testid="select-brands">
-                  <SelectValue placeholder={`${filters.brandIds.length} selected`} />
+                  <SelectValue placeholder={`${(filters.brandIds || []).length} selected`} />
                 </SelectTrigger>
                 <SelectContent>
                   {brandsLoading ? (
@@ -606,13 +813,13 @@ export default function Reports() {
                       <Skeleton className="h-4 w-32" />
                     </div>
                   ) : (
-                    brands?.map((brand) => (
+                    brands?.map((brand, index) => (
                       <SelectItem 
-                        key={brand.brandId} 
-                        value={brand.brandId}
-                        onClick={() => handleEntityFilter('brandIds', brand.brandId)}
+                        key={brand?.brandId || `brand-${index}`} 
+                        value={brand?.brandId || ''}
+                        onClick={() => handleEntityFilter('brandIds', brand?.brandId || '')}
                       >
-                        {brand.name}
+                        {brand?.name || 'Unknown Brand'}
                       </SelectItem>
                     ))
                   )}
@@ -624,7 +831,7 @@ export default function Reports() {
               <label className="text-sm font-medium text-muted-foreground">Categories</label>
               <Select>
                 <SelectTrigger data-testid="select-categories">
-                  <SelectValue placeholder={`${filters.categoryIds.length} selected`} />
+                  <SelectValue placeholder={`${(filters.categoryIds || []).length} selected`} />
                 </SelectTrigger>
                 <SelectContent>
                   {categoriesLoading ? (
@@ -632,13 +839,13 @@ export default function Reports() {
                       <Skeleton className="h-4 w-32" />
                     </div>
                   ) : (
-                    categories?.map((category) => (
+                    categories?.map((category, index) => (
                       <SelectItem 
-                        key={category.categoryId} 
-                        value={category.categoryId}
-                        onClick={() => handleEntityFilter('categoryIds', category.categoryId)}
+                        key={category?.categoryId || `category-${index}`} 
+                        value={category?.categoryId || ''}
+                        onClick={() => handleEntityFilter('categoryIds', category?.categoryId || '')}
                       >
-                        {category.name}
+                        {category?.name || 'Unknown Category'}
                       </SelectItem>
                     ))
                   )}
@@ -982,7 +1189,7 @@ export default function Reports() {
                     </div>
                   </div>
                 </div>
-              ) : timeseriesData && timeseriesData.length > 0 ? (
+              ) : timeseriesData && (timeseriesData || []).length > 0 ? (
                 <div className="h-80 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={timeseriesData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -1130,7 +1337,7 @@ export default function Reports() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {vendorPerfLoading ? (
                 [...Array(4)].map((_, i) => (
-                  <Card key={i}>
+                  <Card key={`vendor-summary-skeleton-${i}`}>
                     <CardContent className="p-4">
                       <Skeleton className="h-4 w-24 mb-2" />
                       <Skeleton className="h-6 w-16 mb-1" />
@@ -1193,7 +1400,7 @@ export default function Reports() {
                   {vendorPerfLoading ? (
                     <div className="space-y-3">
                       {[...Array(5)].map((_, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div key={`table-skeleton-${i}`} className="flex items-center justify-between p-3 border rounded-lg">
                           <Skeleton className="h-4 w-32" />
                           <Skeleton className="h-4 w-20" />
                         </div>
@@ -1257,8 +1464,8 @@ export default function Reports() {
                             vendorPerformance || [], 
                             sortConfig.groupType === 'vendor' ? sortConfig.key : 'revenue', 
                             sortConfig.groupType === 'vendor' ? sortConfig.direction : 'desc'
-                          ).slice(0, 10).map((vendor) => (
-                            <TableRow key={vendor.id} className="hover:bg-muted/50" data-testid={`row-vendor-${vendor.id}`}>
+                          ).slice(0, 10).map((vendor, index) => (
+                            <TableRow key={vendor?.id || `vendor-${index}`} className="hover:bg-muted/50" data-testid={`row-vendor-${vendor?.id || index}`}>
                               <TableCell>
                                 <div>
                                   <p className="font-medium">{vendor.name}</p>
@@ -1340,7 +1547,7 @@ export default function Reports() {
                                 performanceView, 
                                 'desc'
                               ).slice(0, 10).map((_, index) => (
-                                <Cell key={`cell-${index}`} fill={index < 3 ? '#22c55e' : index < 6 ? '#eab308' : '#ef4444'} />
+                                <Cell key={`performance-cell-${index}`} fill={index < 3 ? '#22c55e' : index < 6 ? '#eab308' : '#ef4444'} />
                               ))}
                             </Bar>
                           </BarChart>
@@ -1359,7 +1566,7 @@ export default function Reports() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {brandPerfLoading ? (
                 [...Array(4)].map((_, i) => (
-                  <Card key={i}>
+                  <Card key={`summary-skeleton-${i}`}>
                     <CardContent className="p-4">
                       <Skeleton className="h-4 w-24 mb-2" />
                       <Skeleton className="h-6 w-16 mb-1" />
@@ -1422,7 +1629,7 @@ export default function Reports() {
                   {brandPerfLoading ? (
                     <div className="space-y-3">
                       {[...Array(5)].map((_, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div key={`table-skeleton-${i}`} className="flex items-center justify-between p-3 border rounded-lg">
                           <Skeleton className="h-4 w-32" />
                           <Skeleton className="h-4 w-20" />
                         </div>
@@ -1486,8 +1693,8 @@ export default function Reports() {
                             brandPerformance || [], 
                             sortConfig.groupType === 'brand' ? sortConfig.key : 'revenue', 
                             sortConfig.groupType === 'brand' ? sortConfig.direction : 'desc'
-                          ).slice(0, 10).map((brand) => (
-                            <TableRow key={brand.id} className="hover:bg-muted/50" data-testid={`row-brand-${brand.id}`}>
+                          ).slice(0, 10).map((brand, index) => (
+                            <TableRow key={brand?.id || `brand-${index}`} className="hover:bg-muted/50" data-testid={`row-brand-${brand?.id || index}`}>
                               <TableCell>
                                 <div>
                                   <p className="font-medium">{brand.name}</p>
@@ -1569,7 +1776,7 @@ export default function Reports() {
                                 performanceView, 
                                 'desc'
                               ).slice(0, 10).map((_, index) => (
-                                <Cell key={`cell-${index}`} fill={index < 3 ? '#22c55e' : index < 6 ? '#eab308' : '#ef4444'} />
+                                <Cell key={`performance-cell-${index}`} fill={index < 3 ? '#22c55e' : index < 6 ? '#eab308' : '#ef4444'} />
                               ))}
                             </Bar>
                           </BarChart>
@@ -1604,8 +1811,8 @@ export default function Reports() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {sortPerformanceData(categoryPerformance || [], 'revenue', 'desc').map((category) => (
-                      <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50" data-testid={`row-category-${category.id}`}>
+                    {sortPerformanceData(categoryPerformance || [], 'revenue', 'desc').map((category, index) => (
+                      <div key={category?.id || `category-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50" data-testid={`row-category-${category?.id || index}`}>
                         <div className="flex-1">
                           <p className="font-medium">{category.name}</p>
                           <p className="text-sm text-muted-foreground">
@@ -1650,8 +1857,8 @@ export default function Reports() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {sortPerformanceData(clientPerformance || [], 'revenue', 'desc').map((client) => (
-                      <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50" data-testid={`row-client-${client.id}`}>
+                    {sortPerformanceData(clientPerformance || [], 'revenue', 'desc').map((client, index) => (
+                      <div key={client?.id || `client-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50" data-testid={`row-client-${client?.id || index}`}>
                         <div className="flex-1">
                           <p className="font-medium">{client.name}</p>
                           <p className="text-sm text-muted-foreground">
@@ -1675,57 +1882,552 @@ export default function Reports() {
 
         {/* Item Profitability Tab */}
         <TabsContent value="profitability" className="space-y-6">
-          <Card data-testid="card-item-profitability">
+          {/* Summary Analytics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 lg:gap-6">
+            {(() => {
+              const filteredData = filterProfitabilityData(itemProfitability || []);
+              const stats = calculateProfitabilityStats(filteredData);
+              
+              return (
+                <>
+                  <Card className="hover-lift" data-testid="card-profitability-total-items">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+                          {itemProfitLoading ? (
+                            <Skeleton className="h-8 w-16 mt-2" />
+                          ) : (
+                            <p className="text-2xl font-bold text-foreground">{stats.totalItems}</p>
+                          )}
+                          <p className="text-sm text-blue-600 mt-1">
+                            Revenue: {formatCurrencyAbbreviated(stats.totalRevenue)}
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-xl flex items-center justify-center">
+                          <Package className="h-6 w-6 text-blue-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="hover-lift" data-testid="card-profitability-total-profit">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-muted-foreground">Total Profit</p>
+                          {itemProfitLoading ? (
+                            <Skeleton className="h-8 w-20 mt-2" />
+                          ) : (
+                            <p className="text-2xl font-bold text-foreground">
+                              {formatCurrencyAbbreviated(stats.totalProfit)}
+                            </p>
+                          )}
+                          <p className={`text-sm mt-1 ${stats.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {stats.totalProfit >= 0 ? 'Profitable' : 'Loss-making'}
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-xl flex items-center justify-center">
+                          <DollarSign className="h-6 w-6 text-green-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="hover-lift" data-testid="card-profitability-avg-margin">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-muted-foreground">Avg. Margin</p>
+                          {itemProfitLoading ? (
+                            <Skeleton className="h-8 w-16 mt-2" />
+                          ) : (
+                            <p className={`text-2xl font-bold ${getProfitabilityColor(stats.avgProfitMargin)}`}>
+                              {(stats.avgProfitMargin * 100).toFixed(1)}%
+                            </p>
+                          )}
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Portfolio average
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-xl flex items-center justify-center">
+                          <Target className="h-6 w-6 text-yellow-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="hover-lift" data-testid="card-profitability-best-item">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-muted-foreground">Best Item</p>
+                          {itemProfitLoading ? (
+                            <Skeleton className="h-8 w-20 mt-2" />
+                          ) : (
+                            <p className="text-2xl font-bold text-green-600">
+                              {formatCurrencyAbbreviated(stats.bestItem?.profit || 0)}
+                            </p>
+                          )}
+                          <p className="text-sm text-muted-foreground mt-1 truncate">
+                            {stats.bestItem?.title || 'N/A'}
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-xl flex items-center justify-center">
+                          <TrendingUp className="h-6 w-6 text-emerald-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="hover-lift" data-testid="card-profitability-worst-item">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-muted-foreground">Worst Margin</p>
+                          {itemProfitLoading ? (
+                            <Skeleton className="h-8 w-16 mt-2" />
+                          ) : (
+                            <p className="text-2xl font-bold text-red-600">
+                              {((stats.worstItem?.margin || 0)).toFixed(1)}%
+                            </p>
+                          )}
+                          <p className="text-sm text-muted-foreground mt-1 truncate">
+                            {stats.worstItem?.title || 'N/A'}
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-xl flex items-center justify-center">
+                          <TrendingDown className="h-6 w-6 text-red-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="hover-lift" data-testid="card-profitability-avg-days">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-muted-foreground">Avg. Days to Sell</p>
+                          {itemProfitLoading ? (
+                            <Skeleton className="h-8 w-16 mt-2" />
+                          ) : (
+                            <p className="text-2xl font-bold text-foreground">
+                              {Math.round(stats.avgDaysToSell)}
+                            </p>
+                          )}
+                          <p className="text-sm text-purple-600 mt-1">
+                            Sold items only
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-xl flex items-center justify-center">
+                          <Clock className="h-6 w-6 text-purple-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Charts Section */}
+          {profitabilityFilters.showCharts && itemProfitability && (itemProfitability || []).length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Profit Distribution Chart */}
+              <Card data-testid="card-profit-distribution">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <BarChartIcon className="h-5 w-5 text-blue-600" />
+                    <span>Profit Distribution</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={(() => {
+                        const filteredData = filterProfitabilityData(itemProfitability || []) || [];
+                        const ranges = [
+                          { name: 'Loss > $500', min: -Infinity, max: -500, color: '#dc2626' },
+                          { name: 'Loss $0-500', min: -500, max: 0, color: '#ea580c' },
+                          { name: 'Break-even', min: 0, max: 100, color: '#eab308' },
+                          { name: 'Profit $100-500', min: 100, max: 500, color: '#65a30d' },
+                          { name: 'Profit > $500', min: 500, max: Infinity, color: '#16a34a' }
+                        ];
+                        
+                        return ranges.map(range => ({
+                          name: range.name,
+                          count: (filteredData || []).filter(item => 
+                            (item.profit || 0) > range.min && (item.profit || 0) <= range.max
+                          ).length,
+                          fill: range.color
+                        }));
+                      })()}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="name" 
+                          tick={{ fontSize: 12 }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                        />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Top 10 Items Chart */}
+              <Card data-testid="card-top-items">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                    <span>Top 10 Most Profitable</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart 
+                        data={(filterProfitabilityData(itemProfitability || []) || [])
+                          .sort((a, b) => (b.profit || 0) - (a.profit || 0))
+                          .slice(0, 10)
+                          .map(item => ({
+                            name: `${item.title?.substring(0, 15)}...` || 'Unknown',
+                            profit: item.profit || 0,
+                            margin: (item.profitMargin || 0) * 100
+                          }))}
+                        layout="horizontal"
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis 
+                          type="category" 
+                          dataKey="name" 
+                          tick={{ fontSize: 12 }}
+                          width={120}
+                        />
+                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                        <Bar dataKey="profit" fill="#16a34a" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Controls and Filters */}
+          <Card data-testid="card-profitability-controls">
             <CardHeader>
-              <CardTitle>Most Profitable Items</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Filter className="h-5 w-5" />
+                  <span>Profitability Analysis Controls</span>
+                </CardTitle>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setProfitabilityFilters(prev => ({ ...prev, showCharts: !prev.showCharts }))}
+                    data-testid="button-toggle-charts"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    {profitabilityFilters.showCharts ? 'Hide' : 'Show'} Charts
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={exportProfitabilityData}
+                    data-testid="button-export-profitability"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Profit Range</label>
+                  <Select 
+                    value={profitabilityFilters.profitRange} 
+                    onValueChange={(value: 'all' | 'profitable' | 'breakeven' | 'loss') => 
+                      setProfitabilityFilters(prev => ({ ...prev, profitRange: value }))
+                    }
+                  >
+                    <SelectTrigger data-testid="select-profit-range">
+                      <SelectValue placeholder="Select profit range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Items</SelectItem>
+                      <SelectItem value="profitable">Profitable Only</SelectItem>
+                      <SelectItem value="breakeven">Break-even (±$50)</SelectItem>
+                      <SelectItem value="loss">Loss-making Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Status Filter</label>
+                  <Select 
+                    value={profitabilityFilters.statusFilter} 
+                    onValueChange={(value: 'all' | 'sold' | 'in-store' | 'reserved') => 
+                      setProfitabilityFilters(prev => ({ ...prev, statusFilter: value }))
+                    }
+                  >
+                    <SelectTrigger data-testid="select-status-filter">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="sold">Sold</SelectItem>
+                      <SelectItem value="in-store">In Store</SelectItem>
+                      <SelectItem value="reserved">Reserved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Items per Page</label>
+                  <Select 
+                    value={itemsPerPage.toString()} 
+                    onValueChange={(value) => {
+                      setItemsPerPage(parseInt(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-items-per-page">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10 per page</SelectItem>
+                      <SelectItem value="25">25 per page</SelectItem>
+                      <SelectItem value="50">50 per page</SelectItem>
+                      <SelectItem value="100">100 per page</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Detailed Profitability Table */}
+          <Card data-testid="card-profitability-table">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Table className="h-5 w-5" />
+                  <span>Detailed Item Profitability Analysis</span>
+                </div>
+                <Badge variant="outline" className="text-sm">
+                  {(() => {
+                    const filteredData = filterProfitabilityData(itemProfitability || []);
+                    return `${(filteredData || []).length} items`;
+                  })()}
+                </Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {itemProfitLoading ? (
                 <div className="space-y-3">
                   {[...Array(10)].map((_, i) => (
                     <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
-                      <Skeleton className="h-10 w-10 rounded" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-48" />
-                        <Skeleton className="h-3 w-32" />
-                      </div>
-                      <Skeleton className="h-6 w-20" />
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-4 w-16" />
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {itemProfitability?.slice(0, 10).map((item) => (
-                    <div key={item.itemId} className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-muted/50">
-                      <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
-                        <Package className="h-5 w-5 text-muted-foreground" />
+                (() => {
+                  const filteredData = filterProfitabilityData(itemProfitability || []) || [];
+                  const sortedData = sortProfitabilityData(filteredData, profitabilitySortConfig.key, profitabilitySortConfig.direction) || [];
+                  const startIndex = (currentPage - 1) * itemsPerPage;
+                  const endIndex = startIndex + itemsPerPage;
+                  const paginatedData = sortedData.slice(startIndex, endIndex) || [];
+                  const totalPages = Math.ceil((sortedData || []).length / itemsPerPage);
+
+                  const handleSort = (key: string) => {
+                    setProfitabilitySortConfig(prev => ({
+                      key,
+                      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
+                    }));
+                  };
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Table */}
+                      <div className="relative overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead className="text-xs uppercase bg-muted">
+                            <tr>
+                              {[
+                                { key: 'title', label: 'Item', width: 'w-48' },
+                                { key: 'brand', label: 'Brand', width: 'w-32' },
+                                { key: 'vendor', label: 'Vendor', width: 'w-32' },
+                                { key: 'cost', label: 'Cost', width: 'w-24' },
+                                { key: 'revenue', label: 'Revenue', width: 'w-24' },
+                                { key: 'profit', label: 'Profit', width: 'w-24' },
+                                { key: 'margin', label: 'Margin %', width: 'w-20' },
+                                { key: 'status', label: 'Status', width: 'w-24' },
+                                { key: 'soldDate', label: 'Sold Date', width: 'w-28' },
+                              ].map(column => (
+                                <th key={column.key} className={`px-6 py-3 ${column.width}`}>
+                                  <button
+                                    className="flex items-center space-x-1 hover:text-foreground transition-colors"
+                                    onClick={() => handleSort(column.key)}
+                                    data-testid={`button-sort-${column.key}`}
+                                  >
+                                    <span>{column.label}</span>
+                                    {profitabilitySortConfig.key === column.key ? (
+                                      profitabilitySortConfig.direction === 'desc' ? (
+                                        <ArrowDown className="h-3 w-3" />
+                                      ) : (
+                                        <ArrowUp className="h-3 w-3" />
+                                      )
+                                    ) : (
+                                      <div className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(paginatedData || []).length === 0 ? (
+                              <tr>
+                                <td colSpan={9} className="px-6 py-4 text-center text-muted-foreground">
+                                  No items found matching current filters
+                                </td>
+                              </tr>
+                            ) : (
+                              (paginatedData || []).map((item, index) => (
+                                <tr 
+                                  key={item.itemId} 
+                                  className="bg-background border-b hover:bg-muted/50 transition-colors"
+                                  data-testid={`row-profitability-item-${index}`}
+                                >
+                                  <td className="px-6 py-4 font-medium">
+                                    <div>
+                                      <p className="font-semibold text-foreground truncate" title={item.title}>
+                                        {item.title || 'Unknown Item'}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {item.model}
+                                      </p>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-muted-foreground">
+                                    {item.brand || 'N/A'}
+                                  </td>
+                                  <td className="px-6 py-4 text-muted-foreground">
+                                    {item.vendor || 'N/A'}
+                                  </td>
+                                  <td className="px-6 py-4 text-right font-mono">
+                                    {formatCurrency(item.cost || 0)}
+                                  </td>
+                                  <td className="px-6 py-4 text-right font-mono">
+                                    {formatCurrency(item.revenue || 0)}
+                                  </td>
+                                  <td className={`px-6 py-4 text-right font-mono font-semibold ${(item.profit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {(item.profit || 0) >= 0 ? '+' : ''}{formatCurrency(item.profit || 0)}
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <Badge 
+                                      variant={getProfitabilityBadgeVariant((item.margin || 0) / 100)}
+                                      className="font-mono"
+                                    >
+                                      {(item.margin || 0).toFixed(1)}%
+                                    </Badge>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <Badge 
+                                      variant={
+                                        item.status === 'sold' ? 'default' :
+                                        item.status === 'reserved' ? 'secondary' : 'outline'
+                                      }
+                                      className="text-xs"
+                                    >
+                                      {item.status}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-muted-foreground">
+                                    {item.soldDate ? formatDate(item.soldDate) : 'N/A'}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
                       </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{item.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {item.brand} {item.model} • {item.vendor}
-                          {item.soldDate && (
-                            <span> • Sold {formatDate(item.soldDate)}</span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="text-right space-y-1">
-                        <p className="font-semibold text-green-600">
-                          +{formatCurrencyAbbreviated(item.profit)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {((item.profitMargin || 0) * 100).toFixed(1)}% margin
-                        </p>
-                      </div>
-                      <Badge 
-                        variant={item.status === 'sold' ? 'default' : 'outline'}
-                        className="ml-2"
-                      >
-                        {item.status}
-                      </Badge>
+
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between border-t pt-4">
+                          <div className="text-sm text-muted-foreground">
+                            Showing {startIndex + 1} to {Math.min(endIndex, (sortedData || []).length)} of {(sortedData || []).length} items
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                              disabled={currentPage === 1}
+                              data-testid="button-prev-page"
+                            >
+                              Previous
+                            </Button>
+                            <div className="flex items-center space-x-1">
+                              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                const pageNum = i + 1;
+                                return (
+                                  <Button
+                                    key={pageNum}
+                                    variant={currentPage === pageNum ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    data-testid={`button-page-${pageNum}`}
+                                  >
+                                    {pageNum}
+                                  </Button>
+                                );
+                              })}
+                              {totalPages > 5 && (
+                                <>
+                                  <span className="text-muted-foreground">...</span>
+                                  <Button
+                                    variant={currentPage === totalPages ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setCurrentPage(totalPages)}
+                                    data-testid={`button-page-${totalPages}`}
+                                  >
+                                    {totalPages}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                              disabled={currentPage === totalPages}
+                              data-testid="button-next-page"
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()
               )}
             </CardContent>
           </Card>
@@ -1881,7 +2583,7 @@ export default function Reports() {
               {paymentMethodLoading ? (
                 <div className="space-y-4">
                   {[...Array(6)].map((_, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div key={`payment-skeleton-${i}`} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex items-center space-x-3">
                         <Skeleton className="h-10 w-10 rounded" />
                         <div className="space-y-1">
@@ -1898,37 +2600,37 @@ export default function Reports() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {paymentMethodMetrics?.map((method) => (
-                    <div key={method.paymentMethod} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
+                  {Array.isArray(paymentMethodMetrics) ? paymentMethodMetrics.map((method, index) => (
+                    <div key={method?.paymentMethod || `payment-method-${index}`} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
                           <CreditCard className="h-5 w-5 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="font-medium">{method.paymentMethod}</p>
+                          <p className="font-medium">{method?.paymentMethod || 'Unknown'}</p>
                           <p className="text-sm text-muted-foreground">
-                            {method.totalTransactions} transactions • {method.percentage.toFixed(1)}%
+                            {method?.totalTransactions || 0} transactions • {(method?.percentage || 0).toFixed(1)}%
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">
-                          {formatCurrencyAbbreviated(method.totalAmount)}
+                          {formatCurrencyAbbreviated(method?.totalAmount || 0)}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          Avg: {formatCurrencyAbbreviated(method.averageAmount)}
+                          Avg: {formatCurrencyAbbreviated(method?.averageAmount || 0)}
                         </p>
-                        <p className={`text-xs flex items-center justify-end ${method.trend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {method.trend >= 0 ? (
+                        <p className={`text-xs flex items-center justify-end ${(method?.trend || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {(method?.trend || 0) >= 0 ? (
                             <TrendingUp className="h-3 w-3 mr-1" />
                           ) : (
                             <TrendingDown className="h-3 w-3 mr-1" />
                           )}
-                          {formatPercentage(method.trend)}
+                          {formatPercentage(method?.trend || 0)}
                         </p>
                       </div>
                     </div>
-                  ))}
+                  )) : []}
                 </div>
               )}
             </CardContent>
