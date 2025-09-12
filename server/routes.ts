@@ -8,7 +8,8 @@ import { ObjectStorageService } from "./objectStorage";
 import { 
   insertVendorSchema, insertClientSchema, insertItemSchema, 
   insertClientPaymentSchema, insertVendorPayoutSchema, insertItemExpenseSchema, insertInstallmentPlanSchema,
-  insertBrandSchema, insertCategorySchema, insertPaymentMethodSchema
+  insertBrandSchema, insertCategorySchema, insertPaymentMethodSchema,
+  insertContractTemplateSchema, insertContractSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1114,6 +1115,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error serving public object:", error);
       return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Contract Template routes
+  app.get("/api/contract-templates", async (req, res) => {
+    try {
+      const templates = await storage.getContractTemplates();
+      res.json(templates);
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.get("/api/contract-templates/default", async (req, res) => {
+    try {
+      const template = await storage.getDefaultContractTemplate();
+      if (!template) {
+        return res.status(404).json({ error: "No default template found" });
+      }
+      res.json(template);
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.get("/api/contract-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getContractTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Contract template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.post("/api/contract-templates", async (req, res) => {
+    try {
+      const templateData = insertContractTemplateSchema.parse(req.body);
+      const template = await storage.createContractTemplate(templateData);
+      res.status(201).json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.put("/api/contract-templates/:id", async (req, res) => {
+    try {
+      const templateData = insertContractTemplateSchema.partial().parse(req.body);
+      const template = await storage.updateContractTemplate(req.params.id, templateData);
+      res.json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.delete("/api/contract-templates/:id", async (req, res) => {
+    try {
+      await storage.deleteContractTemplate(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  // Contract routes
+  app.get("/api/contracts", async (req, res) => {
+    try {
+      const contracts = await storage.getContracts();
+      res.json(contracts);
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.get("/api/contracts/vendor/:vendorId", async (req, res) => {
+    try {
+      const contracts = await storage.getContractsByVendor(req.params.vendorId);
+      res.json(contracts);
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.get("/api/contracts/:id", async (req, res) => {
+    try {
+      const contract = await storage.getContract(req.params.id);
+      if (!contract) {
+        return res.status(404).json({ error: "Contract not found" });
+      }
+      res.json(contract);
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.post("/api/contracts", async (req, res) => {
+    try {
+      const contractData = insertContractSchema.parse(req.body);
+      const contract = await storage.createContract(contractData);
+      res.status(201).json(contract);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.put("/api/contracts/:id", async (req, res) => {
+    try {
+      const contractData = insertContractSchema.partial().parse(req.body);
+      const contract = await storage.updateContract(req.params.id, contractData);
+      res.json(contract);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.post("/api/contracts/:id/finalize", async (req, res) => {
+    try {
+      const { pdfUrl } = req.body;
+      if (!pdfUrl || typeof pdfUrl !== 'string') {
+        return res.status(400).json({ error: "PDF URL is required" });
+      }
+      const contract = await storage.finalizeContract(req.params.id, pdfUrl);
+      res.json(contract);
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.delete("/api/contracts/:id", async (req, res) => {
+    try {
+      await storage.deleteContract(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
     }
   });
 
