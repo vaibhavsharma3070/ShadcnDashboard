@@ -74,6 +74,7 @@ export const item = pgTable("item", {
   maxCost: numeric("max_cost", { precision: 12, scale: 2 }),
   minSalesPrice: numeric("min_sales_price", { precision: 12, scale: 2 }),
   maxSalesPrice: numeric("max_sales_price", { precision: 12, scale: 2 }),
+  imageUrl: text("image_url"),
   status: text("status").notNull().default("in-store"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
