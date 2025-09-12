@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -110,14 +110,14 @@ function ContractCreationWizard() {
       // Create item snapshots
       const itemSnapshots = items.map(item => ({
         itemId: item.itemId,
-        name: item.name,
-        description: item.description || '',
-        currentPrice: item.currentPrice,
-        originalPrice: item.originalPrice,
-        category: item.category || '',
+        name: item.title || '',
+        description: item.model || '',
+        currentPrice: Number(item.minSalesPrice || 0),
+        originalPrice: Number(item.minCost || 0),
+        category: item.categoryId || '',
         brand: item.brand || '',
-        condition: item.condition,
-        images: item.images || []
+        condition: item.condition || '',
+        images: item.imageUrl ? [item.imageUrl] : []
       }));
 
       // Generate terms text by replacing template variables (using global replacement)
@@ -137,7 +137,7 @@ function ContractCreationWizard() {
       
       // Create items table
       const itemsTable = items.map((item, index) => 
-        `${index + 1}. ${item.name} - ${item.brand || 'N/A'} - ${item.category || 'N/A'} - $${item.currentPrice.toFixed(2)}`
+        `${index + 1}. ${item.title || 'Sin título'} - ${item.brand || 'N/A'} - ${item.model || 'N/A'} - $${Number(item.minSalesPrice || 0).toFixed(2)}`
       ).join('\n');
       termsText = termsText.replaceAll('{{ITEMS_TABLE}}', itemsTable);
 
@@ -152,7 +152,7 @@ function ContractCreationWizard() {
       return apiRequest('/api/contracts', {
         method: 'POST',
         body: JSON.stringify(contractData)
-      });
+      } as any);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
@@ -177,13 +177,15 @@ function ContractCreationWizard() {
     createContractMutation.mutate(data);
   };
 
-  // Set default template when available
-  if (defaultTemplate && !form.getValues().templateId) {
-    form.setValue('templateId', defaultTemplate.templateId);
-  }
+  // Set default template when available using useEffect to avoid render issues
+  useEffect(() => {
+    if (defaultTemplate && !form.getValues().templateId) {
+      form.setValue('templateId', defaultTemplate.templateId);
+    }
+  }, [defaultTemplate, form]);
 
   const availableItems = vendorItems.filter(item => 
-    item.status === 'in_store' || item.status === 'available'
+    item.status === 'in-store' || item.status === 'available'
   );
 
   return (
@@ -274,12 +276,12 @@ function ContractCreationWizard() {
                             <Label htmlFor={item.itemId} className="flex-1 cursor-pointer">
                               <div className="flex justify-between items-center">
                                 <div>
-                                  <span className="font-medium">{item.name}</span>
+                                  <span className="font-medium">{item.title || 'Sin título'}</span>
                                   <span className="text-sm text-muted-foreground ml-2">
-                                    {item.brand} - {item.category}
+                                    {item.brand || 'N/A'} - {item.model || 'N/A'}
                                   </span>
                                 </div>
-                                <span className="font-medium">${item.currentPrice.toFixed(2)}</span>
+                                <span className="font-medium">${Number(item.minSalesPrice || 0).toFixed(2)}</span>
                               </div>
                             </Label>
                           </div>
