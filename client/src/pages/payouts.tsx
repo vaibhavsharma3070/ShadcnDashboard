@@ -145,13 +145,13 @@ function formatDateTime(dateString: string) {
 function getStatusBadge(status: string) {
   switch (status) {
     case 'ready':
-      return <Badge variant="secondary" className="bg-green-100 text-green-800">Ready for Payout</Badge>;
+      return <Badge variant="secondary" className="bg-green-100 text-green-800">Listo para Pago</Badge>;
     case 'pending':
-      return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+      return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Pendiente</Badge>;
     case 'paid':
-      return <Badge variant="default" className="bg-blue-100 text-blue-800">Paid</Badge>;
+      return <Badge variant="default" className="bg-blue-100 text-blue-800">Pagado</Badge>;
     case 'partial':
-      return <Badge variant="outline" className="bg-gray-100 text-gray-800">Partial Payment</Badge>;
+      return <Badge variant="outline" className="bg-gray-100 text-gray-800">Pago Parcial</Badge>;
     default:
       return <Badge variant="outline">{status}</Badge>;
   }

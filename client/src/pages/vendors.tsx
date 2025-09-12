@@ -327,26 +327,26 @@ export default function Vendors() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold">{formatCurrencyRangeAbbreviated(totalValueRange.min, totalValueRange.max)}</div>
             <p className="text-xs text-muted-foreground">
-              Combined inventory value
+              Valor combinado del inventario
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Payouts</CardTitle>
+            <CardTitle className="text-sm font-medium">Pagos Pendientes</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold">{formatCurrencyRangeAbbreviated(totalPendingPayoutsRange.min, totalPendingPayoutsRange.max)}</div>
             <p className="text-xs text-muted-foreground">
-              Awaiting payment
+              Esperando pago
             </p>
           </CardContent>
         </Card>
@@ -357,7 +357,7 @@ export default function Vendors() {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Search vendors by name, email, or phone..."
+            placeholder="Buscar consignadores por nombre, email o teléfono..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -368,12 +368,12 @@ export default function Vendors() {
           <DialogTrigger asChild>
             <Button className="hidden sm:flex" data-testid="button-add-vendor">
               <Plus className="h-4 w-4 mr-2" />
-              Add Vendor
+              Agregar Consignador
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Add New Vendor</DialogTitle>
+              <DialogTitle>Agregar Nuevo Consignador</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -382,9 +382,9 @@ export default function Vendors() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Name</FormLabel>
+                      <FormLabel>Nombre</FormLabel>
                       <FormControl>
-                        <Input placeholder="Vendor name" {...field} />
+                        <Input placeholder="Nombre del consignador" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -396,7 +396,7 @@ export default function Vendors() {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone</FormLabel>
+                      <FormLabel>Teléfono</FormLabel>
                       <FormControl>
                         <Input placeholder="Phone number" {...field} />
                       </FormControl>

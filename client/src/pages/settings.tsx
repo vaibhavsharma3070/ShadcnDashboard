@@ -33,15 +33,15 @@ import {
 } from "lucide-react";
 
 const brandFormSchema = insertBrandSchema.extend({
-  name: z.string().min(1, "Brand name is required"),
+  name: z.string().min(1, "El nombre de la marca es requerido"),
 });
 
 const categoryFormSchema = insertCategorySchema.extend({
-  name: z.string().min(1, "Category name is required"),
+  name: z.string().min(1, "El nombre de la categoría es requerido"),
 });
 
 const paymentMethodFormSchema = insertPaymentMethodSchema.extend({
-  name: z.string().min(1, "Payment method name is required"),
+  name: z.string().min(1, "El nombre del método de pago es requerido"),
 });
 
 type BrandFormData = z.infer<typeof brandFormSchema>;
@@ -76,11 +76,11 @@ function BrandManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/brands'] });
       setIsCreateDialogOpen(false);
-      toast({ title: "Brand created successfully" });
+      toast({ title: "Marca creada exitosamente" });
     },
     onError: (error: any) => {
       toast({ 
-        title: "Error creating brand", 
+        title: "Error al crear la marca", 
         description: error.message,
         variant: "destructive" 
       });
@@ -93,11 +93,11 @@ function BrandManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/brands'] });
       setEditingBrand(null);
-      toast({ title: "Brand updated successfully" });
+      toast({ title: "Marca actualizada exitosamente" });
     },
     onError: (error: any) => {
       toast({ 
-        title: "Error updating brand", 
+        title: "Error al actualizar la marca", 
         description: error.message,
         variant: "destructive" 
       });
