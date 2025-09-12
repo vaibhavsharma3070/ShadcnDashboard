@@ -11,6 +11,7 @@ import Vendors from "@/pages/vendors";
 import VendorDetails from "@/pages/vendor-details";
 import Clients from "@/pages/clients";
 import ClientDetails from "@/pages/client-details";
+import Contracts from "@/pages/contracts";
 import Payments from "@/pages/payments";
 import Payouts from "@/pages/payouts";
 import Expenses from "@/pages/expenses";

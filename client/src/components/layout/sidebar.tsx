@@ -13,6 +13,7 @@ import {
   Gem,
   Settings,
   User,
+  FileText,
 } from "lucide-react";
 
 const navigation = [
