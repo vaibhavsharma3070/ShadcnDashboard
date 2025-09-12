@@ -242,6 +242,24 @@ export default function Vendors() {
     max: acc.max + v.pendingPayouts.max
   }), { min: 0, max: 0 });
 
+  // Calculate active vendors with active listings stats
+  const vendorsWithActiveItems = vendorsWithStats.filter(v => v.activeItems > 0);
+  const activeItemsList = items?.filter(item => 
+    item.status === 'in-store' || item.status === 'reserved'
+  ) || [];
+  
+  const activeVendorsStats = {
+    qtyVendors: vendorsWithActiveItems.length,
+    costRange: activeItemsList.reduce((acc, item) => ({
+      min: acc.min + Number(item.minCost || 0),
+      max: acc.max + Number(item.maxCost || item.minCost || 0)
+    }), { min: 0, max: 0 }),
+    marketValueRange: activeItemsList.reduce((acc, item) => ({
+      min: acc.min + Number(item.minSalesPrice || 0),
+      max: acc.max + Number(item.maxSalesPrice || item.minSalesPrice || 0)
+    }), { min: 0, max: 0 })
+  };
+
   // Calculate Luxette vendor active listings data
   const luxetteVendor = vendorsWithStats.find(v => v.name?.toLowerCase().includes('luxette'));
   const luxetteActiveItems = items?.filter(item => 
@@ -264,13 +282,16 @@ export default function Vendors() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Vendors</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Vendors</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalVendors}</div>
+            <div className="text-xl font-bold">{activeVendorsStats.qtyVendors} Vendors</div>
+            <div className="text-sm font-medium text-muted-foreground mb-1">
+              Cost: {formatCurrencyRangeAbbreviated(activeVendorsStats.costRange.min, activeVendorsStats.costRange.max)}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Registered vendors
+              Value: {formatCurrencyRangeAbbreviated(activeVendorsStats.marketValueRange.min, activeVendorsStats.marketValueRange.max)}
             </p>
           </CardContent>
         </Card>
