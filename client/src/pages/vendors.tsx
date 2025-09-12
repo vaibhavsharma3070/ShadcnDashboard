@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
@@ -34,7 +35,8 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  MoreVertical
+  MoreVertical,
+  Building2
 } from "lucide-react";
 
 const vendorFormSchema = insertVendorSchema.extend({
@@ -155,7 +157,10 @@ export default function Vendors() {
       name: "",
       phone: "",
       email: "",
-      taxId: ""
+      taxId: "",
+      bankAccountNumber: "",
+      bankName: "",
+      accountType: undefined
     },
   });
 
@@ -367,6 +372,56 @@ export default function Vendors() {
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="bankAccountNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bank Account Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Account number" {...field} value={field.value || ""} data-testid="input-bank-account-number" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="bankName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bank Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Bank name" {...field} value={field.value || ""} data-testid="input-bank-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="accountType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} data-testid="select-account-type">
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select account type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Ahorros">Ahorros</SelectItem>
+                          <SelectItem value="Corriente">Corriente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
                     Cancel
@@ -446,6 +501,17 @@ export default function Vendors() {
                             <Phone className="h-3 w-3 flex-shrink-0" />
                             <span>{vendor.phone}</span>
                           </div>
+                          {vendor.bankName && (
+                            <div className="flex items-center space-x-1">
+                              <Building2 className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{vendor.bankName}</span>
+                              {vendor.accountType && (
+                                <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                  {vendor.accountType}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

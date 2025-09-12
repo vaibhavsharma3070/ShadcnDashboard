@@ -9,6 +9,9 @@ export const vendor = pgTable("vendor", {
   phone: text("phone"),
   email: text("email"),
   taxId: text("tax_id"),
+  bankAccountNumber: text("bank_account_number"),
+  bankName: text("bank_name"),
+  accountType: text("account_type"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   emailIdx: index("idx_vendor_email").on(table.email),
@@ -259,6 +262,8 @@ export const installmentPlanRelations = relations(installmentPlan, ({ one }) => 
 export const insertVendorSchema = createInsertSchema(vendor).omit({
   vendorId: true,
   createdAt: true,
+}).extend({
+  accountType: z.enum(["Ahorros", "Corriente"]).optional(),
 });
 
 export const insertClientSchema = createInsertSchema(client).omit({
