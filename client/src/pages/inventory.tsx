@@ -1179,7 +1179,7 @@ export default function Inventory() {
                         {item.imageUrl ? (
                           <img 
                             src={item.imageUrl} 
-                            alt={item.title} 
+                            alt={item.title || ""} 
                             className="w-full h-full object-cover"
                           />
                         ) : (
