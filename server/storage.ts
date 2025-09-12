@@ -183,6 +183,13 @@ export interface IStorage {
     itemsUpdated: number;
     skippedItems: number;
   }>;
+
+  // Luxette vendor inventory methods
+  getLuxetteInventoryData(): Promise<{
+    itemCount: number;
+    totalCost: number;
+    priceRange: { min: number; max: number };
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1347,6 +1354,67 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       return false;
     }
+  }
+
+  async getLuxetteInventoryData(): Promise<{
+    itemCount: number;
+    totalCost: number;
+    priceRange: { min: number; max: number };
+  }> {
+    // Get all items from the Luxette vendor
+    const luxetteItems = await db
+      .select({
+        minCost: item.minCost,
+        maxCost: item.maxCost,
+        minSalesPrice: item.minSalesPrice,
+        maxSalesPrice: item.maxSalesPrice,
+        status: item.status
+      })
+      .from(item)
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .where(
+        and(
+          sql`LOWER(${vendor.name}) LIKE '%luxette%'`,
+          sql`${item.status} IN ('in-store', 'reserved')`
+        )
+      );
+
+    const itemCount = luxetteItems.length;
+
+    // Calculate total cost using minCost where available
+    const totalCost = luxetteItems.reduce((sum, item) => {
+      const cost = parseFloat(item.minCost || '0');
+      return sum + cost;
+    }, 0);
+
+    // Calculate price range using sales prices
+    let minPrice = Infinity;
+    let maxPrice = -Infinity;
+
+    luxetteItems.forEach(item => {
+      const itemMinPrice = parseFloat(item.minSalesPrice || '0');
+      const itemMaxPrice = parseFloat(item.maxSalesPrice || '0');
+      
+      if (itemMinPrice > 0) {
+        minPrice = Math.min(minPrice, itemMinPrice);
+      }
+      if (itemMaxPrice > 0) {
+        maxPrice = Math.max(maxPrice, itemMaxPrice);
+      }
+    });
+
+    // If no valid prices found, set to 0
+    if (minPrice === Infinity) minPrice = 0;
+    if (maxPrice === -Infinity) maxPrice = 0;
+
+    return {
+      itemCount,
+      totalCost: Math.round(totalCost * 100) / 100, // Round to 2 decimal places
+      priceRange: {
+        min: Math.round(minPrice * 100) / 100,
+        max: Math.round(maxPrice * 100) / 100
+      }
+    };
   }
 }
 

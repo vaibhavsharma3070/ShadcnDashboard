@@ -87,6 +87,12 @@ interface PaymentMetrics {
   monthlyPaymentTrend: number;
 }
 
+interface LuxetteInventoryData {
+  itemCount: number;
+  totalCost: number;
+  priceRange: { min: number; max: number };
+}
+
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -180,6 +186,11 @@ export default function Dashboard() {
       queryKey: ["/api/payments/metrics"],
     });
 
+  const { data: luxetteInventory, isLoading: luxetteLoading } =
+    useQuery<LuxetteInventoryData>({
+      queryKey: ["/api/dashboard/luxette-inventory"],
+    });
+
   // Pagination logic for items
   const totalPages = Math.ceil((recentItems?.length || 0) / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -218,7 +229,7 @@ export default function Dashboard() {
       subtitle="Welcome back, here's what's happening today!"
     >
       {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <Card className="hover-lift">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -324,6 +335,43 @@ export default function Dashboard() {
               </div>
               <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
                 <TrendingUp className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Luxette Inventory Card */}
+        <Card className="hover-lift" data-testid="card-luxette-inventory">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Inventario Luxette
+                </p>
+                {luxetteLoading ? (
+                  <div className="space-y-2 mt-2">
+                    <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <p className="text-2xl font-bold text-foreground" data-testid="text-luxette-item-count">
+                      {luxetteInventory?.itemCount || 0} items
+                    </p>
+                    <p className="text-sm text-blue-600 mt-1" data-testid="text-luxette-total-cost">
+                      Costo Total: {formatCurrency(luxetteInventory?.totalCost || 0)}
+                    </p>
+                    <p className="text-sm text-green-600 mt-1" data-testid="text-luxette-price-range">
+                      Rango: {luxetteInventory?.priceRange ? 
+                        `${formatCurrency(luxetteInventory.priceRange.min)} - ${formatCurrency(luxetteInventory.priceRange.max)}` : 
+                        formatCurrency(0)}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+                <Package className="h-6 w-6 text-indigo-600" />
               </div>
             </div>
           </CardContent>

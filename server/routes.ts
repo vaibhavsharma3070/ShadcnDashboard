@@ -63,6 +63,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dashboard/luxette-inventory", async (req, res) => {
+    try {
+      const luxetteData = await storage.getLuxetteInventoryData();
+      res.json(luxetteData);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch Luxette inventory data" });
+    }
+  });
+
   // Vendor routes
   app.get("/api/vendors", async (req, res) => {
     try {
