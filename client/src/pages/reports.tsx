@@ -67,13 +67,13 @@ interface OverviewMetrics {
 }
 
 interface GroupPerformance {
-  id: string;
-  name: string;
+  groupId: string;
+  groupName: string;
   revenue: number;
   profit: number;
-  itemCount: number;
-  profitMargin: number;
-  change: number;
+  itemsSold: number;
+  profitMargin?: number;
+  change?: number;
 }
 
 interface ItemProfitability {
@@ -86,8 +86,11 @@ interface ItemProfitability {
   cost: number;
   profit: number;
   margin: number;
+  profitMargin?: number;
   soldDate?: string;
   daysToSell?: number;
+  status?: string;
+  acquisitionDate?: string;
 }
 
 interface InventoryHealthMetrics {
@@ -1465,10 +1468,10 @@ export default function Reports() {
                             sortConfig.groupType === 'vendor' ? sortConfig.key : 'revenue', 
                             sortConfig.groupType === 'vendor' ? sortConfig.direction : 'desc'
                           ).slice(0, 10).map((vendor, index) => (
-                            <TableRow key={vendor?.id || `vendor-${index}`} className="hover:bg-muted/50" data-testid={`row-vendor-${vendor?.id || index}`}>
+                            <TableRow key={vendor?.groupId || `vendor-${index}`} className="hover:bg-muted/50" data-testid={`row-vendor-${vendor?.groupId || index}`}>
                               <TableCell>
                                 <div>
-                                  <p className="font-medium">{vendor.name}</p>
+                                  <p className="font-medium">{vendor.groupName}</p>
                                   <p className="text-sm text-muted-foreground">{vendor.itemCount} items</p>
                                 </div>
                               </TableCell>
@@ -1527,7 +1530,7 @@ export default function Reports() {
                               performanceView, 
                               'desc'
                             ).slice(0, 10).map(vendor => ({
-                              name: vendor.name.length > 15 ? vendor.name.substring(0, 15) + '...' : vendor.name,
+                              name: (vendor.groupName || '').length > 15 ? (vendor.groupName || '').substring(0, 15) + '...' : (vendor.groupName || ''),
                               value: performanceView === 'revenue' ? vendor.revenue : vendor.profit,
                               margin: vendor.profitMargin || 0
                             }))}
@@ -1694,10 +1697,10 @@ export default function Reports() {
                             sortConfig.groupType === 'brand' ? sortConfig.key : 'revenue', 
                             sortConfig.groupType === 'brand' ? sortConfig.direction : 'desc'
                           ).slice(0, 10).map((brand, index) => (
-                            <TableRow key={brand?.id || `brand-${index}`} className="hover:bg-muted/50" data-testid={`row-brand-${brand?.id || index}`}>
+                            <TableRow key={brand?.groupId || `brand-${index}`} className="hover:bg-muted/50" data-testid={`row-brand-${brand?.groupId || index}`}>
                               <TableCell>
                                 <div>
-                                  <p className="font-medium">{brand.name}</p>
+                                  <p className="font-medium">{brand.groupName}</p>
                                   <p className="text-sm text-muted-foreground">{brand.itemCount} items</p>
                                 </div>
                               </TableCell>
@@ -1756,7 +1759,7 @@ export default function Reports() {
                               performanceView, 
                               'desc'
                             ).slice(0, 10).map(brand => ({
-                              name: brand.name.length > 15 ? brand.name.substring(0, 15) + '...' : brand.name,
+                              name: (brand.groupName || '').length > 15 ? (brand.groupName || '').substring(0, 15) + '...' : (brand.groupName || ''),
                               value: performanceView === 'revenue' ? brand.revenue : brand.profit,
                               margin: brand.profitMargin || 0
                             }))}
@@ -1812,9 +1815,9 @@ export default function Reports() {
                 ) : (
                   <div className="space-y-3">
                     {sortPerformanceData(categoryPerformance || [], 'revenue', 'desc').map((category, index) => (
-                      <div key={category?.id || `category-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50" data-testid={`row-category-${category?.id || index}`}>
+                      <div key={category?.groupId || `category-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50" data-testid={`row-category-${category?.groupId || index}`}>
                         <div className="flex-1">
-                          <p className="font-medium">{category.name}</p>
+                          <p className="font-medium">{category.groupName}</p>
                           <p className="text-sm text-muted-foreground">
                             {category.itemCount} items • {((category.profitMargin || 0) * 100).toFixed(1)}% margin
                           </p>
@@ -1858,9 +1861,9 @@ export default function Reports() {
                 ) : (
                   <div className="space-y-3">
                     {sortPerformanceData(clientPerformance || [], 'revenue', 'desc').map((client, index) => (
-                      <div key={client?.id || `client-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50" data-testid={`row-client-${client?.id || index}`}>
+                      <div key={client?.groupId || `client-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50" data-testid={`row-client-${client?.groupId || index}`}>
                         <div className="flex-1">
-                          <p className="font-medium">{client.name}</p>
+                          <p className="font-medium">{client.groupName}</p>
                           <p className="text-sm text-muted-foreground">
                             {client.itemCount} purchases
                           </p>
