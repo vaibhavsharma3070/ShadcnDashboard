@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertItemSchema, insertClientPaymentSchema, insertItemExpenseSchema, insertInstallmentPlanSchema, type Item, type Vendor, type Client, type ClientPayment, type ItemExpense, type InstallmentPlan } from "@shared/schema";
+import { insertItemSchema, insertClientPaymentSchema, insertItemExpenseSchema, insertInstallmentPlanSchema, type Item, type Vendor, type Client, type ClientPayment, type ItemExpense, type InstallmentPlan, type Brand, type Category } from "@shared/schema";
 import { StatusUpdateDropdown } from "@/components/status-update-dropdown";
 import { ImageUploader } from "@/components/ImageUploader";
 import { z } from "zod";
@@ -51,7 +51,8 @@ type ExpenseWithItem = ItemExpense & { item: Item };
 const itemFormSchema = insertItemSchema.extend({
   vendorId: z.string().min(1, "Vendor is required"),
   title: z.string().min(1, "Title is required"),
-  brand: z.string().min(1, "Brand is required"),
+  brandId: z.string().min(1, "Brand is required"),
+  categoryId: z.string().optional(),
   model: z.string().min(1, "Model is required"),
   minCost: z.string().optional(),
   maxCost: z.string().optional(),
@@ -169,6 +170,14 @@ export default function ItemDetails() {
 
   const { data: vendors, isLoading: vendorsLoading } = useQuery<Vendor[]>({
     queryKey: ['/api/vendors'],
+  });
+
+  const { data: brands, isLoading: brandsLoading } = useQuery<Brand[]>({
+    queryKey: ['/api/brands'],
+  });
+
+  const { data: categories, isLoading: categoriesLoading } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
   });
 
   const { data: clients, isLoading: clientsLoading } = useQuery<Client[]>({
@@ -388,7 +397,8 @@ export default function ItemDetails() {
     defaultValues: {
       vendorId: "",
       title: "",
-      brand: "",
+      brandId: "",
+      categoryId: "",
       model: "",
       serialNo: "",
       condition: "",
@@ -439,7 +449,8 @@ export default function ItemDetails() {
       editForm.reset({
         vendorId: item.vendorId,
         title: item.title || "",
-        brand: item.brand || "",
+        brandId: item.brandId || "",
+        categoryId: item.categoryId || "",
         model: item.model || "",
         serialNo: item.serialNo || "",
         condition: item.condition || "",
@@ -455,6 +466,11 @@ export default function ItemDetails() {
   };
 
   const onEditSubmit = (data: ItemFormData) => {
+    console.log("🔍 [DEBUG] onEditSubmit - Form submitted with data:", data);
+    console.log("🔍 [DEBUG] onEditSubmit - Form validation errors:", editForm.formState.errors);
+    console.log("🔍 [DEBUG] onEditSubmit - Form is valid:", editForm.formState.isValid);
+    console.log("🔍 [DEBUG] onEditSubmit - About to call updateItemMutation.mutate");
+    
     updateItemMutation.mutate(data);
   };
 
@@ -679,13 +695,49 @@ export default function ItemDetails() {
 
                     <FormField
                       control={editForm.control}
-                      name="brand"
+                      name="brandId"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Brand</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Brand name" {...field} />
-                          </FormControl>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select brand" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {brands?.map((brand) => (
+                                <SelectItem key={brand.brandId} value={brand.brandId}>
+                                  {brand.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="categoryId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || undefined}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select category" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {categories?.map((category) => (
+                                <SelectItem key={category.categoryId} value={category.categoryId}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
