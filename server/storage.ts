@@ -202,6 +202,119 @@ export interface IStorage {
     totalCost: number;
     priceRange: { min: number; max: number };
   }>;
+
+  // Business Intelligence data aggregation methods
+  getReportKPIs(startDate: string, endDate: string, filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+    itemStatuses?: string[];
+  }): Promise<{
+    revenue: number;
+    cogs: number;
+    grossProfit: number;
+    grossMargin: number;
+    itemsSold: number;
+    averageOrderValue: number;
+    totalExpenses: number;
+    netProfit: number;
+    netMargin: number;
+    paymentCount: number;
+    uniqueClients: number;
+    averageDaysToSell: number;
+    inventoryTurnover: number;
+  }>;
+
+  getTimeSeries(metric: 'revenue' | 'profit' | 'itemsSold' | 'payments', granularity: 'day' | 'week' | 'month', startDate: string, endDate: string, filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+    itemStatuses?: string[];
+  }): Promise<Array<{
+    period: string;
+    value: number;
+    count?: number;
+  }>>;
+
+  getGroupedMetrics(groupBy: 'brand' | 'vendor' | 'client' | 'category', metrics: Array<'revenue' | 'profit' | 'itemsSold' | 'avgOrderValue'>, startDate: string, endDate: string, filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+    itemStatuses?: string[];
+  }): Promise<Array<{
+    groupId: string;
+    groupName: string;
+    revenue?: number;
+    profit?: number;
+    itemsSold?: number;
+    avgOrderValue?: number;
+  }>>;
+
+  getItemProfitability(startDate: string, endDate: string, filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+    itemStatuses?: string[];
+  }, limit?: number, offset?: number): Promise<{
+    items: Array<{
+      itemId: string;
+      title: string;
+      brand: string;
+      model: string;
+      vendor: string;
+      revenue: number;
+      cost: number;
+      profit: number;
+      margin: number;
+      soldDate?: string;
+      daysToSell?: number;
+    }>;
+    totalCount: number;
+  }>;
+
+  getInventoryHealth(filters?: {
+    vendorIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+  }): Promise<{
+    totalItems: number;
+    inStoreItems: number;
+    reservedItems: number;
+    soldItems: number;
+    partialPaidItems: number;
+    totalValue: number;
+    avgDaysInInventory: number;
+    categoriesBreakdown: Array<{
+      categoryId: string;
+      categoryName: string;
+      itemCount: number;
+      totalValue: number;
+      avgAge: number;
+    }>;
+    agingAnalysis: {
+      under30Days: number;
+      days30To90: number;
+      days90To180: number;
+      over180Days: number;
+    };
+  }>;
+
+  getPaymentMethodBreakdown(startDate: string, endDate: string, filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+  }): Promise<Array<{
+    paymentMethod: string;
+    totalAmount: number;
+    transactionCount: number;
+    percentage: number;
+    avgTransactionAmount: number;
+  }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1527,6 +1640,836 @@ export class DatabaseStorage implements IStorage {
         max: Math.round(maxPrice * 100) / 100
       }
     };
+  }
+
+  // Business Intelligence data aggregation methods
+  async getReportKPIs(startDate: string, endDate: string, filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+    itemStatuses?: string[];
+  }): Promise<{
+    revenue: number;
+    cogs: number;
+    grossProfit: number;
+    grossMargin: number;
+    itemsSold: number;
+    averageOrderValue: number;
+    totalExpenses: number;
+    netProfit: number;
+    netMargin: number;
+    paymentCount: number;
+    uniqueClients: number;
+    averageDaysToSell: number;
+    inventoryTurnover: number;
+  }> {
+    // Build where conditions based on filters
+    const buildWhereConditions = () => {
+      const conditions = [
+        sql`${clientPayment.paidAt} >= ${startDate}`,
+        sql`${clientPayment.paidAt} <= ${endDate}`
+      ];
+      
+      if (filters?.vendorIds?.length) {
+        conditions.push(inArray(vendor.vendorId, filters.vendorIds));
+      }
+      if (filters?.clientIds?.length) {
+        conditions.push(inArray(client.clientId, filters.clientIds));
+      }
+      if (filters?.brandIds?.length) {
+        conditions.push(inArray(item.brandId, filters.brandIds));
+      }
+      if (filters?.categoryIds?.length) {
+        conditions.push(inArray(item.categoryId, filters.categoryIds));
+      }
+      if (filters?.itemStatuses?.length) {
+        conditions.push(inArray(item.status, filters.itemStatuses));
+      }
+      
+      return and(...conditions);
+    };
+
+    // Get revenue and payment data
+    const [revenueData] = await db
+      .select({
+        totalRevenue: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+        paymentCount: sql<number>`COUNT(${clientPayment.paymentId})`,
+        uniqueClients: sql<number>`COUNT(DISTINCT ${clientPayment.clientId})`,
+        uniqueItems: sql<number>`COUNT(DISTINCT ${clientPayment.itemId})`
+      })
+      .from(clientPayment)
+      .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(buildWhereConditions());
+
+    // Get COGS (Cost of Goods Sold) based on items that had payments
+    const soldItemsData = await db
+      .selectDistinct({
+        itemId: clientPayment.itemId,
+        minCost: item.minCost,
+        maxCost: item.maxCost
+      })
+      .from(clientPayment)
+      .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(buildWhereConditions());
+
+    const cogs = soldItemsData.reduce((sum, item) => {
+      const cost = Number(item.maxCost || item.minCost || 0);
+      return sum + cost;
+    }, 0);
+
+    // Get expenses for sold items
+    const soldItemIds = soldItemsData.map(item => item.itemId);
+    let totalExpenses = 0;
+    
+    if (soldItemIds.length > 0) {
+      const [expenseData] = await db
+        .select({
+          totalExpenses: sql<number>`COALESCE(SUM(${itemExpense.amount}), 0)`
+        })
+        .from(itemExpense)
+        .where(
+          and(
+            inArray(itemExpense.itemId, soldItemIds),
+            sql`${itemExpense.incurredAt} >= ${startDate}`,
+            sql`${itemExpense.incurredAt} <= ${endDate}`
+          )
+        );
+      totalExpenses = Number(expenseData.totalExpenses || 0);
+    }
+
+    // Get average days to sell
+    const soldItemsWithDates = await db
+      .select({
+        itemId: item.itemId,
+        acquisitionDate: item.acquisitionDate,
+        firstPaymentDate: sql<string>`MIN(${clientPayment.paidAt})`
+      })
+      .from(item)
+      .innerJoin(clientPayment, eq(item.itemId, clientPayment.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(buildWhereConditions())
+      .groupBy(item.itemId, item.acquisitionDate);
+
+    const averageDaysToSell = soldItemsWithDates.length > 0 ? 
+      soldItemsWithDates.reduce((sum, item) => {
+        if (item.acquisitionDate && item.firstPaymentDate) {
+          const acquisitionDate = new Date(item.acquisitionDate);
+          const soldDate = new Date(item.firstPaymentDate);
+          const days = Math.max(0, Math.floor((soldDate.getTime() - acquisitionDate.getTime()) / (1000 * 60 * 60 * 24)));
+          return sum + days;
+        }
+        return sum;
+      }, 0) / soldItemsWithDates.length : 0;
+
+    // Calculate KPIs
+    const revenue = Number(revenueData.totalRevenue || 0);
+    const itemsSold = Number(revenueData.uniqueItems || 0);
+    const paymentCount = Number(revenueData.paymentCount || 0);
+    const uniqueClients = Number(revenueData.uniqueClients || 0);
+    
+    const grossProfit = revenue - cogs;
+    const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+    const netProfit = grossProfit - totalExpenses;
+    const netMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+    const averageOrderValue = paymentCount > 0 ? revenue / paymentCount : 0;
+    
+    // Simple inventory turnover approximation (revenue / average inventory value)
+    const averageInventoryValue = cogs / (itemsSold || 1);
+    const inventoryTurnover = averageInventoryValue > 0 ? revenue / averageInventoryValue : 0;
+
+    return {
+      revenue: Math.round(revenue * 100) / 100,
+      cogs: Math.round(cogs * 100) / 100,
+      grossProfit: Math.round(grossProfit * 100) / 100,
+      grossMargin: Math.round(grossMargin * 100) / 100,
+      itemsSold,
+      averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+      totalExpenses: Math.round(totalExpenses * 100) / 100,
+      netProfit: Math.round(netProfit * 100) / 100,
+      netMargin: Math.round(netMargin * 100) / 100,
+      paymentCount,
+      uniqueClients,
+      averageDaysToSell: Math.round(averageDaysToSell * 10) / 10,
+      inventoryTurnover: Math.round(inventoryTurnover * 100) / 100
+    };
+  }
+
+  async getTimeSeries(metric: 'revenue' | 'profit' | 'itemsSold' | 'payments', granularity: 'day' | 'week' | 'month', startDate: string, endDate: string, filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+    itemStatuses?: string[];
+  }): Promise<Array<{
+    period: string;
+    value: number;
+    count?: number;
+  }>> {
+    // Build where conditions based on filters
+    const buildWhereConditions = () => {
+      const conditions = [
+        sql`${clientPayment.paidAt} >= ${startDate}`,
+        sql`${clientPayment.paidAt} <= ${endDate}`
+      ];
+      
+      if (filters?.vendorIds?.length) {
+        conditions.push(inArray(vendor.vendorId, filters.vendorIds));
+      }
+      if (filters?.clientIds?.length) {
+        conditions.push(inArray(client.clientId, filters.clientIds));
+      }
+      if (filters?.brandIds?.length) {
+        conditions.push(inArray(item.brandId, filters.brandIds));
+      }
+      if (filters?.categoryIds?.length) {
+        conditions.push(inArray(item.categoryId, filters.categoryIds));
+      }
+      if (filters?.itemStatuses?.length) {
+        conditions.push(inArray(item.status, filters.itemStatuses));
+      }
+      
+      return and(...conditions);
+    };
+
+    // Date truncation based on granularity
+    const dateTrunc = {
+      day: sql`DATE(${clientPayment.paidAt})`,
+      week: sql`DATE_TRUNC('week', ${clientPayment.paidAt})`,
+      month: sql`DATE_TRUNC('month', ${clientPayment.paidAt})`
+    }[granularity];
+
+    if (metric === 'revenue') {
+      const results = await db
+        .select({
+          period: dateTrunc,
+          value: sql<number>`SUM(${clientPayment.amount})`,
+          count: sql<number>`COUNT(${clientPayment.paymentId})`
+        })
+        .from(clientPayment)
+        .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+        .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+        .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+        .leftJoin(brand, eq(item.brandId, brand.brandId))
+        .leftJoin(category, eq(item.categoryId, category.categoryId))
+        .where(buildWhereConditions())
+        .groupBy(dateTrunc)
+        .orderBy(dateTrunc);
+
+      return results.map(row => ({
+        period: row.period.toString(),
+        value: Number(row.value || 0),
+        count: Number(row.count || 0)
+      }));
+    }
+
+    if (metric === 'payments') {
+      const results = await db
+        .select({
+          period: dateTrunc,
+          value: sql<number>`COUNT(${clientPayment.paymentId})`,
+          count: sql<number>`COUNT(DISTINCT ${clientPayment.clientId})`
+        })
+        .from(clientPayment)
+        .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+        .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+        .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+        .leftJoin(brand, eq(item.brandId, brand.brandId))
+        .leftJoin(category, eq(item.categoryId, category.categoryId))
+        .where(buildWhereConditions())
+        .groupBy(dateTrunc)
+        .orderBy(dateTrunc);
+
+      return results.map(row => ({
+        period: row.period.toString(),
+        value: Number(row.value || 0),
+        count: Number(row.count || 0) // unique clients
+      }));
+    }
+
+    if (metric === 'itemsSold') {
+      const results = await db
+        .select({
+          period: dateTrunc,
+          value: sql<number>`COUNT(DISTINCT ${clientPayment.itemId})`,
+          count: sql<number>`COUNT(${clientPayment.paymentId})`
+        })
+        .from(clientPayment)
+        .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+        .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+        .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+        .leftJoin(brand, eq(item.brandId, brand.brandId))
+        .leftJoin(category, eq(item.categoryId, category.categoryId))
+        .where(buildWhereConditions())
+        .groupBy(dateTrunc)
+        .orderBy(dateTrunc);
+
+      return results.map(row => ({
+        period: row.period.toString(),
+        value: Number(row.value || 0),
+        count: Number(row.count || 0) // payment count
+      }));
+    }
+
+    if (metric === 'profit') {
+      // For profit, we need to get revenue and subtract costs and expenses
+      const revenueResults = await db
+        .select({
+          period: dateTrunc,
+          revenue: sql<number>`SUM(${clientPayment.amount})`,
+          itemIds: sql<string[]>`ARRAY_AGG(DISTINCT ${clientPayment.itemId})`
+        })
+        .from(clientPayment)
+        .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+        .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+        .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+        .leftJoin(brand, eq(item.brandId, brand.brandId))
+        .leftJoin(category, eq(item.categoryId, category.categoryId))
+        .where(buildWhereConditions())
+        .groupBy(dateTrunc)
+        .orderBy(dateTrunc);
+
+      const results = [];
+      for (const row of revenueResults) {
+        let profit = Number(row.revenue || 0);
+        
+        // Subtract costs for items sold in this period
+        if (row.itemIds && row.itemIds.length > 0) {
+          const itemCosts = await db
+            .select({
+              totalCost: sql<number>`SUM(COALESCE(${item.maxCost}, ${item.minCost}, 0))`
+            })
+            .from(item)
+            .where(inArray(item.itemId, row.itemIds));
+          
+          profit -= Number(itemCosts[0]?.totalCost || 0);
+
+          // Subtract expenses for items sold in this period
+          const itemExpenses = await db
+            .select({
+              totalExpenses: sql<number>`SUM(${itemExpense.amount})`
+            })
+            .from(itemExpense)
+            .where(inArray(itemExpense.itemId, row.itemIds));
+          
+          profit -= Number(itemExpenses[0]?.totalExpenses || 0);
+        }
+
+        results.push({
+          period: row.period.toString(),
+          value: Math.round(profit * 100) / 100,
+          count: row.itemIds?.length || 0
+        });
+      }
+
+      return results;
+    }
+
+    return [];
+  }
+
+  async getGroupedMetrics(groupBy: 'brand' | 'vendor' | 'client' | 'category', metrics: Array<'revenue' | 'profit' | 'itemsSold' | 'avgOrderValue'>, startDate: string, endDate: string, filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+    itemStatuses?: string[];
+  }): Promise<Array<{
+    groupId: string;
+    groupName: string;
+    revenue?: number;
+    profit?: number;
+    itemsSold?: number;
+    avgOrderValue?: number;
+  }>> {
+    // Build where conditions based on filters
+    const buildWhereConditions = () => {
+      const conditions = [
+        sql`${clientPayment.paidAt} >= ${startDate}`,
+        sql`${clientPayment.paidAt} <= ${endDate}`
+      ];
+      
+      if (filters?.vendorIds?.length) {
+        conditions.push(inArray(vendor.vendorId, filters.vendorIds));
+      }
+      if (filters?.clientIds?.length) {
+        conditions.push(inArray(client.clientId, filters.clientIds));
+      }
+      if (filters?.brandIds?.length) {
+        conditions.push(inArray(item.brandId, filters.brandIds));
+      }
+      if (filters?.categoryIds?.length) {
+        conditions.push(inArray(item.categoryId, filters.categoryIds));
+      }
+      if (filters?.itemStatuses?.length) {
+        conditions.push(inArray(item.status, filters.itemStatuses));
+      }
+      
+      return and(...conditions);
+    };
+
+    // Select appropriate grouping fields
+    const getGroupFields = () => {
+      switch (groupBy) {
+        case 'brand':
+          return {
+            groupId: sql<string>`COALESCE(${brand.brandId}, 'unknown')`,
+            groupName: sql<string>`COALESCE(${brand.name}, ${item.brand}, 'Unknown Brand')`
+          };
+        case 'vendor':
+          return {
+            groupId: vendor.vendorId,
+            groupName: sql<string>`COALESCE(${vendor.name}, 'Unknown Vendor')`
+          };
+        case 'client':
+          return {
+            groupId: client.clientId,
+            groupName: sql<string>`COALESCE(${client.name}, 'Unknown Client')`
+          };
+        case 'category':
+          return {
+            groupId: sql<string>`COALESCE(${category.categoryId}, 'unknown')`,
+            groupName: sql<string>`COALESCE(${category.name}, 'Unknown Category')`
+          };
+        default:
+          throw new Error(`Invalid groupBy: ${groupBy}`);
+      }
+    };
+
+    const groupFields = getGroupFields();
+    
+    // Build select fields based on requested metrics
+    const selectFields: any = {
+      groupId: groupFields.groupId,
+      groupName: groupFields.groupName
+    };
+
+    if (metrics.includes('revenue')) {
+      selectFields.revenue = sql<number>`SUM(${clientPayment.amount})`;
+    }
+    if (metrics.includes('itemsSold')) {
+      selectFields.itemsSold = sql<number>`COUNT(DISTINCT ${clientPayment.itemId})`;
+    }
+    if (metrics.includes('avgOrderValue')) {
+      selectFields.avgOrderValue = sql<number>`AVG(${clientPayment.amount})`;
+    }
+    if (metrics.includes('profit')) {
+      selectFields.itemIds = sql<string[]>`ARRAY_AGG(DISTINCT ${clientPayment.itemId})`;
+    }
+
+    const results = await db
+      .select(selectFields)
+      .from(clientPayment)
+      .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(buildWhereConditions())
+      .groupBy(groupFields.groupId, groupFields.groupName)
+      .orderBy(desc(selectFields.revenue || sql<number>`COUNT(*)`));
+
+    // Calculate profit if requested
+    const finalResults = [];
+    for (const row of results) {
+      const result: any = {
+        groupId: row.groupId,
+        groupName: row.groupName
+      };
+
+      if (metrics.includes('revenue')) {
+        result.revenue = Math.round(Number(row.revenue || 0) * 100) / 100;
+      }
+      if (metrics.includes('itemsSold')) {
+        result.itemsSold = Number(row.itemsSold || 0);
+      }
+      if (metrics.includes('avgOrderValue')) {
+        result.avgOrderValue = Math.round(Number(row.avgOrderValue || 0) * 100) / 100;
+      }
+
+      if (metrics.includes('profit') && row.itemIds && row.itemIds.length > 0) {
+        let profit = Number(row.revenue || 0);
+        
+        // Subtract costs
+        const itemCosts = await db
+          .select({
+            totalCost: sql<number>`SUM(COALESCE(${item.maxCost}, ${item.minCost}, 0))`
+          })
+          .from(item)
+          .where(inArray(item.itemId, row.itemIds));
+        
+        profit -= Number(itemCosts[0]?.totalCost || 0);
+
+        // Subtract expenses
+        const itemExpenses = await db
+          .select({
+            totalExpenses: sql<number>`SUM(${itemExpense.amount})`
+          })
+          .from(itemExpense)
+          .where(inArray(itemExpense.itemId, row.itemIds));
+        
+        profit -= Number(itemExpenses[0]?.totalExpenses || 0);
+        
+        result.profit = Math.round(profit * 100) / 100;
+      }
+
+      finalResults.push(result);
+    }
+
+    return finalResults;
+  }
+
+  async getItemProfitability(startDate: string, endDate: string, filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+    itemStatuses?: string[];
+  }, limit = 50, offset = 0): Promise<{
+    items: Array<{
+      itemId: string;
+      title: string;
+      brand: string;
+      model: string;
+      vendor: string;
+      revenue: number;
+      cost: number;
+      profit: number;
+      margin: number;
+      soldDate?: string;
+      daysToSell?: number;
+    }>;
+    totalCount: number;
+  }> {
+    // Build where conditions based on filters
+    const buildWhereConditions = () => {
+      const conditions = [
+        sql`${clientPayment.paidAt} >= ${startDate}`,
+        sql`${clientPayment.paidAt} <= ${endDate}`
+      ];
+      
+      if (filters?.vendorIds?.length) {
+        conditions.push(inArray(vendor.vendorId, filters.vendorIds));
+      }
+      if (filters?.clientIds?.length) {
+        conditions.push(inArray(client.clientId, filters.clientIds));
+      }
+      if (filters?.brandIds?.length) {
+        conditions.push(inArray(item.brandId, filters.brandIds));
+      }
+      if (filters?.categoryIds?.length) {
+        conditions.push(inArray(item.categoryId, filters.categoryIds));
+      }
+      if (filters?.itemStatuses?.length) {
+        conditions.push(inArray(item.status, filters.itemStatuses));
+      }
+      
+      return and(...conditions);
+    };
+
+    // Get item revenue data with pagination
+    const itemsData = await db
+      .select({
+        itemId: item.itemId,
+        title: sql<string>`COALESCE(${item.title}, 'Unknown Item')`,
+        brand: sql<string>`COALESCE(${brand.name}, ${item.brand}, 'Unknown Brand')`,
+        model: sql<string>`COALESCE(${item.model}, '')`,
+        vendor: sql<string>`COALESCE(${vendor.name}, 'Unknown Vendor')`,
+        revenue: sql<number>`SUM(${clientPayment.amount})`,
+        cost: sql<number>`COALESCE(${item.maxCost}, ${item.minCost}, 0)`,
+        acquisitionDate: item.acquisitionDate,
+        firstSaleDate: sql<string>`MIN(${clientPayment.paidAt})`
+      })
+      .from(clientPayment)
+      .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(buildWhereConditions())
+      .groupBy(item.itemId, item.title, brand.name, item.brand, item.model, vendor.name, item.maxCost, item.minCost, item.acquisitionDate)
+      .orderBy(desc(sql<number>`SUM(${clientPayment.amount})`)) // Order by revenue
+      .limit(limit)
+      .offset(offset);
+
+    // Get total count for pagination
+    const [countResult] = await db
+      .select({
+        totalCount: sql<number>`COUNT(DISTINCT ${item.itemId})`
+      })
+      .from(clientPayment)
+      .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(buildWhereConditions());
+
+    // Get expenses for each item
+    const itemIds = itemsData.map(item => item.itemId);
+    let expensesMap: Record<string, number> = {};
+    
+    if (itemIds.length > 0) {
+      const expensesData = await db
+        .select({
+          itemId: itemExpense.itemId,
+          totalExpenses: sql<number>`SUM(${itemExpense.amount})`
+        })
+        .from(itemExpense)
+        .where(inArray(itemExpense.itemId, itemIds))
+        .groupBy(itemExpense.itemId);
+      
+      expensesMap = expensesData.reduce((acc, expense) => {
+        acc[expense.itemId] = Number(expense.totalExpenses || 0);
+        return acc;
+      }, {} as Record<string, number>);
+    }
+
+    const items = itemsData.map(item => {
+      const revenue = Number(item.revenue || 0);
+      const cost = Number(item.cost || 0);
+      const expenses = expensesMap[item.itemId] || 0;
+      const totalCost = cost + expenses;
+      const profit = revenue - totalCost;
+      const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+      
+      // Calculate days to sell
+      let daysToSell: number | undefined;
+      if (item.acquisitionDate && item.firstSaleDate) {
+        const acquisitionDate = new Date(item.acquisitionDate);
+        const soldDate = new Date(item.firstSaleDate);
+        daysToSell = Math.max(0, Math.floor((soldDate.getTime() - acquisitionDate.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+
+      return {
+        itemId: item.itemId,
+        title: item.title,
+        brand: item.brand,
+        model: item.model,
+        vendor: item.vendor,
+        revenue: Math.round(revenue * 100) / 100,
+        cost: Math.round(totalCost * 100) / 100,
+        profit: Math.round(profit * 100) / 100,
+        margin: Math.round(margin * 100) / 100,
+        soldDate: item.firstSaleDate ? new Date(item.firstSaleDate).toISOString().split('T')[0] : undefined,
+        daysToSell
+      };
+    });
+
+    return {
+      items,
+      totalCount: Number(countResult.totalCount || 0)
+    };
+  }
+
+  async getInventoryHealth(filters?: {
+    vendorIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+  }): Promise<{
+    totalItems: number;
+    inStoreItems: number;
+    reservedItems: number;
+    soldItems: number;
+    partialPaidItems: number;
+    totalValue: number;
+    avgDaysInInventory: number;
+    categoriesBreakdown: Array<{
+      categoryId: string;
+      categoryName: string;
+      itemCount: number;
+      totalValue: number;
+      avgAge: number;
+    }>;
+    agingAnalysis: {
+      under30Days: number;
+      days30To90: number;
+      days90To180: number;
+      over180Days: number;
+    };
+  }> {
+    // Build where conditions based on filters
+    const buildWhereConditions = () => {
+      const conditions: any[] = [];
+      
+      if (filters?.vendorIds?.length) {
+        conditions.push(inArray(vendor.vendorId, filters.vendorIds));
+      }
+      if (filters?.brandIds?.length) {
+        conditions.push(inArray(item.brandId, filters.brandIds));
+      }
+      if (filters?.categoryIds?.length) {
+        conditions.push(inArray(item.categoryId, filters.categoryIds));
+      }
+      
+      return conditions.length > 0 ? and(...conditions) : undefined;
+    };
+
+    const whereConditions = buildWhereConditions();
+
+    // Get overall inventory stats
+    const [overallStats] = await db
+      .select({
+        totalItems: sql<number>`COUNT(*)`,
+        inStoreItems: sql<number>`COUNT(CASE WHEN ${item.status} = 'in-store' THEN 1 END)`,
+        reservedItems: sql<number>`COUNT(CASE WHEN ${item.status} = 'reserved' THEN 1 END)`,
+        soldItems: sql<number>`COUNT(CASE WHEN ${item.status} = 'sold' THEN 1 END)`,
+        partialPaidItems: sql<number>`COUNT(CASE WHEN ${item.status} = 'partial' THEN 1 END)`,
+        totalValue: sql<number>`SUM(COALESCE(${item.maxSalesPrice}, ${item.minSalesPrice}, 0))`,
+        avgDaysInInventory: sql<number>`AVG(CASE WHEN ${item.acquisitionDate} IS NOT NULL THEN DATE_PART('day', NOW() - ${item.acquisitionDate}::timestamp) ELSE NULL END)`
+      })
+      .from(item)
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(whereConditions);
+
+    // Get category breakdown
+    const categoriesBreakdown = await db
+      .select({
+        categoryId: sql<string>`COALESCE(${category.categoryId}, 'unknown')`,
+        categoryName: sql<string>`COALESCE(${category.name}, 'Unknown Category')`,
+        itemCount: sql<number>`COUNT(*)`,
+        totalValue: sql<number>`SUM(COALESCE(${item.maxSalesPrice}, ${item.minSalesPrice}, 0))`,
+        avgAge: sql<number>`AVG(CASE WHEN ${item.acquisitionDate} IS NOT NULL THEN DATE_PART('day', NOW() - ${item.acquisitionDate}::timestamp) ELSE NULL END)`
+      })
+      .from(item)
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(whereConditions)
+      .groupBy(sql`COALESCE(${category.categoryId}, 'unknown')`, sql`COALESCE(${category.name}, 'Unknown Category')`)
+      .orderBy(desc(sql<number>`COUNT(*)`));
+
+    // Get aging analysis
+    const [agingStats] = await db
+      .select({
+        under30Days: sql<number>`COUNT(CASE WHEN ${item.acquisitionDate} IS NOT NULL AND DATE_PART('day', NOW() - ${item.acquisitionDate}::timestamp) < 30 THEN 1 END)`,
+        days30To90: sql<number>`COUNT(CASE WHEN ${item.acquisitionDate} IS NOT NULL AND DATE_PART('day', NOW() - ${item.acquisitionDate}::timestamp) BETWEEN 30 AND 90 THEN 1 END)`,
+        days90To180: sql<number>`COUNT(CASE WHEN ${item.acquisitionDate} IS NOT NULL AND DATE_PART('day', NOW() - ${item.acquisitionDate}::timestamp) BETWEEN 91 AND 180 THEN 1 END)`,
+        over180Days: sql<number>`COUNT(CASE WHEN ${item.acquisitionDate} IS NOT NULL AND DATE_PART('day', NOW() - ${item.acquisitionDate}::timestamp) > 180 THEN 1 END)`
+      })
+      .from(item)
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(whereConditions);
+
+    return {
+      totalItems: Number(overallStats.totalItems || 0),
+      inStoreItems: Number(overallStats.inStoreItems || 0),
+      reservedItems: Number(overallStats.reservedItems || 0),
+      soldItems: Number(overallStats.soldItems || 0),
+      partialPaidItems: Number(overallStats.partialPaidItems || 0),
+      totalValue: Math.round(Number(overallStats.totalValue || 0) * 100) / 100,
+      avgDaysInInventory: Math.round(Number(overallStats.avgDaysInInventory || 0) * 10) / 10,
+      categoriesBreakdown: categoriesBreakdown.map(cat => ({
+        categoryId: cat.categoryId,
+        categoryName: cat.categoryName,
+        itemCount: Number(cat.itemCount || 0),
+        totalValue: Math.round(Number(cat.totalValue || 0) * 100) / 100,
+        avgAge: Math.round(Number(cat.avgAge || 0) * 10) / 10
+      })),
+      agingAnalysis: {
+        under30Days: Number(agingStats.under30Days || 0),
+        days30To90: Number(agingStats.days30To90 || 0),
+        days90To180: Number(agingStats.days90To180 || 0),
+        over180Days: Number(agingStats.over180Days || 0)
+      }
+    };
+  }
+
+  async getPaymentMethodBreakdown(startDate: string, endDate: string, filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+  }): Promise<Array<{
+    paymentMethod: string;
+    totalAmount: number;
+    transactionCount: number;
+    percentage: number;
+    avgTransactionAmount: number;
+  }>> {
+    // Build where conditions based on filters
+    const buildWhereConditions = () => {
+      const conditions = [
+        sql`${clientPayment.paidAt} >= ${startDate}`,
+        sql`${clientPayment.paidAt} <= ${endDate}`
+      ];
+      
+      if (filters?.vendorIds?.length) {
+        conditions.push(inArray(vendor.vendorId, filters.vendorIds));
+      }
+      if (filters?.clientIds?.length) {
+        conditions.push(inArray(client.clientId, filters.clientIds));
+      }
+      if (filters?.brandIds?.length) {
+        conditions.push(inArray(item.brandId, filters.brandIds));
+      }
+      if (filters?.categoryIds?.length) {
+        conditions.push(inArray(item.categoryId, filters.categoryIds));
+      }
+      
+      return and(...conditions);
+    };
+
+    // Get total amount for percentage calculation
+    const [totalStats] = await db
+      .select({
+        grandTotal: sql<number>`SUM(${clientPayment.amount})`
+      })
+      .from(clientPayment)
+      .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(buildWhereConditions());
+
+    const grandTotal = Number(totalStats.grandTotal || 0);
+
+    // Get payment method breakdown
+    const results = await db
+      .select({
+        paymentMethod: clientPayment.paymentMethod,
+        totalAmount: sql<number>`SUM(${clientPayment.amount})`,
+        transactionCount: sql<number>`COUNT(*)`,
+        avgTransactionAmount: sql<number>`AVG(${clientPayment.amount})`
+      })
+      .from(clientPayment)
+      .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+      .innerJoin(client, eq(clientPayment.clientId, client.clientId))
+      .leftJoin(brand, eq(item.brandId, brand.brandId))
+      .leftJoin(category, eq(item.categoryId, category.categoryId))
+      .where(buildWhereConditions())
+      .groupBy(clientPayment.paymentMethod)
+      .orderBy(desc(sql<number>`SUM(${clientPayment.amount})`));
+
+    return results.map(row => {
+      const totalAmount = Number(row.totalAmount || 0);
+      const percentage = grandTotal > 0 ? (totalAmount / grandTotal) * 100 : 0;
+      
+      return {
+        paymentMethod: row.paymentMethod || 'Unknown',
+        totalAmount: Math.round(totalAmount * 100) / 100,
+        transactionCount: Number(row.transactionCount || 0),
+        percentage: Math.round(percentage * 100) / 100,
+        avgTransactionAmount: Math.round(Number(row.avgTransactionAmount || 0) * 100) / 100
+      };
+    });
   }
 }
 
