@@ -1,220 +1,50 @@
-# Consignment Management System
+# Luxury Consignment Management System
 
 ## Overview
 
-This is a luxury consignment management system built with React, TypeScript, and Express. The application manages pre-owned luxury goods (watches, handbags, fashion accessories) through a consignment model where vendors supply items, the company manages sales, and clients can purchase items with full or partial payments.
+This project is a comprehensive luxury consignment management system designed for pre-owned luxury goods (watches, handbags, fashion accessories, jewelry). It provides end-to-end business management, including inventory tracking, financial reporting, vendor/client relationship management, payment processing (including installment plans), expense tracking, and business intelligence analytics. The system supports a complete consignment business model from item intake to sales, vendor payouts, and detailed profitability analysis.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes
-
-### September 12, 2025 - Comprehensive Business Intelligence Suite
-- **New Feature**: Complete BI reporting infrastructure with advanced analytics
-  - Added 6 comprehensive data aggregation functions in storage layer for KPIs, time-series, grouped metrics, item profitability, inventory health, and payment method analysis
-  - Created API endpoints for all report types: `/api/reports/kpis`, `/api/reports/timeseries`, `/api/reports/grouped`, `/api/reports/items`, `/api/reports/inventory`, `/api/reports/payment-methods`
-  - Built comprehensive Reports page with tabbed navigation (Overview, Performance, Item Profitability, Inventory Health, Payment Method Audit)
-  - Implemented advanced filter controls with date ranges, granularity settings, and entity selection (brands, vendors, clients, categories)
-  - Added real-time KPI tiles showing revenue, COGS, gross profit, margin, and item performance metrics
-  - Created interactive time-series charts for revenue trends and business performance visualization using Recharts
-  - Built grouped performance analysis with sortable tables and bar charts for vendors, brands, categories, and clients
-  - Implemented profit distribution analysis and top-performing item identification
-  - Added inventory health monitoring with aging analysis and turnover metrics
-  - Created payment method audit reports for financial reconciliation and cross-checking
-  - Enhanced backend with proper UUID handling, null-safe joins, and cash-basis accounting principles
-  - Applied comprehensive defensive programming with null checks and error handling throughout
-  - All reports use real data from database with proper pagination, sorting, and filtering capabilities
-
-### July 15, 2025 - Edit Installment Validation & Balance Protection
-- **New Feature**: Added comprehensive validation for installment editing
-  - Prevents total upcoming payments from falling below remaining balance
-  - Real-time validation feedback as users type amounts
-  - Visual indicators showing current balance and total upcoming payments
-  - Clear error messages when validation fails
-  - Allows increases but prevents decreases below balance owed
-  - Protects against scenarios where users reduce payments without ability to add them back
-  - Enhanced split payment validation to ensure proper amount distribution
-
-### July 15, 2025 - Edit Installment Functionality
-- **New Feature**: Complete installment editing system for upcoming payments
-  - Edit button for each pending installment payment
-  - Split button to divide payments into smaller installments
-  - Delete option for removing installments when needed
-  - Real-time amount calculation for split payments
-  - Form validation with proper error handling
-  - API endpoints for updating, deleting, and creating installment plans
-  - Automatic UI refresh after changes
-  - Enhanced payment workflow flexibility for client negotiations
-
-### July 15, 2025 - Removed Redundant Payment Functionality
-- **Cleanup**: Removed "Add Payment" button from item details page
-  - Eliminated redundant payment functionality that conflicted with structured installment system
-  - Removed associated payment dialog, form code, and mutations
-  - Fixed syntax errors and cleaned up orphaned dialog content
-  - Removed useEffect hook that referenced deleted payment form
-  - Application now focuses on structured installment payments only
-  - Payment section displays clean payment history without confusing add payment options
-
-### July 15, 2025 - Payment Timeline in Payouts Section
-- **New Feature**: Enhanced upcoming payouts table with payment timeline information
-  - Added "Payment Timeline" column showing first and last payment dates
-  - First payment date shows when the initial payment was made (green calendar icon)
-  - Last payment date shows either actual last payment (for fully paid items) or expected final payment date (for partial payments)
-  - For items paid upfront, both dates show the same date
-  - Enhanced backend storage to fetch payment timeline data from database
-  - Updated query to include first/last payment dates and expected completion dates from installment plans
-  - Improved user experience with clear visual indicators for payment progress
-
-### July 15, 2025 - Dashboard Improvements & Payment Validation
-- **New Feature**: Comprehensive dashboard enhancements
-  - Fixed top metric cards to show consistent data from database
-  - Added Recent Payments section with pagination (5 payments per page)
-  - Enhanced Quick Actions buttons with proper navigation
-  - Improved Attention Required section with accurate counts
-  - Added pagination to Recent Items table (5, 10, 20 items per page)
-  - All data now comes directly from database without mock information
-
-### July 15, 2025 - Payment Validation & Installment Management
-- **New Feature**: Payment amount validation with error prevention
-  - Full payments cannot exceed item price
-  - Partial payments + installments cannot exceed item price
-  - Real-time validation with clear error messages
-  - Remaining amount display for installment payments
-- **New Feature**: Installment payment breakdown display
-  - Shows initial payment, installment total, and remaining amount
-  - Real-time calculation updates as amounts change
-  - Visual feedback for payment planning
-- **New Feature**: Upcoming Payments section in item details
-  - Shows pending installment payments with due dates
-  - "Mark as Paid" button for each pending installment
-  - Automatically creates payment records when installments are marked as paid
-  - Real-time updates to payment history and remaining balances
-- **New Feature**: Automatic client assignment for purchased items
-  - Items are now automatically assigned to clients after purchase (full or installment)
-  - Payment forms auto-populate assigned client instead of showing dropdown
-  - Streamlined payment process for items with existing owners
-- **Backend Enhancement**: Enhanced `markInstallmentPaid` function
-  - Now creates corresponding payment records in payment history
-  - Updates installment status and paid amount
-  - Maintains data consistency between installments and payments
-
-### July 15, 2025 - Data Type Consistency Fixes
-- **Issue**: Payment forms were failing due to data type mismatches between frontend forms, API validation, and database schemas
-- **Root Cause**: Forms sent string values for numeric/date fields, but Drizzle Zod schemas expected exact types
-- **Solution**: Enhanced insert schemas with preprocessing for automatic type conversion:
-  - `insertClientPaymentSchema`: Added preprocessing for `amount` (string → number) and `paidAt` (string → Date)
-  - `insertVendorPayoutSchema`: Added preprocessing for `amount` and `paidAt`
-  - `insertItemExpenseSchema`: Added preprocessing for `amount` and `incurredAt`
-  - `insertInstallmentPlanSchema`: Added preprocessing for `amount` and `dueDate`
-  - `insertItemSchema`: Added preprocessing for `agreedVendorPayout`, `listPrice`, and `acquisitionDate`
-- **Result**: All forms now work consistently with proper data type handling and validation
-
 ## System Architecture
 
-### Frontend Architecture
-- **Framework**: React 18 with TypeScript
-- **Routing**: Wouter for client-side routing
-- **State Management**: TanStack Query (React Query) for server state
-- **UI Framework**: Tailwind CSS with shadcn/ui components
-- **Build Tool**: Vite for development and build process
-- **Theme**: Next-themes for dark/light mode support
+The application is built with a modern web stack, featuring a React frontend and a Node.js Express backend.
 
-### Backend Architecture
-- **Runtime**: Node.js with Express.js
-- **Language**: TypeScript with ES modules
-- **Database**: PostgreSQL with Drizzle ORM
-- **Database Provider**: Neon Database (@neondatabase/serverless)
-- **Session Management**: PostgreSQL-backed sessions (connect-pg-simple)
-- **API Style**: REST endpoints with JSON responses
+**Technology Stack:**
+*   **Frontend:** React 18 (TypeScript), Wouter (routing), TanStack Query v5 (server state), Tailwind CSS (styling), shadcn/ui (component library), Vite (build tool), next-themes (theme management), React Hook Form with Zod (form handling), Recharts (charts).
+*   **Backend:** Node.js with Express.js (TypeScript, ES modules), PostgreSQL (database), Drizzle ORM (type-safe ORM), connect-pg-simple (session management), TSX (hot-reload).
 
-### Project Structure
-```
-├── client/          # React frontend
-│   ├── src/
-│   │   ├── components/  # UI components
-│   │   ├── pages/       # Route components
-│   │   ├── hooks/       # Custom React hooks
-│   │   └── lib/         # Utilities and query client
-├── server/          # Express backend
-│   ├── routes.ts    # API route definitions
-│   ├── storage.ts   # Database operations
-│   └── db.ts        # Database connection
-├── shared/          # Shared types and schemas
-│   └── schema.ts    # Drizzle database schema
-└── migrations/      # Database migrations
-```
+**Core Features:**
+*   **Inventory Management:** Detailed item cataloging, status tracking, bulk operations, and photo uploads.
+*   **Client & Vendor Management:** Comprehensive profiles, transaction history, and relationship tracking.
+*   **Financial Management:** Payment processing (including flexible installment plans with balance protection), vendor payout management, and item-specific expense tracking.
+*   **Business Intelligence:** Comprehensive reporting suite with KPIs, time-series analysis, grouped performance metrics (by brand, vendor, client, category), item profitability, inventory health, and payment method audits.
+*   **UI/UX:** Responsive design, dark/light mode, accessible components, and intuitive dashboards.
 
-## Key Components
+**Data Model:**
+The PostgreSQL database uses a normalized schema with core entities including `vendors`, `clients`, `brands`, `categories`, `payment_methods`, `items`, `client_payments`, `vendor_payouts`, `item_expenses`, and `installment_plans`. Referential integrity is enforced with foreign key constraints.
 
-### Database Schema
-The system uses PostgreSQL with the following main entities:
-- **Vendors**: Suppliers of luxury items with contact information
-- **Clients**: Customers who purchase items
-- **Items**: Luxury goods with pricing, condition, and status tracking
-- **Client Payments**: Payment records (supports partial payments)
-- **Vendor Payouts**: Payments to vendors after successful sales
-- **Item Expenses**: Costs associated with items (authentication, repairs)
+**Business Logic:**
+The system enforces a strict consignment model:
+1.  **Item Intake:** Vendors consign items with agreed payout terms.
+2.  **Sales & Payments:** Clients purchase items with flexible payment options, including installment plans with validation to prevent total upcoming payments from falling below remaining balances.
+3.  **Payouts:** Vendors are paid only after client payments are complete.
+4.  **Financials:** Cash-basis accounting, profit calculation (Client Payments - Vendor Payout - Item Expenses), COGS, and margin analysis.
 
-### User Interface
-- **Dashboard**: Overview with metrics, recent items, and top performers
-- **Inventory Management**: Item listing and status tracking
-- **Vendor Management**: Vendor relationship management
-- **Client Management**: Customer records and purchase history
-- **Payment Processing**: Client payment tracking
-- **Payout Management**: Vendor payment processing
-- **Expense Tracking**: Item-related cost management
-- **Reports & Analytics**: Business intelligence and profitability analysis
-
-### API Endpoints
-- GET `/api/dashboard/metrics` - Business metrics
-- GET `/api/dashboard/recent-items` - Recent inventory
-- GET `/api/dashboard/top-performing` - Top performing items
-- CRUD operations for vendors, clients, items, payments, payouts, and expenses
-
-## Data Flow
-
-1. **Item Intake**: Vendors consign items with agreed payout amounts
-2. **Inventory Management**: Items are catalogued with pricing and condition
-3. **Sales Process**: Clients make full or partial payments toward items
-4. **Payout Processing**: Vendors are paid after items are fully paid
-5. **Expense Tracking**: Authentication and repair costs are recorded
-6. **Profitability Analysis**: Real-time profit calculations across all transactions
+**API Endpoints:**
+A RESTful API supports all core functionalities:
+*   **Dashboard:** Metrics, recent items, top performers.
+*   **CRUD for Entities:** Vendors, Clients, Brands, Categories, Payment Methods, Items.
+*   **Financial Transactions:** Payments, Payouts, Expenses.
+*   **Installment Plans:** Creation, updates, deletions, and status management.
+*   **Business Intelligence:** Dedicated endpoints for various reports (KPIs, time-series, grouped data, item profitability, inventory, payment methods).
+*   **File Management:** Image uploads to cloud storage.
 
 ## External Dependencies
 
-### Frontend Dependencies
-- **UI Components**: Radix UI primitives with shadcn/ui styling
-- **Form Handling**: React Hook Form with Zod validation
-- **Data Fetching**: TanStack Query for server state management
-- **Styling**: Tailwind CSS with CSS variables for theming
-- **Icons**: Lucide React icons
-
-### Backend Dependencies
-- **Database**: Neon serverless PostgreSQL
-- **ORM**: Drizzle ORM with Zod schema validation
-- **Session Storage**: PostgreSQL-backed sessions
-- **Development**: TSX for TypeScript execution, ESBuild for production builds
-
-## Deployment Strategy
-
-### Development
-- **Frontend**: Vite dev server with hot module replacement
-- **Backend**: TSX with auto-restart on file changes
-- **Database**: Neon serverless PostgreSQL connection
-- **Environment**: Replit-optimized with development banners and error overlays
-
-### Production Build
-- **Frontend**: Vite build outputs to `dist/public`
-- **Backend**: ESBuild bundles server code to `dist/index.js`
-- **Database**: Drizzle migrations run via `npm run db:push`
-- **Deployment**: Single Node.js process serving both API and static files
-
-### Business Logic
-The system implements a consignment model where:
-- Profit = Client Payments - Vendor Payout - Item Expenses
-- Vendors are only paid after items are fully paid by clients
-- Items can have multiple payment installments from clients
-- All financial transactions are tracked for reporting and analytics
-
-The application is designed for internal use by store operators, finance staff, and business owners to manage the complete consignment lifecycle from item intake to final sale and payout.
+*   **Database:** Neon Database (serverless PostgreSQL)
+*   **Cloud Storage:** Google Cloud Storage (for item images)
+*   **Frontend Libraries:** Radix UI primitives, shadcn/ui, TanStack Query, Recharts, Wouter
+*   **Backend Libraries:** Drizzle ORM, Zod, connect-pg-simple
