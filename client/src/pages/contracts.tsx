@@ -1,9 +1,17 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Link } from "wouter";
 import { 
@@ -13,15 +21,329 @@ import {
   User, 
   Download,
   Edit,
-  Trash2
+  Trash2,
+  Users,
+  Package,
+  ChevronRight
 } from "lucide-react";
-import type { Contract, ContractTemplate, ContractItemSnapshot } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Contract, ContractTemplate, ContractItemSnapshot, Vendor, Item } from "@shared/schema";
 
 // Extended contract type with vendor and template info
 type ContractWithDetails = Contract & { 
   vendor: { vendorId: string; name: string; email: string; };
   template?: ContractTemplate;
 };
+
+// Contract creation form schema
+const contractCreationSchema = z.object({
+  vendorId: z.string().min(1, "Selecciona un proveedor"),
+  templateId: z.string().min(1, "Selecciona una plantilla"),
+  selectedItems: z.array(z.string()).min(1, "Selecciona al menos un artículo"),
+  commissionPercentage: z.coerce.number().min(0).max(100).default(30),
+  paymentTerms: z.string().default("30"),
+  consignmentPeriod: z.string().default("6"),
+  withdrawalNotice: z.string().default("30")
+});
+
+type ContractCreationFormData = z.infer<typeof contractCreationSchema>;
+
+// Contract Creation Wizard Component
+function ContractCreationWizard() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedVendorId, setSelectedVendorId] = useState<string>("");
+  const { toast } = useToast();
+
+  const form = useForm<ContractCreationFormData>({
+    resolver: zodResolver(contractCreationSchema),
+    defaultValues: {
+      vendorId: "",
+      templateId: "",
+      selectedItems: [],
+      commissionPercentage: 30,
+      paymentTerms: "30",
+      consignmentPeriod: "6",
+      withdrawalNotice: "30"
+    }
+  });
+
+  // Fetch vendors
+  const { data: vendors = [] } = useQuery<Vendor[]>({
+    queryKey: ["/api/vendors"],
+  });
+
+  // Fetch contract templates
+  const { data: templates = [] } = useQuery<ContractTemplate[]>({
+    queryKey: ["/api/contract-templates"],
+  });
+
+  // Fetch default template
+  const { data: defaultTemplate } = useQuery<ContractTemplate>({
+    queryKey: ["/api/contract-templates/default"],
+  });
+
+  // Fetch vendor items when vendor is selected
+  const { data: vendorItems = [] } = useQuery<Item[]>({
+    queryKey: ["/api/items", selectedVendorId],
+    queryFn: async () => {
+      if (!selectedVendorId) return [];
+      const response = await fetch(`/api/items?vendorId=${selectedVendorId}`);
+      if (!response.ok) throw new Error('Failed to fetch vendor items');
+      return response.json();
+    },
+    enabled: !!selectedVendorId
+  });
+
+  // Contract creation mutation
+  const createContractMutation = useMutation({
+    mutationFn: async (data: ContractCreationFormData) => {
+      // First, get the selected vendor and items
+      const vendor = vendors.find(v => v.vendorId === data.vendorId);
+      const items = vendorItems.filter(item => data.selectedItems.includes(item.itemId));
+      const template = templates.find(t => t.templateId === data.templateId) || defaultTemplate;
+      
+      if (!vendor || !template) {
+        throw new Error('Vendor or template not found');
+      }
+
+      // Create item snapshots
+      const itemSnapshots = items.map(item => ({
+        itemId: item.itemId,
+        name: item.name,
+        description: item.description || '',
+        currentPrice: item.currentPrice,
+        originalPrice: item.originalPrice,
+        category: item.category || '',
+        brand: item.brand || '',
+        condition: item.condition,
+        images: item.images || []
+      }));
+
+      // Generate terms text by replacing template variables (using global replacement)
+      let termsText = template.termsText;
+      termsText = termsText.replaceAll('{{VENDOR_NAME}}', vendor.name || '');
+      termsText = termsText.replaceAll('{{VENDOR_PHONE}}', vendor.phone || '');
+      termsText = termsText.replaceAll('{{VENDOR_EMAIL}}', vendor.email || '');
+      termsText = termsText.replaceAll('{{VENDOR_TAX_ID}}', vendor.taxId || '');
+      termsText = termsText.replaceAll('{{VENDOR_BANK_NAME}}', vendor.bankName || '');
+      termsText = termsText.replaceAll('{{VENDOR_ACCOUNT_NUMBER}}', vendor.bankAccountNumber || '');
+      termsText = termsText.replaceAll('{{VENDOR_ACCOUNT_TYPE}}', vendor.accountType || '');
+      termsText = termsText.replaceAll('{{COMMISSION_PERCENTAGE}}', data.commissionPercentage.toString());
+      termsText = termsText.replaceAll('{{PAYMENT_TERMS}}', data.paymentTerms);
+      termsText = termsText.replaceAll('{{CONSIGNMENT_PERIOD}}', data.consignmentPeriod);
+      termsText = termsText.replaceAll('{{WITHDRAWAL_NOTICE}}', data.withdrawalNotice);
+      termsText = termsText.replaceAll('{{CONTRACT_DATE}}', new Date().toLocaleDateString('es-ES'));
+      
+      // Create items table
+      const itemsTable = items.map((item, index) => 
+        `${index + 1}. ${item.name} - ${item.brand || 'N/A'} - ${item.category || 'N/A'} - $${item.currentPrice.toFixed(2)}`
+      ).join('\n');
+      termsText = termsText.replaceAll('{{ITEMS_TABLE}}', itemsTable);
+
+      const contractData = {
+        vendorId: data.vendorId,
+        templateId: data.templateId,
+        status: 'draft' as const,
+        termsText,
+        itemSnapshots
+      };
+
+      return apiRequest('/api/contracts', {
+        method: 'POST',
+        body: JSON.stringify(contractData)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
+      toast({
+        title: "¡Éxito!",
+        description: "Contrato creado exitosamente"
+      });
+      setIsOpen(false);
+      form.reset();
+      setSelectedVendorId("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Error al crear el contrato: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const onSubmit = (data: ContractCreationFormData) => {
+    createContractMutation.mutate(data);
+  };
+
+  // Set default template when available
+  if (defaultTemplate && !form.getValues().templateId) {
+    form.setValue('templateId', defaultTemplate.templateId);
+  }
+
+  const availableItems = vendorItems.filter(item => 
+    item.status === 'in_store' || item.status === 'available'
+  );
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button data-testid="button-create-contract">
+          <Plus className="h-4 w-4 mr-2" />
+          Crear Contrato
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Crear Nuevo Contrato</DialogTitle>
+          <DialogDescription>
+            Selecciona un proveedor, sus artículos, y los términos del contrato
+          </DialogDescription>
+        </DialogHeader>
+        
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Vendor Selection */}
+            <FormField
+              control={form.control}
+              name="vendorId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center">
+                    <Users className="h-4 w-4 mr-2" />
+                    Proveedor
+                  </FormLabel>
+                  <Select 
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      setSelectedVendorId(value);
+                      form.setValue('selectedItems', []); // Reset items when vendor changes
+                    }} 
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger data-testid="select-vendor">
+                        <SelectValue placeholder="Selecciona un proveedor" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {vendors.map((vendor) => (
+                        <SelectItem key={vendor.vendorId} value={vendor.vendorId}>
+                          {vendor.name} - {vendor.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Items Selection */}
+            {selectedVendorId && (
+              <FormField
+                control={form.control}
+                name="selectedItems"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center">
+                      <Package className="h-4 w-4 mr-2" />
+                      Artículos Disponibles ({availableItems.length})
+                    </FormLabel>
+                    <div className="grid gap-3 max-h-60 overflow-y-auto border rounded-md p-3">
+                      {availableItems.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No hay artículos disponibles para este proveedor
+                        </p>
+                      ) : (
+                        availableItems.map((item) => (
+                          <div key={item.itemId} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={item.itemId}
+                              checked={field.value.includes(item.itemId)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  field.onChange([...field.value, item.itemId]);
+                                } else {
+                                  field.onChange(field.value.filter(id => id !== item.itemId));
+                                }
+                              }}
+                              data-testid={`checkbox-item-${item.itemId}`}
+                            />
+                            <Label htmlFor={item.itemId} className="flex-1 cursor-pointer">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <span className="font-medium">{item.name}</span>
+                                  <span className="text-sm text-muted-foreground ml-2">
+                                    {item.brand} - {item.category}
+                                  </span>
+                                </div>
+                                <span className="font-medium">${item.currentPrice.toFixed(2)}</span>
+                              </div>
+                            </Label>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Template Selection */}
+            <FormField
+              control={form.control}
+              name="templateId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Plantilla de Contrato
+                  </FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-template">
+                        <SelectValue placeholder="Selecciona una plantilla" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {templates.map((template) => (
+                        <SelectItem key={template.templateId} value={template.templateId}>
+                          {template.name} {template.isDefault && '(Por defecto)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsOpen(false)}
+                data-testid="button-cancel-contract"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={createContractMutation.isPending}
+                data-testid="button-submit-contract"
+              >
+                {createContractMutation.isPending ? 'Creando...' : 'Crear Contrato'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function Contracts() {
   const [activeTab, setActiveTab] = useState<"contracts" | "templates">("contracts");
@@ -81,10 +403,7 @@ export default function Contracts() {
                     <Plus className="h-4 w-4 mr-2" />
                     Nueva Plantilla
                   </Button>
-                  <Button data-testid="button-create-contract">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Nuevo Contrato
-                  </Button>
+                  <ContractCreationWizard />
                 </div>
               </div>
             </div>

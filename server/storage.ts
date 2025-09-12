@@ -76,7 +76,7 @@ export interface IStorage {
   deletePaymentMethod(id: string): Promise<void>;
   
   // Item methods
-  getItems(): Promise<Array<Item & { vendor: Vendor }>>;
+  getItems(vendorId?: string): Promise<Array<Item & { vendor: Vendor }>>;
   getItem(id: string): Promise<(Item & { vendor: Vendor }) | undefined>;
   createItem(item: InsertItem): Promise<Item>;
   updateItem(id: string, item: Partial<InsertItem>): Promise<Item>;
@@ -323,6 +323,7 @@ export interface IStorage {
   updateContractTemplate(id: string, template: Partial<InsertContractTemplate>): Promise<ContractTemplate>;
   deleteContractTemplate(id: string): Promise<void>;
   getDefaultContractTemplate(): Promise<ContractTemplate | undefined>;
+  ensureDefaultContractTemplate(): Promise<ContractTemplate>;
 
   // Contract methods
   getContracts(): Promise<Array<Contract & { vendor: Vendor, template?: ContractTemplate }>>;
@@ -514,9 +515,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Item methods
-  async getItems(): Promise<Array<Item & { vendor: Vendor }>> {
-    return await db.select().from(item)
-      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+  async getItems(vendorId?: string): Promise<Array<Item & { vendor: Vendor }>> {
+    const baseQuery = db.select().from(item)
+      .innerJoin(vendor, eq(item.vendorId, vendor.vendorId));
+    
+    const query = vendorId 
+      ? baseQuery.where(eq(item.vendorId, vendorId))
+      : baseQuery;
+    
+    return await query
       .orderBy(desc(item.createdAt))
       .then(results => results.map(row => ({
         ...row.item,
@@ -2558,6 +2565,91 @@ export class DatabaseStorage implements IStorage {
   async getDefaultContractTemplate(): Promise<ContractTemplate | undefined> {
     const [result] = await db.select().from(contractTemplate).where(eq(contractTemplate.isDefault, true));
     return result || undefined;
+  }
+
+  async ensureDefaultContractTemplate(): Promise<ContractTemplate> {
+    // Check if default template already exists
+    const existing = await this.getDefaultContractTemplate();
+    if (existing) {
+      return existing;
+    }
+
+    // Create comprehensive default contract template
+    const defaultTemplate: InsertContractTemplate = {
+      name: "Contrato de Consignación Estándar",
+      description: "Plantilla estándar para contratos de consignación de artículos de lujo",
+      termsText: `
+CONTRATO DE CONSIGNACIÓN DE ARTÍCULOS DE LUJO
+
+Entre: {{VENDOR_NAME}}
+Dirección: {{VENDOR_ADDRESS}}
+Teléfono: {{VENDOR_PHONE}}
+Email: {{VENDOR_EMAIL}}
+Identificación Fiscal: {{VENDOR_TAX_ID}}
+
+Y: LUXETTE CONSIGNMENT
+Dirección: [Dirección de la empresa]
+Teléfono: [Teléfono de la empresa]
+Email: [Email de la empresa]
+
+ARTÍCULOS EN CONSIGNACIÓN:
+{{ITEMS_TABLE}}
+
+TÉRMINOS Y CONDICIONES:
+
+1. CONSIGNACIÓN: El Consignador entrega los artículos listados arriba a LUXETTE CONSIGNMENT para su venta en consignación.
+
+2. PRECIO DE VENTA: Los precios de venta se establecen de mutuo acuerdo y pueden ser ajustados con el consentimiento de ambas partes.
+
+3. COMISIÓN: LUXETTE CONSIGNMENT retendrá una comisión del {{COMMISSION_PERCENTAGE}}% sobre el precio de venta final de cada artículo.
+
+4. PAGO AL CONSIGNADOR: El pago se realizará dentro de {{PAYMENT_TERMS}} días después de la venta completa del artículo.
+
+5. RESPONSABILIDAD: LUXETTE CONSIGNMENT se responsabiliza por el cuidado razonable de los artículos mientras estén en su posesión.
+
+6. PERÍODO DE CONSIGNACIÓN: Los artículos permanecerán en consignación por un período de {{CONSIGNMENT_PERIOD}} meses, renovable por acuerdo mutuo.
+
+7. RETIRO DE ARTÍCULOS: El Consignador puede retirar artículos no vendidos con {{WITHDRAWAL_NOTICE}} días de aviso previo.
+
+8. CONDICIÓN DE LOS ARTÍCULOS: El Consignador garantiza que todos los artículos están en la condición declarada y son de su propiedad legítima.
+
+9. AUTENTICIDAD: El Consignador garantiza la autenticidad de todos los artículos de marca y se responsabiliza por cualquier problema de autenticidad.
+
+10. SEGURO: Los artículos están cubiertos por el seguro de LUXETTE CONSIGNMENT mientras estén en las instalaciones.
+
+INFORMACIÓN BANCARIA DEL CONSIGNADOR:
+Banco: {{VENDOR_BANK_NAME}}
+Número de Cuenta: {{VENDOR_ACCOUNT_NUMBER}}
+Tipo de Cuenta: {{VENDOR_ACCOUNT_TYPE}}
+
+Fecha del Contrato: {{CONTRACT_DATE}}
+
+___________________________                    ___________________________
+{{VENDOR_NAME}}                                 LUXETTE CONSIGNMENT
+Consignador                                     Representante Autorizado
+
+Fecha: _______________                          Fecha: _______________
+      `,
+      variables: JSON.stringify([
+        "VENDOR_NAME",
+        "VENDOR_ADDRESS", 
+        "VENDOR_PHONE",
+        "VENDOR_EMAIL",
+        "VENDOR_TAX_ID",
+        "VENDOR_BANK_NAME",
+        "VENDOR_ACCOUNT_NUMBER", 
+        "VENDOR_ACCOUNT_TYPE",
+        "ITEMS_TABLE",
+        "COMMISSION_PERCENTAGE",
+        "PAYMENT_TERMS",
+        "CONSIGNMENT_PERIOD",
+        "WITHDRAWAL_NOTICE",
+        "CONTRACT_DATE"
+      ]),
+      isDefault: true
+    };
+
+    return await this.createContractTemplate(defaultTemplate);
   }
 
   // Contract methods

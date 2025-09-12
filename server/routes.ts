@@ -445,7 +445,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Item routes
   app.get("/api/items", async (req, res) => {
     try {
-      const items = await storage.getItems();
+      const { vendorId } = req.query;
+      const items = await storage.getItems(vendorId as string);
       res.json(items);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch items" });
@@ -1131,10 +1132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/contract-templates/default", async (req, res) => {
     try {
-      const template = await storage.getDefaultContractTemplate();
-      if (!template) {
-        return res.status(404).json({ error: "No default template found" });
-      }
+      const template = await storage.ensureDefaultContractTemplate();
       res.json(template);
     } catch (error) {
       const { status, message } = handleStorageError(error);
