@@ -1,6 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
+import sharp from "sharp";
+import { randomUUID } from "crypto";
 import { storage } from "./storage";
+import { ObjectStorageService } from "./objectStorage";
 import { 
   insertVendorSchema, insertClientSchema, insertItemSchema, 
   insertClientPaymentSchema, insertVendorPayoutSchema, insertItemExpenseSchema, insertInstallmentPlanSchema,
@@ -757,6 +761,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Installment plan deletion error:", error);
       res.status(500).json({ error: "Failed to delete installment plan" });
+    }
+  });
+
+  // Configure multer for image uploads (memory storage for processing)
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'), false);
+      }
+    },
+  });
+
+  // Image upload route with compression
+  app.post("/api/upload-image", upload.single('image'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No image file provided" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      
+      // Compress image using Sharp
+      const compressedImageBuffer = await sharp(req.file.buffer)
+        .resize(1200, 1200, { 
+          fit: 'inside', 
+          withoutEnlargement: true 
+        })
+        .jpeg({ 
+          quality: 85,
+          progressive: true 
+        })
+        .toBuffer();
+
+      // Get upload URL from object storage
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      
+      // Upload compressed image to object storage
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: compressedImageBuffer,
+        headers: {
+          'Content-Type': 'image/jpeg',
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload to object storage');
+      }
+
+      // Set ACL policy for public access
+      const normalizedPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      const finalPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        uploadURL,
+        {
+          owner: "system", // For public product images
+          visibility: "public",
+        }
+      );
+
+      // Return the public URL for the image
+      const publicImageUrl = `/public-objects${finalPath.replace('/objects', '')}`;
+      
+      res.json({ 
+        imageUrl: publicImageUrl,
+        message: "Image uploaded and compressed successfully" 
+      });
+    } catch (error) {
+      console.error('Image upload error:', error);
+      if (error instanceof Error) {
+        res.status(500).json({ 
+          error: "Failed to upload image", 
+          details: error.message 
+        });
+      } else {
+        res.status(500).json({ error: "Failed to upload image" });
+      }
+    }
+  });
+
+  // Serve public objects route
+  app.get("/public-objects/:filePath(*)", async (req, res) => {
+    const filePath = req.params.filePath;
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const file = await objectStorageService.searchPublicObject(filePath);
+      if (!file) {
+        return res.status(404).json({ error: "Image not found" });
+      }
+      objectStorageService.downloadObject(file, res);
+    } catch (error) {
+      console.error("Error serving public object:", error);
+      return res.status(500).json({ error: "Internal server error" });
     }
   });
 
