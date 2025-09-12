@@ -27,22 +27,22 @@ interface StatusUpdateDropdownProps {
 
 const statusConfig = {
   'in-store': {
-    label: 'In Store',
+    label: 'En Tienda',
     color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
     icon: Package
   },
   'reserved': {
-    label: 'Reserved',
+    label: 'Reservado',
     color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
     icon: Clock
   },
   'sold': {
-    label: 'Sold',
+    label: 'Vendido',
     color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
     icon: CheckCircle
   },
   'returned-to-vendor': {
-    label: 'Returned to Vendor',
+    label: 'Devuelto al Consignador',
     color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
     icon: RotateCcw
   }
@@ -59,8 +59,8 @@ export function StatusUpdateDropdown({ itemId, currentStatus, onStatusChange }: 
     },
     onSuccess: (data) => {
       toast({
-        title: "Status Updated",
-        description: `Item status changed to ${statusConfig[data.status as keyof typeof statusConfig]?.label}`,
+        title: "Estado Actualizado",
+        description: `Estado del artículo cambiado a ${statusConfig[data.status as keyof typeof statusConfig]?.label}`,
       });
       
       // Invalidate relevant queries
@@ -74,7 +74,7 @@ export function StatusUpdateDropdown({ itemId, currentStatus, onStatusChange }: 
     onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to update item status. Please try again.",
+        description: "Error al actualizar el estado del artículo. Por favor inténtalo de nuevo.",
         variant: "destructive",
       });
     }
@@ -113,7 +113,7 @@ export function StatusUpdateDropdown({ itemId, currentStatus, onStatusChange }: 
               <Icon className="h-4 w-4" />
               {config.label}
               {status === currentStatus && (
-                <span className="ml-auto text-xs text-muted-foreground">Current</span>
+                <span className="ml-auto text-xs text-muted-foreground">Actual</span>
               )}
             </DropdownMenuItem>
           );

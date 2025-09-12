@@ -87,15 +87,15 @@ const toOptionalNumber = z.preprocess(
 );
 
 const itemFormSchema = insertItemSchema.extend({
-  vendorId: z.string().min(1, "Vendor is required"),
-  title: z.string().min(1, "Title is required"),
-  brandId: z.string().min(1, "Brand is required"),
-  model: z.string().min(1, "Model is required"),
+  vendorId: z.string().min(1, "Consignador es requerido"),
+  title: z.string().min(1, "Título es requerido"),
+  brandId: z.string().min(1, "Marca es requerida"),
+  model: z.string().min(1, "Modelo es requerido"),
   minCost: toOptionalNumber,
   maxCost: toOptionalNumber,
   minSalesPrice: toOptionalNumber,
   maxSalesPrice: toOptionalNumber,
-  acquisitionDate: z.string().min(1, "Acquisition date is required"),
+  acquisitionDate: z.string().min(1, "Fecha de adquisición es requerida"),
 }).refine((data) => {
   // Validate that min <= max for cost range
   if (data.minCost !== undefined && data.maxCost !== undefined) {
@@ -103,7 +103,7 @@ const itemFormSchema = insertItemSchema.extend({
   }
   return true;
 }, {
-  message: "Minimum cost cannot be greater than maximum cost",
+  message: "El costo mínimo no puede ser mayor que el costo máximo",
   path: ["maxCost"],
 }).refine((data) => {
   // Validate that min <= max for sales price range  
@@ -112,17 +112,17 @@ const itemFormSchema = insertItemSchema.extend({
   }
   return true;
 }, {
-  message: "Minimum sales price cannot be greater than maximum sales price",
+  message: "El precio de venta mínimo no puede ser mayor que el precio de venta máximo",
   path: ["maxSalesPrice"],
 });
 
 // Create a function to generate the sale form schema with item context
 const saleFormSchema = z
   .object({
-    clientId: z.string().min(1, "Client is required"),
+    clientId: z.string().min(1, "Cliente es requerido"),
     paymentType: z.enum(["full", "installment"]),
-    amount: z.string().min(1, "Amount is required"),
-    paymentMethod: z.string().min(1, "Payment method is required"),
+    amount: z.string().min(1, "Monto es requerido"),
+    paymentMethod: z.string().min(1, "Método de pago es requerido"),
     installments: z
       .array(
         z.object({
@@ -151,7 +151,7 @@ const saleFormSchema = z
       return true;
     },
     {
-      message: "Please provide all installment amounts and due dates",
+      message: "Por favor proporcione todos los montos y fechas de vencimiento de las cuotas",
       path: ["installments"],
     },
   );
@@ -189,18 +189,18 @@ function formatDate(dateString: string) {
 function getStatusBadge(status: string) {
   const statusConfig = {
     "in-store": {
-      label: "In Store",
+      label: "En Tienda",
       className: "status-in-store",
       icon: Package,
     },
     reserved: {
-      label: "Reserved",
+      label: "Reservado",
       className: "status-reserved",
       icon: AlertCircle,
     },
-    sold: { label: "Sold", className: "status-sold", icon: CheckCircle },
+    sold: { label: "Vendido", className: "status-sold", icon: CheckCircle },
     returned: {
-      label: "Returned",
+      label: "Devuelto",
       className: "status-returned",
       icon: AlertCircle,
     },
@@ -289,15 +289,15 @@ export default function Inventory() {
       setIsCreateModalOpen(false);
       form.reset();
       toast({
-        title: "Success",
-        description: "Item created successfully",
+        title: "Éxito",
+        description: "Artículo creado exitosamente",
       });
     },
     onError: (error: any) => {
       console.error("Create item error:", error);
       toast({
         title: "Error",
-        description: error?.message || "Failed to create item",
+        description: error?.message || "Error al crear artículo",
         variant: "destructive",
       });
     },
@@ -314,14 +314,14 @@ export default function Inventory() {
         queryKey: ["/api/dashboard/recent-items"],
       });
       toast({
-        title: "Success",
-        description: "Item deleted successfully",
+        title: "Éxito",
+        description: "Artículo eliminado exitosamente",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to delete item",
+        description: "Error al eliminar artículo",
         variant: "destructive",
       });
     },
@@ -357,7 +357,7 @@ export default function Inventory() {
       } else {
         // Create installment plan
         if (!data.installments || data.installments.length === 0) {
-          throw new Error("Installments are required for installment payment");
+          throw new Error("Las cuotas son requeridas para el pago a plazos");
         }
 
         // Update item status to "reserved" for installment plan
@@ -412,14 +412,14 @@ export default function Inventory() {
       setInstallments([{ amount: "", dueDate: "" }]);
       saleForm.reset();
       toast({
-        title: "Success",
-        description: "Sale recorded successfully",
+        title: "Éxito",
+        description: "Venta registrada exitosamente",
       });
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: error?.message || "Failed to record sale",
+        description: error?.message || "Error al registrar venta",
         variant: "destructive",
       });
     },
@@ -469,7 +469,7 @@ export default function Inventory() {
     if (!selectedItem?.itemId) {
       toast({
         title: "Error",
-        description: "No item selected for sale",
+        description: "Ningún artículo seleccionado para la venta",
         variant: "destructive",
       });
       return;
@@ -587,7 +587,7 @@ export default function Inventory() {
     items?.reduce((sum, item) => sum + Number(item.maxSalesPrice || 0), 0) || 0;
 
   return (
-    <MainLayout title="Inventory" subtitle="Manage your luxury items inventory">
+    <MainLayout title="Inventario" subtitle="Administra tu inventario de artículos de lujo">
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <Card className="hover-lift">
@@ -690,7 +690,7 @@ export default function Inventory() {
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search items, brands, vendors..."
+                  placeholder="Buscar artículos, marcas, consignadores..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -701,7 +701,7 @@ export default function Inventory() {
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-48">
                   <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Filter by status" />
+                  <SelectValue placeholder="Filtrar por estado" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
@@ -716,7 +716,7 @@ export default function Inventory() {
               <Select value={brandFilter} onValueChange={setBrandFilter}>
                 <SelectTrigger className="w-48">
                   <Tag className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Filter by brand" />
+                  <SelectValue placeholder="Filtrar por marca" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Brands</SelectItem>
@@ -732,7 +732,7 @@ export default function Inventory() {
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="w-48">
                   <Package className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Filter by category" />
+                  <SelectValue placeholder="Filtrar por categoría" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
@@ -748,7 +748,7 @@ export default function Inventory() {
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-48">
                   <SortAsc className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Sort by" />
+                  <SelectValue placeholder="Ordenar por" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="newest">Newest First</SelectItem>
@@ -796,7 +796,7 @@ export default function Inventory() {
                             >
                               <FormControl>
                                 <SelectTrigger data-testid="select-vendor">
-                                  <SelectValue placeholder="Select vendor" />
+                                  <SelectValue placeholder="Seleccionar consignador" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -828,7 +828,7 @@ export default function Inventory() {
                           <FormItem>
                             <FormLabel>Title</FormLabel>
                             <FormControl>
-                              <Input placeholder="Item title" {...field} />
+                              <Input placeholder="Título del artículo" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -847,7 +847,7 @@ export default function Inventory() {
                             >
                               <FormControl>
                                 <SelectTrigger data-testid="select-brand">
-                                  <SelectValue placeholder="Select brand" />
+                                  <SelectValue placeholder="Seleccionar marca" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -884,7 +884,7 @@ export default function Inventory() {
                             >
                               <FormControl>
                                 <SelectTrigger data-testid="select-category">
-                                  <SelectValue placeholder="Select category" />
+                                  <SelectValue placeholder="Seleccionar categoría" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -918,7 +918,7 @@ export default function Inventory() {
                             <FormLabel>Model</FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="Model number/name"
+                                placeholder="Número/nombre del modelo"
                                 {...field}
                               />
                             </FormControl>
@@ -935,7 +935,7 @@ export default function Inventory() {
                             <FormLabel>Serial Number</FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="Serial number"
+                                placeholder="Número de serie"
                                 {...field}
                                 value={field.value || ""}
                               />
@@ -957,20 +957,20 @@ export default function Inventory() {
                             >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select condition" />
+                                  <SelectValue placeholder="Seleccionar condición" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="New">New</SelectItem>
+                                <SelectItem value="New">Nuevo</SelectItem>
                                 <SelectItem value="Excellent">
-                                  Excellent
+                                  Excelente
                                 </SelectItem>
                                 <SelectItem value="Very Good">
-                                  Very Good
+                                  Muy Bueno
                                 </SelectItem>
-                                <SelectItem value="Good">Good</SelectItem>
-                                <SelectItem value="Fair">Fair</SelectItem>
-                                <SelectItem value="Poor">Poor</SelectItem>
+                                <SelectItem value="Good">Bueno</SelectItem>
+                                <SelectItem value="Fair">Regular</SelectItem>
+                                <SelectItem value="Poor">Malo</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -1080,7 +1080,7 @@ export default function Inventory() {
                             >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select status" />
+                                  <SelectValue placeholder="Seleccionar estado" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -1126,8 +1126,8 @@ export default function Inventory() {
                         disabled={createItemMutation.isPending}
                       >
                         {createItemMutation.isPending
-                          ? "Creating..."
-                          : "Create Item"}
+                          ? "Creando..."
+                          : "Crear Artículo"}
                       </Button>
                     </div>
                   </form>
@@ -1265,7 +1265,7 @@ export default function Inventory() {
                         variant="ghost"
                         size="sm"
                         onClick={() =>
-                          handleDeleteItem(item.itemId, item.title || "Item")
+                          handleDeleteItem(item.itemId, item.title || "Artículo")
                         }
                         disabled={deleteItemMutation.isPending}
                       >
@@ -1309,7 +1309,7 @@ export default function Inventory() {
                             onClick={() =>
                               handleDeleteItem(
                                 item.itemId,
-                                item.title || "Item",
+                                item.title || "Artículo",
                               )
                             }
                             disabled={deleteItemMutation.isPending}
@@ -1333,8 +1333,8 @@ export default function Inventory() {
               </h3>
               <p className="text-muted-foreground mb-4">
                 {searchQuery || statusFilter !== "all"
-                  ? "No items match your current filters"
-                  : "Get started by adding your first item"}
+                  ? "Ningún artículo coincide con tus filtros actuales"
+                  : "Comienza agregando tu primer artículo"}
               </p>
               {!searchQuery && statusFilter === "all" && (
                 <Button onClick={() => setIsCreateModalOpen(true)}>
@@ -1393,8 +1393,8 @@ export default function Inventory() {
             <form
               onSubmit={saleForm.handleSubmit(onSaleSubmit, (errors) => {
                 toast({
-                  title: "Form Validation Error",
-                  description: "Please check all required fields",
+                  title: "Error de Validación del Formulario",
+                  description: "Por favor verifica todos los campos requeridos",
                   variant: "destructive",
                 });
               })}
@@ -1409,7 +1409,7 @@ export default function Inventory() {
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a client" />
+                          <SelectValue placeholder="Seleccionar un cliente" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -1437,7 +1437,7 @@ export default function Inventory() {
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select payment type" />
+                          <SelectValue placeholder="Seleccionar tipo de pago" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -1459,8 +1459,8 @@ export default function Inventory() {
                   <FormItem>
                     <FormLabel>
                       {saleForm.watch("paymentType") === "installment"
-                        ? "Initial Payment Amount"
-                        : "Payment Amount"}
+                        ? "Monto del Pago Inicial"
+                        : "Monto del Pago"}
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -1484,7 +1484,7 @@ export default function Inventory() {
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select payment method" />
+                          <SelectValue placeholder="Seleccionar método de pago" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -1567,7 +1567,7 @@ export default function Inventory() {
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Amount"
+                        placeholder="Monto"
                         value={installment.amount}
                         onChange={(e) =>
                           updateInstallment(index, "amount", e.target.value)
@@ -1610,8 +1610,8 @@ export default function Inventory() {
                   data-testid="button-record-sale"
                 >
                   {createSaleMutation.isPending
-                    ? "Processing..."
-                    : "Record Sale"}
+                    ? "Procesando..."
+                    : "Registrar Venta"}
                 </Button>
               </div>
             </form>
