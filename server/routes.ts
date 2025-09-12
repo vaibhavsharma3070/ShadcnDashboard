@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { 
   insertVendorSchema, insertClientSchema, insertItemSchema, 
   insertClientPaymentSchema, insertVendorPayoutSchema, insertItemExpenseSchema, insertInstallmentPlanSchema,
-  insertBrandSchema, insertCategorySchema
+  insertBrandSchema, insertCategorySchema, insertPaymentMethodSchema
 } from "@shared/schema";
 
 // Helper function to categorize errors
@@ -228,6 +228,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/categories/:id", async (req, res) => {
     try {
       await storage.deleteCategory(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
+  // Payment Method routes
+  app.get("/api/payment-methods", async (req, res) => {
+    try {
+      const paymentMethods = await storage.getPaymentMethods();
+      res.json(paymentMethods);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch payment methods" });
+    }
+  });
+
+  app.get("/api/payment-methods/:id", async (req, res) => {
+    try {
+      const paymentMethod = await storage.getPaymentMethod(req.params.id);
+      if (!paymentMethod) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+      res.json(paymentMethod);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch payment method" });
+    }
+  });
+
+  app.post("/api/payment-methods", async (req, res) => {
+    try {
+      const validatedData = insertPaymentMethodSchema.parse(req.body);
+      const paymentMethod = await storage.createPaymentMethod(validatedData);
+      res.status(201).json(paymentMethod);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid payment method data" });
+    }
+  });
+
+  app.put("/api/payment-methods/:id", async (req, res) => {
+    try {
+      const validatedData = insertPaymentMethodSchema.partial().parse(req.body);
+      const paymentMethod = await storage.updatePaymentMethod(req.params.id, validatedData);
+      res.json(paymentMethod);
+    } catch (error) {
+      // Check if it's a Zod validation error
+      if (error && typeof error === 'object' && 'issues' in error) {
+        res.status(400).json({ error: "Invalid payment method data" });
+      } else {
+        // It's a storage error
+        const { status, message } = handleStorageError(error);
+        res.status(status).json({ error: message });
+      }
+    }
+  });
+
+  app.delete("/api/payment-methods/:id", async (req, res) => {
+    try {
+      await storage.deletePaymentMethod(req.params.id);
       res.status(204).send();
     } catch (error) {
       const { status, message } = handleStorageError(error);

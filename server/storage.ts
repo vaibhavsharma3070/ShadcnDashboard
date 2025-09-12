@@ -1,7 +1,7 @@
 import { 
-  vendor, client, item, clientPayment, vendorPayout, itemExpense, installmentPlan, users, brand, category,
-  type Vendor, type Client, type Item, type ClientPayment, type VendorPayout, type ItemExpense, type InstallmentPlan, type User, type Brand, type Category,
-  type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser, type InsertBrand, type InsertCategory
+  vendor, client, item, clientPayment, vendorPayout, itemExpense, installmentPlan, users, brand, category, paymentMethod,
+  type Vendor, type Client, type Item, type ClientPayment, type VendorPayout, type ItemExpense, type InstallmentPlan, type User, type Brand, type Category, type PaymentMethod,
+  type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser, type InsertBrand, type InsertCategory, type InsertPaymentMethod
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sum, count, sql, and, isNull, isNotNull } from "drizzle-orm";
@@ -67,6 +67,13 @@ export interface IStorage {
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: string, category: Partial<InsertCategory>): Promise<Category>;
   deleteCategory(id: string): Promise<void>;
+  
+  // Payment Method methods
+  getPaymentMethods(): Promise<PaymentMethod[]>;
+  getPaymentMethod(id: string): Promise<PaymentMethod | undefined>;
+  createPaymentMethod(paymentMethod: InsertPaymentMethod): Promise<PaymentMethod>;
+  updatePaymentMethod(id: string, paymentMethod: Partial<InsertPaymentMethod>): Promise<PaymentMethod>;
+  deletePaymentMethod(id: string): Promise<void>;
   
   // Item methods
   getItems(): Promise<Array<Item & { vendor: Vendor }>>;
@@ -319,6 +326,42 @@ export class DatabaseStorage implements IStorage {
     }
     
     await db.delete(category).where(eq(category.categoryId, id));
+  }
+
+  // Payment Method methods
+  async getPaymentMethods(): Promise<PaymentMethod[]> {
+    return await db.select().from(paymentMethod).orderBy(desc(paymentMethod.createdAt));
+  }
+
+  async getPaymentMethod(id: string): Promise<PaymentMethod | undefined> {
+    const [result] = await db.select().from(paymentMethod).where(eq(paymentMethod.paymentMethodId, id));
+    return result || undefined;
+  }
+
+  async createPaymentMethod(insertPaymentMethod: InsertPaymentMethod): Promise<PaymentMethod> {
+    const [result] = await db.insert(paymentMethod).values(insertPaymentMethod).returning();
+    return result;
+  }
+
+  async updatePaymentMethod(id: string, updatePaymentMethod: Partial<InsertPaymentMethod>): Promise<PaymentMethod> {
+    const [result] = await db.update(paymentMethod).set(updatePaymentMethod).where(eq(paymentMethod.paymentMethodId, id)).returning();
+    if (!result) {
+      throw new Error("Payment method not found");
+    }
+    return result;
+  }
+
+  async deletePaymentMethod(id: string): Promise<void> {
+    // Check if payment method is referenced by any client payments
+    const [referencedPayments] = await db.select({ count: sql<number>`COUNT(*)` })
+      .from(clientPayment)
+      .where(eq(clientPayment.paymentMethod, id));
+    
+    if (Number(referencedPayments.count) > 0) {
+      throw new Error("Cannot delete payment method. It is referenced by existing payments.");
+    }
+    
+    await db.delete(paymentMethod).where(eq(paymentMethod.paymentMethodId, id));
   }
 
   // Item methods

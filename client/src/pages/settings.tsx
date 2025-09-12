@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertBrandSchema, insertCategorySchema, type Brand, type Category, type InsertBrand, type InsertCategory } from "@shared/schema";
+import { insertBrandSchema, insertCategorySchema, insertPaymentMethodSchema, type Brand, type Category, type PaymentMethod, type InsertBrand, type InsertCategory, type InsertPaymentMethod } from "@shared/schema";
 import { z } from "zod";
 import { 
   Settings as SettingsIcon, 
@@ -28,7 +28,8 @@ import {
   Package,
   Eye,
   EyeOff,
-  MoreVertical
+  MoreVertical,
+  CreditCard
 } from "lucide-react";
 
 const brandFormSchema = insertBrandSchema.extend({
@@ -39,8 +40,13 @@ const categoryFormSchema = insertCategorySchema.extend({
   name: z.string().min(1, "Category name is required"),
 });
 
+const paymentMethodFormSchema = insertPaymentMethodSchema.extend({
+  name: z.string().min(1, "Payment method name is required"),
+});
+
 type BrandFormData = z.infer<typeof brandFormSchema>;
 type CategoryFormData = z.infer<typeof categoryFormSchema>;
+type PaymentMethodFormData = z.infer<typeof paymentMethodFormSchema>;
 
 function formatDate(date: string | Date) {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
@@ -803,6 +809,377 @@ function CategoryManagement() {
   );
 }
 
+// Payment Method Management Component  
+function PaymentMethodManagement() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
+  
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: paymentMethods = [], isLoading } = useQuery<PaymentMethod[]>({
+    queryKey: ['/api/payment-methods'],
+  });
+
+  const createPaymentMethodMutation = useMutation({
+    mutationFn: (data: PaymentMethodFormData) => 
+      apiRequest('POST', '/api/payment-methods', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-methods'] });
+      setIsCreateDialogOpen(false);
+      toast({ title: "Payment method created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error creating payment method", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const updatePaymentMethodMutation = useMutation({
+    mutationFn: ({ paymentMethodId, data }: { paymentMethodId: string; data: Partial<PaymentMethodFormData> }) =>
+      apiRequest('PUT', `/api/payment-methods/${paymentMethodId}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-methods'] });
+      setEditingPaymentMethod(null);
+      toast({ title: "Payment method updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error updating payment method", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const deletePaymentMethodMutation = useMutation({
+    mutationFn: (paymentMethodId: string) =>
+      apiRequest('DELETE', `/api/payment-methods/${paymentMethodId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-methods'] });
+      toast({ title: "Payment method deleted successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error deleting payment method", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const paymentMethodForm = useForm<PaymentMethodFormData>({
+    resolver: zodResolver(paymentMethodFormSchema),
+    defaultValues: {
+      name: "",
+      active: "true",
+    },
+  });
+
+  const editForm = useForm<PaymentMethodFormData>({
+    resolver: zodResolver(paymentMethodFormSchema),
+    defaultValues: {
+      name: "",
+      active: "true",
+    },
+  });
+
+  const filteredPaymentMethods = paymentMethods.filter((paymentMethod: PaymentMethod) =>
+    paymentMethod.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleCreatePaymentMethod = (data: PaymentMethodFormData) => {
+    createPaymentMethodMutation.mutate(data);
+  };
+
+  const handleEditPaymentMethod = (paymentMethod: PaymentMethod) => {
+    setEditingPaymentMethod(paymentMethod);
+    editForm.reset({
+      name: paymentMethod.name,
+      active: paymentMethod.active,
+    });
+  };
+
+  const handleUpdatePaymentMethod = (data: PaymentMethodFormData) => {
+    if (!editingPaymentMethod) return;
+    updatePaymentMethodMutation.mutate({
+      paymentMethodId: editingPaymentMethod.paymentMethodId,
+      data,
+    });
+  };
+
+  const handleDeletePaymentMethod = (paymentMethodId: string, paymentMethodName: string) => {
+    if (confirm(`Are you sure you want to delete the payment method "${paymentMethodName}"? This action cannot be undone.`)) {
+      deletePaymentMethodMutation.mutate(paymentMethodId);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search payment methods..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-payment-methods"
+          />
+        </div>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-create-payment-method">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Payment Method
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Payment Method</DialogTitle>
+            </DialogHeader>
+            <Form {...paymentMethodForm}>
+              <form onSubmit={paymentMethodForm.handleSubmit(handleCreatePaymentMethod)} className="space-y-4">
+                <FormField
+                  control={paymentMethodForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Payment Method Name</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder="e.g., Cash, Credit Card, Wire Transfer" 
+                          data-testid="input-create-payment-method-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={paymentMethodForm.control}
+                  name="active"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>Active</FormLabel>
+                        <div className="text-sm text-muted-foreground">
+                          Allow this payment method to be used for new payments
+                        </div>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value === "true"}
+                          onCheckedChange={(checked) => field.onChange(checked ? "true" : "false")}
+                          data-testid="switch-create-payment-method-active"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsCreateDialogOpen(false)}
+                    data-testid="button-cancel-create-payment-method"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={createPaymentMethodMutation.isPending}
+                    data-testid="button-submit-create-payment-method"
+                  >
+                    {createPaymentMethodMutation.isPending ? "Creating..." : "Create Payment Method"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid gap-4">
+        {isLoading ? (
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <Skeleton className="h-9 w-9" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : filteredPaymentMethods.length === 0 ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <CreditCard className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                {searchTerm ? "No payment methods found" : "No payment methods yet"}
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                {searchTerm 
+                  ? "Try adjusting your search terms"
+                  : "Get started by creating your first payment method"
+                }
+              </p>
+              {!searchTerm && (
+                <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-first-payment-method">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create First Payment Method
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          filteredPaymentMethods.map((paymentMethod: PaymentMethod) => (
+            <Card key={paymentMethod.paymentMethodId} data-testid={`card-payment-method-${paymentMethod.paymentMethodId}`}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-lg font-medium text-foreground" data-testid={`text-payment-method-name-${paymentMethod.paymentMethodId}`}>
+                        {paymentMethod.name}
+                      </h3>
+                      <Badge 
+                        variant={paymentMethod.active === "true" ? "default" : "secondary"}
+                        data-testid={`badge-payment-method-status-${paymentMethod.paymentMethodId}`}
+                      >
+                        {paymentMethod.active === "true" ? (
+                          <>
+                            <Eye className="mr-1 h-3 w-3" />
+                            Active
+                          </>
+                        ) : (
+                          <>
+                            <EyeOff className="mr-1 h-3 w-3" />
+                            Inactive
+                          </>
+                        )}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Created {formatDate(paymentMethod.createdAt)}
+                    </p>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" data-testid={`button-payment-method-actions-${paymentMethod.paymentMethodId}`}>
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem 
+                        onClick={() => handleEditPaymentMethod(paymentMethod)}
+                        data-testid={`button-edit-payment-method-${paymentMethod.paymentMethodId}`}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDeletePaymentMethod(paymentMethod.paymentMethodId, paymentMethod.name)}
+                        className="text-destructive focus:text-destructive"
+                        data-testid={`button-delete-payment-method-${paymentMethod.paymentMethodId}`}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingPaymentMethod} onOpenChange={() => setEditingPaymentMethod(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Payment Method</DialogTitle>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleUpdatePaymentMethod)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Method Name</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="e.g., Cash, Credit Card, Wire Transfer" 
+                        data-testid="input-edit-payment-method-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="active"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel>Active</FormLabel>
+                      <div className="text-sm text-muted-foreground">
+                        Allow this payment method to be used for new payments
+                      </div>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value === "true"}
+                        onCheckedChange={(checked) => field.onChange(checked ? "true" : "false")}
+                        data-testid="switch-edit-payment-method-active"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setEditingPaymentMethod(null)}
+                  data-testid="button-cancel-edit-payment-method"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={updatePaymentMethodMutation.isPending}
+                  data-testid="button-update-payment-method"
+                >
+                  {updatePaymentMethodMutation.isPending ? "Updating..." : "Update Payment Method"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // Main Settings Page Component
 export default function Settings() {
   return (
@@ -821,7 +1198,7 @@ export default function Settings() {
 
         {/* Settings Tabs */}
         <Tabs defaultValue="brands" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="brands" data-testid="tab-brands">
               <Tags className="mr-2 h-4 w-4" />
               Brands
@@ -829,6 +1206,10 @@ export default function Settings() {
             <TabsTrigger value="categories" data-testid="tab-categories">
               <Package className="mr-2 h-4 w-4" />
               Categories
+            </TabsTrigger>
+            <TabsTrigger value="payment-methods" data-testid="tab-payment-methods">
+              <CreditCard className="mr-2 h-4 w-4" />
+              Payment Methods
             </TabsTrigger>
           </TabsList>
 
@@ -838,6 +1219,10 @@ export default function Settings() {
 
           <TabsContent value="categories">
             <CategoryManagement />
+          </TabsContent>
+
+          <TabsContent value="payment-methods">
+            <PaymentMethodManagement />
           </TabsContent>
         </Tabs>
       </div>

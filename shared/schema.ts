@@ -45,6 +45,16 @@ export const category = pgTable("category", {
   activeIdx: index("idx_category_active").on(table.active),
 }));
 
+export const paymentMethod = pgTable("payment_method", {
+  paymentMethodId: uuid("payment_method_id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  active: text("active").notNull().default("true"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("idx_payment_method_name").on(table.name),
+  activeIdx: index("idx_payment_method_active").on(table.active),
+}));
+
 export const item = pgTable("item", {
   itemId: uuid("item_id").primaryKey().defaultRandom(),
   vendorId: uuid("vendor_id").notNull(),
@@ -266,6 +276,11 @@ export const insertCategorySchema = createInsertSchema(category).omit({
   createdAt: true,
 });
 
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethod).omit({
+  paymentMethodId: true,
+  createdAt: true,
+});
+
 export const insertItemSchema = createInsertSchema(item).omit({
   itemId: true,
   brand: true, // Omit legacy brand field
@@ -341,6 +356,9 @@ export type Brand = typeof brand.$inferSelect;
 
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof category.$inferSelect;
+
+export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
+export type PaymentMethod = typeof paymentMethod.$inferSelect;
 
 export type InsertItem = z.infer<typeof insertItemSchema>;
 export type Item = typeof item.$inferSelect;
