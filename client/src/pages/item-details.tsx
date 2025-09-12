@@ -41,7 +41,9 @@ import {
   History,
   Target,
   TrendingUp,
-  Minus
+  Minus,
+  FileText,
+  Download
 } from "lucide-react";
 
 type ItemWithVendor = Item & { vendor: Vendor };
@@ -154,6 +156,7 @@ export default function ItemDetails() {
   const itemId = params.id;
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isEditInstallmentModalOpen, setIsEditInstallmentModalOpen] = useState(false);
   const [editingInstallment, setEditingInstallment] = useState<InstallmentPlan | null>(null);
   const [isSplitMode, setIsSplitMode] = useState(false);
@@ -916,6 +919,29 @@ export default function ItemDetails() {
             </DialogContent>
           </Dialog>
 
+          {/* Invoice Button - only show if item has a client assigned */}
+          {assignedClient && (
+            <Dialog open={isInvoiceModalOpen} onOpenChange={setIsInvoiceModalOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" data-testid="button-generate-invoice">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Generate Invoice
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Invoice - {item.title}</DialogTitle>
+                </DialogHeader>
+                <InvoiceComponent 
+                  item={item}
+                  client={assignedClient}
+                  payments={payments || []}
+                  installmentPlans={installmentPlans || []}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
+
           <Button variant="destructive" onClick={handleDelete} disabled={deleteItemMutation.isPending}>
             <Trash2 className="h-4 w-4 mr-2" />
             {deleteItemMutation.isPending ? "Deleting..." : "Delete"}
@@ -1466,5 +1492,182 @@ export default function ItemDetails() {
         </DialogContent>
       </Dialog>
     </MainLayout>
+  );
+}
+
+// Invoice Component
+interface InvoiceComponentProps {
+  item: ItemWithVendor;
+  client: Client;
+  payments: PaymentWithClient[];
+  installmentPlans: Array<InstallmentPlan & { client: Client }>;
+}
+
+function InvoiceComponent({ item, client, payments, installmentPlans }: InvoiceComponentProps) {
+  // Generate invoice number based on current timestamp
+  const invoiceNumber = `INV-${Date.now()}`;
+  const currentDate = new Date().toLocaleDateString();
+  const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(); // 30 days from now
+  
+  // Calculate totals
+  const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const itemPrice = Number(item.maxSalesPrice || item.minSalesPrice || 0);
+  const remainingBalance = Math.max(0, itemPrice - totalPaid);
+  
+  // Get upcoming installments
+  const upcomingInstallments = installmentPlans.filter(plan => plan.status === 'pending');
+  
+  // Calculate tax (for now using 0%, but this could be configurable)
+  const taxRate = 0.0;
+  const subtotal = itemPrice / (1 + taxRate);
+  const taxAmount = itemPrice - subtotal;
+
+  return (
+    <div className="invoice-container p-8 bg-white text-black min-h-[11in] max-w-4xl mx-auto" data-testid="invoice-container">
+      {/* Company Header */}
+      <div className="flex justify-between items-start mb-8">
+        <div>
+          <h1 className="text-3xl font-bold mb-2" data-testid="text-invoice-title">INVOICE</h1>
+          <p className="text-sm text-gray-600">SYSTEM</p>
+        </div>
+        <div className="text-right text-sm">
+          <p>info@company.com</p>
+          <p>555-123-4567</p>
+          <p className="mt-2">Business Address</p>
+        </div>
+      </div>
+
+      {/* Invoice Details */}
+      <div className="grid grid-cols-2 gap-8 mb-8">
+        <div>
+          <h3 className="font-semibold mb-2">INVOICE FOR:</h3>
+          <div className="text-sm" data-testid="text-client-details">
+            <p className="font-medium">{client.name}</p>
+            {client.phone && <p>Phone: {client.phone}</p>}
+            {client.email && <p>Email: {client.email}</p>}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-sm">
+            <p><span className="font-medium">NUMBER:</span> {invoiceNumber}</p>
+            <p><span className="font-medium">DATE:</span> {currentDate}</p>
+            <p><span className="font-medium">DUE DATE:</span> {dueDate}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Item Details Table */}
+      <div className="mb-8">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-2">Descripción</th>
+              <th className="text-center py-2">Cantidad</th>
+              <th className="text-center py-2">Precio por unidad</th>
+              <th className="text-center py-2">TAX</th>
+              <th className="text-right py-2">Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="py-4" data-testid="text-item-description">
+                {item.title}
+                {item.model && <div className="text-sm text-gray-600">{item.model}</div>}
+              </td>
+              <td className="text-center py-4">1</td>
+              <td className="text-center py-4">{formatCurrency(itemPrice)}</td>
+              <td className="text-center py-4">{(taxRate * 100).toFixed(1)}%</td>
+              <td className="text-right py-4">{formatCurrency(itemPrice)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Payment Summary */}
+      <div className="flex justify-end mb-8">
+        <div className="w-64">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span>SUBTOTAL:</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>TAX:</span>
+              <span>{formatCurrency(taxAmount)}</span>
+            </div>
+            <div className="flex justify-between font-semibold border-t pt-2">
+              <span>TOTAL:</span>
+              <span data-testid="text-total-amount">{formatCurrency(itemPrice)}</span>
+            </div>
+            <div className="flex justify-between text-green-600">
+              <span>PAGADA:</span>
+              <span data-testid="text-paid-amount">{formatCurrency(totalPaid)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-lg border-t pt-2">
+              <span>TOTAL POR PAGAR</span>
+              <span data-testid="text-remaining-balance">{formatCurrency(remainingBalance)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Payment Schedule for Installments */}
+      {upcomingInstallments.length > 0 && (
+        <div className="mb-8">
+          <h3 className="font-semibold mb-4">Upcoming Payment Schedule:</h3>
+          <table className="w-full border-collapse border">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border p-2 text-left">Due Date</th>
+                <th className="border p-2 text-right">Amount</th>
+                <th className="border p-2 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {upcomingInstallments.map((installment, index) => (
+                <tr key={installment.installmentId} data-testid={`row-installment-${index}`}>
+                  <td className="border p-2">{formatDate(installment.dueDate)}</td>
+                  <td className="border p-2 text-right">{formatCurrency(Number(installment.amount))}</td>
+                  <td className="border p-2 text-center">
+                    <Badge variant={installment.status === 'paid' ? 'default' : 'secondary'}>
+                      {installment.status}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Terms and Conditions */}
+      <div className="mb-8">
+        <h3 className="font-semibold mb-2">Términos y condiciones</h3>
+        <p className="text-sm text-gray-700">
+          Payment terms: Net 30 days. Late payments may incur additional charges. All sales are final unless otherwise specified.
+          Items must be inspected upon delivery. Any discrepancies must be reported within 48 hours.
+          Luxury consignment items are sold as-is with authenticity guarantee. Returns are subject to inspection and approval.
+        </p>
+      </div>
+
+      {/* Notes */}
+      <div className="mb-4">
+        <h3 className="font-semibold mb-2">Notes:</h3>
+        <p className="text-sm text-gray-700">
+          Generated on {currentDate}
+        </p>
+        <p className="text-sm text-gray-700 mt-2">
+          Thank you for your business. For any questions regarding this invoice, please contact us at info@company.com or 555-123-4567.
+        </p>
+      </div>
+
+      {/* Print/Download Actions */}
+      <div className="flex justify-end space-x-2 mt-8 no-print">
+        <Button variant="outline" onClick={() => window.print()} data-testid="button-print-invoice">
+          <Download className="h-4 w-4 mr-2" />
+          Print Invoice
+        </Button>
+      </div>
+    </div>
   );
 }
