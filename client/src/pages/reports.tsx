@@ -706,7 +706,7 @@ export default function Reports() {
               </Button>
               <Button variant="outline" size="sm" onClick={exportReport} data-testid="button-export-report">
                 <Download className="h-4 w-4 mr-2" />
-                Export
+                Exportar
               </Button>
             </div>
           </div>
@@ -715,7 +715,7 @@ export default function Reports() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
             {/* Date Range */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Start Date</label>
+              <label className="text-sm font-medium text-muted-foreground">Fecha de Inicio</label>
               <input
                 type="date"
                 className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background"
@@ -726,7 +726,7 @@ export default function Reports() {
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">End Date</label>
+              <label className="text-sm font-medium text-muted-foreground">Fecha Final</label>
               <input
                 type="date"
                 className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background"
@@ -738,25 +738,25 @@ export default function Reports() {
 
             {/* Granularity */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Granularity</label>
+              <label className="text-sm font-medium text-muted-foreground">Granularidad</label>
               <Select value={filters.granularity} onValueChange={(value: 'day' | 'week' | 'month') => handleFilterChange('granularity', value)}>
                 <SelectTrigger data-testid="select-granularity">
-                  <SelectValue placeholder="Select granularity" />
+                  <SelectValue placeholder="Seleccionar granularidad" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="day">Daily</SelectItem>
-                  <SelectItem value="week">Weekly</SelectItem>
-                  <SelectItem value="month">Monthly</SelectItem>
+                  <SelectItem value="day">Diario</SelectItem>
+                  <SelectItem value="week">Semanal</SelectItem>
+                  <SelectItem value="month">Mensual</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Entity Filters */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Vendors</label>
+              <label className="text-sm font-medium text-muted-foreground">Consignadores</label>
               <Select>
                 <SelectTrigger data-testid="select-vendors">
-                  <SelectValue placeholder={`${(filters.vendorIds || []).length} selected`} />
+                  <SelectValue placeholder={`${(filters.vendorIds || []).length} seleccionados`} />
                 </SelectTrigger>
                 <SelectContent>
                   {vendorsLoading ? (
@@ -770,7 +770,7 @@ export default function Reports() {
                         value={vendor?.vendorId || ''}
                         onClick={() => handleEntityFilter('vendorIds', vendor?.vendorId || '')}
                       >
-                        {vendor?.name || 'Unknown Vendor'}
+                        {vendor?.name || 'Consignador Desconocido'}
                       </SelectItem>
                     ))
                   )}
@@ -779,10 +779,10 @@ export default function Reports() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Clients</label>
+              <label className="text-sm font-medium text-muted-foreground">Clientes</label>
               <Select>
                 <SelectTrigger data-testid="select-clients">
-                  <SelectValue placeholder={`${(filters.clientIds || []).length} selected`} />
+                  <SelectValue placeholder={`${(filters.clientIds || []).length} seleccionados`} />
                 </SelectTrigger>
                 <SelectContent>
                   {clientsLoading ? (
@@ -796,7 +796,7 @@ export default function Reports() {
                         value={client?.clientId || ''}
                         onClick={() => handleEntityFilter('clientIds', client?.clientId || '')}
                       >
-                        {client?.name || 'Unknown Client'}
+                        {client?.name || 'Cliente Desconocido'}
                       </SelectItem>
                     ))
                   )}
@@ -805,10 +805,10 @@ export default function Reports() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Brands</label>
+              <label className="text-sm font-medium text-muted-foreground">Marcas</label>
               <Select>
                 <SelectTrigger data-testid="select-brands">
-                  <SelectValue placeholder={`${(filters.brandIds || []).length} selected`} />
+                  <SelectValue placeholder={`${(filters.brandIds || []).length} seleccionados`} />
                 </SelectTrigger>
                 <SelectContent>
                   {brandsLoading ? (
@@ -822,7 +822,7 @@ export default function Reports() {
                         value={brand?.brandId || ''}
                         onClick={() => handleEntityFilter('brandIds', brand?.brandId || '')}
                       >
-                        {brand?.name || 'Unknown Brand'}
+                        {brand?.name || 'Marca Desconocida'}
                       </SelectItem>
                     ))
                   )}
@@ -831,10 +831,10 @@ export default function Reports() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Categories</label>
+              <label className="text-sm font-medium text-muted-foreground">Categorías</label>
               <Select>
                 <SelectTrigger data-testid="select-categories">
-                  <SelectValue placeholder={`${(filters.categoryIds || []).length} selected`} />
+                  <SelectValue placeholder={`${(filters.categoryIds || []).length} seleccionados`} />
                 </SelectTrigger>
                 <SelectContent>
                   {categoriesLoading ? (
@@ -848,7 +848,7 @@ export default function Reports() {
                         value={category?.categoryId || ''}
                         onClick={() => handleEntityFilter('categoryIds', category?.categoryId || '')}
                       >
-                        {category?.name || 'Unknown Category'}
+                        {category?.name || 'Categoría Desconocida'}
                       </SelectItem>
                     ))
                   )}
@@ -864,23 +864,23 @@ export default function Reports() {
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" data-testid="tab-overview">
             <TrendingUp className="h-4 w-4 mr-2" />
-            Overview
+            Resumen
           </TabsTrigger>
           <TabsTrigger value="performance" data-testid="tab-performance">
             <BarChartIcon className="h-4 w-4 mr-2" />
-            Performance by Groups
+            Rendimiento por Grupos
           </TabsTrigger>
           <TabsTrigger value="profitability" data-testid="tab-profitability">
             <DollarSign className="h-4 w-4 mr-2" />
-            Item Profitability
+            Rentabilidad de Artículos
           </TabsTrigger>
           <TabsTrigger value="inventory" data-testid="tab-inventory">
             <Package className="h-4 w-4 mr-2" />
-            Inventory Health
+            Salud del Inventario
           </TabsTrigger>
           <TabsTrigger value="payments" data-testid="tab-payments">
             <CreditCard className="h-4 w-4 mr-2" />
-            Payment Method Audit
+            Auditoría de Métodos de Pago
           </TabsTrigger>
         </TabsList>
 
@@ -893,7 +893,7 @@ export default function Reports() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                    <p className="text-sm font-medium text-muted-foreground">Ingresos Totales</p>
                     {overviewLoading ? (
                       <Skeleton className="h-8 w-24 mt-2" />
                     ) : (
@@ -922,7 +922,7 @@ export default function Reports() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Cost of Goods Sold</p>
+                    <p className="text-sm font-medium text-muted-foreground">Costo de Productos Vendidos</p>
                     {overviewLoading ? (
                       <Skeleton className="h-8 w-24 mt-2" />
                     ) : (
@@ -931,7 +931,7 @@ export default function Reports() {
                       </p>
                     )}
                     <p className="text-sm text-muted-foreground mt-1">
-                      {(((((overviewMetrics?.totalRevenue || 0) - (overviewMetrics?.totalProfit || 0)) / (overviewMetrics?.totalRevenue || 1)) * 100).toFixed(1))}% of revenue
+                      {(((((overviewMetrics?.totalRevenue || 0) - (overviewMetrics?.totalProfit || 0)) / (overviewMetrics?.totalRevenue || 1)) * 100).toFixed(1))}% de ingresos
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-xl flex items-center justify-center">
@@ -946,7 +946,7 @@ export default function Reports() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Gross Profit</p>
+                    <p className="text-sm font-medium text-muted-foreground">Ganancia Bruta</p>
                     {overviewLoading ? (
                       <Skeleton className="h-8 w-24 mt-2" />
                     ) : (
@@ -975,7 +975,7 @@ export default function Reports() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Net Margin</p>
+                    <p className="text-sm font-medium text-muted-foreground">Margen Neto</p>
                     {overviewLoading ? (
                       <Skeleton className="h-8 w-16 mt-2" />
                     ) : (
@@ -984,7 +984,7 @@ export default function Reports() {
                       </p>
                     )}
                     <p className="text-sm text-amber-600 mt-1">
-                      After expenses: {formatCurrencyAbbreviated((overviewMetrics?.totalProfit || 0) - (overviewMetrics?.totalExpenses || 0))}
+                      Después de gastos: {formatCurrencyAbbreviated((overviewMetrics?.totalProfit || 0) - (overviewMetrics?.totalExpenses || 0))}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-xl flex items-center justify-center">
@@ -999,7 +999,7 @@ export default function Reports() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
+                    <p className="text-sm font-medium text-muted-foreground">Artículos Vendidos</p>
                     {overviewLoading ? (
                       <Skeleton className="h-8 w-16 mt-2" />
                     ) : (
@@ -1008,7 +1008,7 @@ export default function Reports() {
                       </p>
                     )}
                     <p className="text-sm text-purple-600 mt-1">
-                      {formatCurrencyAbbreviated((overviewMetrics?.totalRevenue || 0) / (overviewMetrics?.itemsSold || 1))} avg. value
+                      {formatCurrencyAbbreviated((overviewMetrics?.totalRevenue || 0) / (overviewMetrics?.itemsSold || 1))} valor promedio
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-xl flex items-center justify-center">
@@ -1023,7 +1023,7 @@ export default function Reports() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground">Payment Status</p>
+                    <p className="text-sm font-medium text-muted-foreground">Estado de Pagos</p>
                     {overviewLoading ? (
                       <Skeleton className="h-8 w-16 mt-2" />
                     ) : (
@@ -1033,11 +1033,11 @@ export default function Reports() {
                     )}
                     <div className="flex items-center space-x-2 mt-1">
                       <Badge variant="outline" className="text-orange-600 text-xs">
-                        {overviewMetrics?.pendingPayments || 0} pending
+                        {overviewMetrics?.pendingPayments || 0} pendientes
                       </Badge>
                       {(overviewMetrics?.overduePayments || 0) > 0 && (
                         <Badge variant="destructive" className="text-xs">
-                          {overviewMetrics?.overduePayments || 0} overdue
+                          {overviewMetrics?.overduePayments || 0} vencidos
                         </Badge>
                       )}
                     </div>
@@ -1056,21 +1056,21 @@ export default function Reports() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <TrendingUp className="h-5 w-5 text-green-600" />
-                  <span>Top Performers</span>
+                  <span>Mejores Resultados</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Best Brand</p>
+                    <p className="text-sm text-muted-foreground">Mejor Marca</p>
                     <p className="font-semibold text-foreground">{overviewMetrics?.topPerformingBrand || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Best Vendor</p>
+                    <p className="text-sm text-muted-foreground">Mejor Consignador</p>
                     <p className="font-semibold text-foreground">{overviewMetrics?.topPerformingVendor || 'N/A'}</p>
                   </div>
                   <div className="pt-2 border-t">
-                    <p className="text-sm text-muted-foreground">Performance Period</p>
+                    <p className="text-sm text-muted-foreground">Período de Rendimiento</p>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(filters.startDate)} - {formatDate(filters.endDate)}
                     </p>
@@ -1083,13 +1083,13 @@ export default function Reports() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Package className="h-5 w-5 text-blue-600" />
-                  <span>Inventory Status</span>
+                  <span>Estado del Inventario</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total Items</span>
+                    <span className="text-sm text-muted-foreground">Total de Artículos</span>
                     <span className="font-semibold text-foreground">{overviewMetrics?.totalItems || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
