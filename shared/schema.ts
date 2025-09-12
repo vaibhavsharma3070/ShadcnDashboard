@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, numeric, date, timestamp, index, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, numeric, date, timestamp, index, foreignKey, boolean, jsonb, pgEnum } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -179,10 +179,47 @@ export const installmentPlan = pgTable("installment_plan", {
   }),
 }));
 
+export const contractStatusEnum = pgEnum("contract_status", ["draft", "final"]);
+
+export const contractTemplate = pgTable("contract_template", {
+  templateId: uuid("template_id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  termsText: text("terms_text").notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("idx_contract_template_name").on(table.name),
+  defaultIdx: index("idx_contract_template_default").on(table.isDefault),
+}));
+
+export const contract = pgTable("contract", {
+  contractId: uuid("contract_id").primaryKey().defaultRandom(),
+  vendorId: uuid("vendor_id").notNull(),
+  templateId: uuid("template_id"),
+  status: contractStatusEnum("status").notNull().default("draft"),
+  termsText: text("terms_text").notNull(),
+  itemSnapshots: jsonb("item_snapshots").notNull(),
+  pdfUrl: text("pdf_url"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  vendorIdx: index("idx_contract_vendor").on(table.vendorId),
+  statusIdx: index("idx_contract_status").on(table.status),
+  createdAtIdx: index("idx_contract_created_at").on(table.createdAt),
+  vendorFk: foreignKey({
+    columns: [table.vendorId],
+    foreignColumns: [vendor.vendorId]
+  }),
+  templateFk: foreignKey({
+    columns: [table.templateId],
+    foreignColumns: [contractTemplate.templateId]
+  }),
+}));
+
 // Relations
 export const vendorRelations = relations(vendor, ({ many }) => ({
   items: many(item),
   payouts: many(vendorPayout),
+  contracts: many(contract),
 }));
 
 export const clientRelations = relations(client, ({ many }) => ({
@@ -257,6 +294,21 @@ export const installmentPlanRelations = relations(installmentPlan, ({ one }) => 
   client: one(client, {
     fields: [installmentPlan.clientId],
     references: [client.clientId]
+  }),
+}));
+
+export const contractTemplateRelations = relations(contractTemplate, ({ many }) => ({
+  contracts: many(contract),
+}));
+
+export const contractRelations = relations(contract, ({ one }) => ({
+  vendor: one(vendor, {
+    fields: [contract.vendorId],
+    references: [vendor.vendorId]
+  }),
+  template: one(contractTemplate, {
+    fields: [contract.templateId],
+    references: [contractTemplate.templateId]
   }),
 }));
 
@@ -351,6 +403,36 @@ export const insertInstallmentPlanSchema = createInsertSchema(installmentPlan).o
   dueDate: z.preprocess((val) => typeof val === 'string' ? new Date(val) : val, z.date()),
 });
 
+// Contract Item Snapshot schema for validation
+export const contractItemSnapshotSchema = z.object({
+  itemId: z.string().uuid(),
+  title: z.string(),
+  brand: z.string(),
+  model: z.string().optional(),
+  serialNo: z.string().optional(),
+  condition: z.string().optional(),
+  imageUrl: z.string().optional(),
+  minCost: z.number().optional(),
+  maxCost: z.number().optional(),
+  marketValue: z.number().optional(),
+});
+
+export const insertContractTemplateSchema = createInsertSchema(contractTemplate).omit({
+  templateId: true,
+  createdAt: true,
+}).extend({
+  isDefault: z.boolean().default(false),
+});
+
+export const insertContractSchema = createInsertSchema(contract).omit({
+  contractId: true,
+  createdAt: true,
+  pdfUrl: true,
+}).extend({
+  status: z.enum(["draft", "final"]).default("draft"),
+  itemSnapshots: z.array(contractItemSnapshotSchema),
+});
+
 // Types
 export type InsertVendor = z.infer<typeof insertVendorSchema>;
 export type Vendor = typeof vendor.$inferSelect;
@@ -381,6 +463,14 @@ export type ItemExpense = typeof itemExpense.$inferSelect;
 
 export type InsertInstallmentPlan = z.infer<typeof insertInstallmentPlanSchema>;
 export type InstallmentPlan = typeof installmentPlan.$inferSelect;
+
+export type InsertContractTemplate = z.infer<typeof insertContractTemplateSchema>;
+export type ContractTemplate = typeof contractTemplate.$inferSelect;
+
+export type InsertContract = z.infer<typeof insertContractSchema>;
+export type Contract = typeof contract.$inferSelect;
+
+export type ContractItemSnapshot = z.infer<typeof contractItemSnapshotSchema>;
 
 // Legacy user table (keeping for compatibility)
 export const users = pgTable("users", {
