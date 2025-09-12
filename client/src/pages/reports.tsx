@@ -31,7 +31,11 @@ import {
   Eye,
   ArrowUp,
   ArrowDown,
+  ShoppingCart,
+  Activity,
+  Target,
 } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Vendor, Client, Brand, Category } from "@shared/schema";
 
 // TypeScript interfaces for report data structures
@@ -139,8 +143,12 @@ function formatCurrencyAbbreviated(amount: number): string {
   }
 }
 
-function formatPercentage(value: number): string {
-  return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+function formatPercentage(value: number | undefined | null): string {
+  if (value === undefined || value === null || isNaN(Number(value))) {
+    return '0.0%';
+  }
+  const numValue = Number(value);
+  return `${numValue >= 0 ? '+' : ''}${numValue.toFixed(1)}%`;
 }
 
 function formatDate(dateString: string): string {
@@ -322,15 +330,25 @@ export default function Reports() {
     enabled: activeTab === 'payments',
   });
 
-  const { data: timeseriesData, isLoading: timeseriesLoading } = useQuery<TimeseriesDataPoint[]>({
+  const { data: timeseriesData, isLoading: timeseriesLoading, error: timeseriesError } = useQuery<TimeseriesDataPoint[]>({
     queryKey: ['/api/reports/timeseries', filters],
     queryFn: async () => {
       const params = buildQueryParams(filters, { granularity: filters.granularity });
       const response = await fetch(`/api/reports/timeseries?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch timeseries data');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Failed to fetch timeseries data: ${response.status}`);
+      }
       return response.json();
     },
     enabled: activeTab === 'overview',
+    retry: (failureCount, error) => {
+      // Don't retry on client errors (400s)
+      if (error?.message?.includes('400') || error?.message?.includes('Invalid query parameters')) {
+        return false;
+      }
+      return failureCount < 3;
+    }
   });
 
   // Filter handlers
@@ -389,7 +407,7 @@ export default function Reports() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
             {/* Date Range */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">Start Date</label>
@@ -563,11 +581,13 @@ export default function Reports() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Enhanced KPI Tiles Grid - Mobile responsive: 1 col on mobile, 2 on tablet, 3 on laptop, 6 on desktop */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 lg:gap-6">
+            {/* Revenue Card */}
             <Card className="hover-lift" data-testid="card-overview-revenue">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
                     {overviewLoading ? (
                       <Skeleton className="h-8 w-24 mt-2" />
@@ -576,27 +596,52 @@ export default function Reports() {
                         {formatCurrencyAbbreviated(overviewMetrics?.totalRevenue || 0)}
                       </p>
                     )}
-                    <p className={`text-sm mt-1 flex items-center ${(overviewMetrics?.revenueChange || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <div className={`text-sm mt-1 flex items-center ${(overviewMetrics?.revenueChange || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {(overviewMetrics?.revenueChange || 0) >= 0 ? (
-                        <ArrowUp className="h-3 w-3 mr-1" />
+                        <TrendingUp className="h-3 w-3 mr-1" />
                       ) : (
-                        <ArrowDown className="h-3 w-3 mr-1" />
+                        <TrendingDown className="h-3 w-3 mr-1" />
                       )}
-                      {formatPercentage(overviewMetrics?.revenueChange || 0)}
-                    </p>
+                      <span className="font-medium">{formatPercentage(overviewMetrics?.revenueChange || 0)}</span>
+                    </div>
                   </div>
-                  <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-xl flex items-center justify-center">
                     <DollarSign className="h-6 w-6 text-emerald-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover-lift" data-testid="card-overview-profit">
+            {/* COGS Card */}
+            <Card className="hover-lift" data-testid="card-overview-cogs">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Profit</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Cost of Goods Sold</p>
+                    {overviewLoading ? (
+                      <Skeleton className="h-8 w-24 mt-2" />
+                    ) : (
+                      <p className="text-2xl font-bold text-foreground">
+                        {formatCurrencyAbbreviated(((overviewMetrics?.totalRevenue || 0) - (overviewMetrics?.totalProfit || 0)))}
+                      </p>
+                    )}
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {(((((overviewMetrics?.totalRevenue || 0) - (overviewMetrics?.totalProfit || 0)) / (overviewMetrics?.totalRevenue || 1)) * 100).toFixed(1))}% of revenue
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-xl flex items-center justify-center">
+                    <ShoppingCart className="h-6 w-6 text-orange-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Gross Profit Card */}
+            <Card className="hover-lift" data-testid="card-overview-gross-profit">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Gross Profit</p>
                     {overviewLoading ? (
                       <Skeleton className="h-8 w-24 mt-2" />
                     ) : (
@@ -604,26 +649,51 @@ export default function Reports() {
                         {formatCurrencyAbbreviated(overviewMetrics?.totalProfit || 0)}
                       </p>
                     )}
-                    <p className={`text-sm mt-1 flex items-center ${(overviewMetrics?.profitChange || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <div className={`text-sm mt-1 flex items-center ${(overviewMetrics?.profitChange || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {(overviewMetrics?.profitChange || 0) >= 0 ? (
-                        <ArrowUp className="h-3 w-3 mr-1" />
+                        <TrendingUp className="h-3 w-3 mr-1" />
                       ) : (
-                        <ArrowDown className="h-3 w-3 mr-1" />
+                        <TrendingDown className="h-3 w-3 mr-1" />
                       )}
-                      {formatPercentage(overviewMetrics?.profitChange || 0)}
-                    </p>
+                      <span className="font-medium">{formatPercentage(overviewMetrics?.profitChange || 0)}</span>
+                    </div>
                   </div>
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-xl flex items-center justify-center">
                     <TrendingUp className="h-6 w-6 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover-lift" data-testid="card-overview-items">
+            {/* Net Margin Card */}
+            <Card className="hover-lift" data-testid="card-overview-net-margin">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Net Margin</p>
+                    {overviewLoading ? (
+                      <Skeleton className="h-8 w-16 mt-2" />
+                    ) : (
+                      <p className="text-2xl font-bold text-foreground">
+                        {(((overviewMetrics?.totalProfit || 0) - (overviewMetrics?.totalExpenses || 0)) / (overviewMetrics?.totalRevenue || 1) * 100).toFixed(1)}%
+                      </p>
+                    )}
+                    <p className="text-sm text-amber-600 mt-1">
+                      After expenses: {formatCurrencyAbbreviated((overviewMetrics?.totalProfit || 0) - (overviewMetrics?.totalExpenses || 0))}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-xl flex items-center justify-center">
+                    <Target className="h-6 w-6 text-amber-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Items Sold Card */}
+            <Card className="hover-lift" data-testid="card-overview-items-sold">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
                     {overviewLoading ? (
                       <Skeleton className="h-8 w-16 mt-2" />
@@ -632,138 +702,289 @@ export default function Reports() {
                         {overviewMetrics?.itemsSold || 0}
                       </p>
                     )}
-                    <p className="text-sm text-blue-600 mt-1">
-                      Total: {overviewMetrics?.totalItems || 0}
+                    <p className="text-sm text-purple-600 mt-1">
+                      {formatCurrencyAbbreviated((overviewMetrics?.totalRevenue || 0) / (overviewMetrics?.itemsSold || 1))} avg. value
                     </p>
                   </div>
-                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-xl flex items-center justify-center">
                     <Package className="h-6 w-6 text-purple-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover-lift" data-testid="card-overview-margin">
+            {/* Payment Activity Card */}
+            <Card className="hover-lift" data-testid="card-overview-payments">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Profit Margin</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Payment Status</p>
                     {overviewLoading ? (
                       <Skeleton className="h-8 w-16 mt-2" />
                     ) : (
                       <p className="text-2xl font-bold text-foreground">
-                        {((overviewMetrics?.profitMargin || 0) * 100).toFixed(1)}%
+                        {(overviewMetrics?.pendingPayments || 0) + (overviewMetrics?.overduePayments || 0)}
                       </p>
                     )}
-                    <p className="text-sm text-amber-600 mt-1">
-                      Avg: {formatCurrency(overviewMetrics?.averageProfit || 0)}
-                    </p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <Badge variant="outline" className="text-orange-600 text-xs">
+                        {overviewMetrics?.pendingPayments || 0} pending
+                      </Badge>
+                      {(overviewMetrics?.overduePayments || 0) > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                          {overviewMetrics?.overduePayments || 0} overdue
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
-                    <BarChart className="h-6 w-6 text-amber-600" />
+                  <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-xl flex items-center justify-center">
+                    <CreditCard className="h-6 w-6 text-indigo-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Additional Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card data-testid="card-overview-payments">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <AlertTriangle className="h-5 w-5 text-orange-600" />
-                  <span>Payment Status</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Pending Payments</span>
-                    <Badge variant="outline" className="text-orange-600">
-                      {overviewMetrics?.pendingPayments || 0}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Overdue Payments</span>
-                    <Badge variant="destructive">
-                      {overviewMetrics?.overduePayments || 0}
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-overview-top-brand">
+          {/* Status Summary Cards - Mobile responsive */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <Card data-testid="card-overview-top-performers">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <TrendingUp className="h-5 w-5 text-green-600" />
-                  <span>Top Performing</span>
+                  <span>Top Performers</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Best Brand</p>
-                    <p className="font-semibold">{overviewMetrics?.topPerformingBrand || 'N/A'}</p>
+                    <p className="font-semibold text-foreground">{overviewMetrics?.topPerformingBrand || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Best Vendor</p>
-                    <p className="font-semibold">{overviewMetrics?.topPerformingVendor || 'N/A'}</p>
+                    <p className="font-semibold text-foreground">{overviewMetrics?.topPerformingVendor || 'N/A'}</p>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <p className="text-sm text-muted-foreground">Performance Period</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(filters.startDate)} - {formatDate(filters.endDate)}
+                    </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card data-testid="card-overview-expenses">
+            <Card data-testid="card-overview-inventory-status">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <XCircle className="h-5 w-5 text-red-600" />
-                  <span>Expenses</span>
+                  <Package className="h-5 w-5 text-blue-600" />
+                  <span>Inventory Status</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <p className="text-2xl font-bold">
-                    {formatCurrencyAbbreviated(overviewMetrics?.totalExpenses || 0)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Total expenses for selected period
-                  </p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Total Items</span>
+                    <span className="font-semibold text-foreground">{overviewMetrics?.totalItems || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Items Sold</span>
+                    <span className="font-semibold text-emerald-600">{overviewMetrics?.itemsSold || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Available</span>
+                    <span className="font-semibold text-blue-600">{(overviewMetrics?.totalItems || 0) - (overviewMetrics?.itemsSold || 0)}</span>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Turnover Rate</span>
+                      <span className="text-sm font-medium text-foreground">
+                        {(((overviewMetrics?.itemsSold || 0) / (overviewMetrics?.totalItems || 1)) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-overview-expenses-breakdown">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  <span>Expenses Overview</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">
+                      {formatCurrencyAbbreviated(overviewMetrics?.totalExpenses || 0)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Total expenses for period
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">% of Revenue</span>
+                      <span className="text-sm font-medium text-red-600">
+                        {(((overviewMetrics?.totalExpenses || 0) / (overviewMetrics?.totalRevenue || 1)) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-sm text-muted-foreground">Net Profit Impact</span>
+                      <span className="text-sm font-medium text-foreground">
+                        {formatCurrencyAbbreviated((overviewMetrics?.totalProfit || 0) - (overviewMetrics?.totalExpenses || 0))}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Timeseries Chart Placeholder */}
+          {/* Time-Series Chart */}
           <Card data-testid="card-timeseries-chart">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <BarChart className="h-5 w-5 text-blue-600" />
+                <Activity className="h-5 w-5 text-blue-600" />
                 <span>Revenue & Profit Trends</span>
               </CardTitle>
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <span>Granularity: {filters.granularity}</span>
+                <Badge variant="outline" className="text-xs">
+                  {timeseriesData?.length || 0} data points
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent>
               {timeseriesLoading ? (
-                <div className="h-64 w-full flex items-center justify-center">
+                <div className="h-80 w-full flex items-center justify-center">
                   <div className="space-y-4 w-full">
-                    <Skeleton className="h-4 w-48 mx-auto" />
-                    <Skeleton className="h-48 w-full" />
+                    <Skeleton className="h-6 w-48 mx-auto" />
+                    <Skeleton className="h-64 w-full rounded-lg" />
+                    <div className="flex justify-center space-x-4">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
                   </div>
                 </div>
+              ) : timeseriesError ? (
+                <div className="h-80 w-full flex items-center justify-center bg-red-50 dark:bg-red-950/20 rounded-lg border-2 border-dashed border-red-200 dark:border-red-800">
+                  <div className="text-center space-y-3">
+                    <AlertTriangle className="h-16 w-16 text-red-500 mx-auto" />
+                    <div>
+                      <p className="text-lg font-medium text-red-700 dark:text-red-400">
+                        Failed to Load Chart Data
+                      </p>
+                      <p className="text-sm text-red-600 dark:text-red-500 max-w-md">
+                        {timeseriesError?.message || 'Unable to fetch timeseries data. Please try adjusting your filters or contact support if the issue persists.'}
+                      </p>
+                    </div>
+                    <div className="text-xs text-red-500 space-y-1">
+                      <p>Period: {formatDate(filters.startDate)} - {formatDate(filters.endDate)}</p>
+                      <p>Granularity: {filters.granularity}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : timeseriesData && timeseriesData.length > 0 ? (
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={timeseriesData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        dataKey="date" 
+                        className="text-muted-foreground text-xs"
+                        tickFormatter={(value) => {
+                          const date = new Date(value);
+                          if (filters.granularity === 'day') {
+                            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          } else if (filters.granularity === 'week') {
+                            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          } else {
+                            return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                          }
+                        }}
+                      />
+                      <YAxis 
+                        className="text-muted-foreground text-xs"
+                        tickFormatter={(value) => formatCurrencyAbbreviated(value)}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px',
+                          color: 'hsl(var(--card-foreground))'
+                        }}
+                        formatter={(value: number, name: string) => [
+                          formatCurrency(value),
+                          name === 'revenue' ? 'Revenue' : 
+                          name === 'profit' ? 'Profit' :
+                          name === 'expenses' ? 'Expenses' : 'Items Sold'
+                        ]}
+                        labelFormatter={(label) => formatDate(label)}
+                      />
+                      <Legend 
+                        wrapperStyle={{ 
+                          paddingTop: '20px',
+                          fontSize: '12px'
+                        }}
+                        formatter={(value) => (
+                          <span className="text-muted-foreground">
+                            {value === 'revenue' ? 'Revenue' : 
+                             value === 'profit' ? 'Profit' :
+                             value === 'expenses' ? 'Expenses' : 'Items Sold'}
+                          </span>
+                        )}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="hsl(var(--chart-1, #10b981))" 
+                        strokeWidth={3}
+                        dot={{ fill: 'hsl(var(--chart-1, #10b981))', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: 'hsl(var(--chart-1, #10b981))', strokeWidth: 2, fill: 'white' }}
+                        name="revenue"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="profit" 
+                        stroke="hsl(var(--chart-2, #3b82f6))" 
+                        strokeWidth={3}
+                        dot={{ fill: 'hsl(var(--chart-2, #3b82f6))', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: 'hsl(var(--chart-2, #3b82f6))', strokeWidth: 2, fill: 'white' }}
+                        name="profit"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="expenses" 
+                        stroke="hsl(var(--chart-3, #ef4444))" 
+                        strokeWidth={2}
+                        strokeDasharray="4 4"
+                        dot={{ fill: 'hsl(var(--chart-3, #ef4444))', strokeWidth: 2, r: 3 }}
+                        activeDot={{ r: 5, stroke: 'hsl(var(--chart-3, #ef4444))', strokeWidth: 2, fill: 'white' }}
+                        name="expenses"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               ) : (
-                <div className="h-64 w-full flex items-center justify-center bg-muted/30 rounded-lg border-2 border-dashed border-muted">
-                  <div className="text-center space-y-2">
-                    <BarChart className="h-12 w-12 text-muted-foreground mx-auto" />
-                    <p className="text-lg font-medium text-muted-foreground">
-                      Chart Visualization
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {timeseriesData?.length || 0} data points loaded
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Granularity: {filters.granularity}
-                    </p>
+                <div className="h-80 w-full flex items-center justify-center bg-muted/30 rounded-lg border-2 border-dashed border-muted">
+                  <div className="text-center space-y-3">
+                    <Activity className="h-16 w-16 text-muted-foreground mx-auto" />
+                    <div>
+                      <p className="text-lg font-medium text-muted-foreground">
+                        No Data Available
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Try adjusting your date range or filters
+                      </p>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <p>Period: {formatDate(filters.startDate)} - {formatDate(filters.endDate)}</p>
+                      <p>Granularity: {filters.granularity}</p>
+                    </div>
                   </div>
                 </div>
               )}
