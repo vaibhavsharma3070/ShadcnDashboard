@@ -24,6 +24,7 @@ const navigation = [
       { name: "Inventario", href: "/inventory", icon: Package },
       { name: "Consignadores", href: "/vendors", icon: Handshake },
       { name: "Clientes", href: "/clients", icon: Users },
+      { name: "Contratos", href: "/contracts", icon: FileText },
     ],
   },
   {

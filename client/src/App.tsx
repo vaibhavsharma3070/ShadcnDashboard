@@ -30,6 +30,7 @@ function Router() {
       <Route path="/vendor/:vendorId" component={VendorDetails} />
       <Route path="/clients" component={Clients} />
       <Route path="/client/:clientId" component={ClientDetails} />
+      <Route path="/contracts" component={Contracts} />
       <Route path="/payments" component={Payments} />
       <Route path="/payouts" component={Payouts} />
       <Route path="/expenses" component={Expenses} />
