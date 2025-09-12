@@ -150,11 +150,11 @@ export default function Contracts() {
                               Creado: {new Date(contract.createdAt).toLocaleDateString("es-ES")}
                             </div>
                             
-                            {contract.itemSnapshots && Array.isArray(contract.itemSnapshots) && contract.itemSnapshots.length > 0 && (
+                            {contract.itemSnapshots && Array.isArray(contract.itemSnapshots) && contract.itemSnapshots.length > 0 ? (
                               <div className="text-sm text-muted-foreground">
-                                {(contract.itemSnapshots as ContractItemSnapshot[]).length} producto(s) incluido(s)
+                                {contract.itemSnapshots.length} producto(s) incluido(s)
                               </div>
-                            )}
+                            ) : null}
                             
                             <div className="flex justify-between items-center pt-2">
                               <div className="flex space-x-2">
