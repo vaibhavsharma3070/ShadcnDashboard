@@ -1,0 +1,1713 @@
+openapi: 3.0.3
+info:
+  title: LUXETTE Luxury Consignment Management API
+  description: |
+    Comprehensive API for managing luxury consignment business operations including inventory, 
+    vendors, clients, payments, contracts, and business intelligence reporting.
+    
+    ## Authentication
+    All endpoints except /api/auth/login require session-based authentication.
+    Login with valid credentials to receive a session cookie that must be included in subsequent requests.
+    
+    ## Base URL
+    Development: http://localhost:5000
+    
+  version: 1.0.0
+  contact:
+    name: LUXETTE Support
+    email: support@luxette.com
+
+servers:
+  - url: http://localhost:5000
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: User authentication and management
+  - name: Dashboard
+    description: Dashboard metrics and analytics
+  - name: Vendors
+    description: Vendor management operations
+  - name: Clients
+    description: Client management operations
+  - name: Items
+    description: Inventory item management
+  - name: Payments
+    description: Client payment operations
+  - name: Payouts
+    description: Vendor payout operations
+  - name: Expenses
+    description: Item expense tracking
+  - name: Installment Plans
+    description: Payment installment plan management
+  - name: Contracts
+    description: Contract generation and management
+  - name: Reports
+    description: Business intelligence and reporting
+  - name: Configuration
+    description: System configuration (brands, categories, payment methods)
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: luxette.session.id
+      
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, staff, readOnly]
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          
+    Vendor:
+      type: object
+      properties:
+        vendorId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        taxId:
+          type: string
+        bankAccountNumber:
+          type: string
+        bankName:
+          type: string
+        accountType:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+          
+    Client:
+      type: object
+      properties:
+        clientId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        billingAddr:
+          type: string
+        idNumber:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+          
+    Item:
+      type: object
+      properties:
+        itemId:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        brandId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        model:
+          type: string
+        serialNo:
+          type: string
+        condition:
+          type: string
+        acquisitionDate:
+          type: string
+          format: date
+        minCost:
+          type: number
+        maxCost:
+          type: number
+        minSalesPrice:
+          type: number
+        maxSalesPrice:
+          type: number
+        imageUrl:
+          type: string
+        status:
+          type: string
+          enum: [in-store, sold, returned, consigned, pending]
+        createdAt:
+          type: string
+          format: date-time
+          
+    Payment:
+      type: object
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        itemId:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        paymentMethod:
+          type: string
+        amount:
+          type: number
+        paidAt:
+          type: string
+          format: date-time
+          
+    Payout:
+      type: object
+      properties:
+        payoutId:
+          type: string
+          format: uuid
+        itemId:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        paidAt:
+          type: string
+          format: date-time
+        bankAccount:
+          type: string
+        transferId:
+          type: string
+        notes:
+          type: string
+
+    InstallmentPlan:
+      type: object
+      properties:
+        planId:
+          type: string
+          format: uuid
+        itemId:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        totalAmount:
+          type: number
+        downPayment:
+          type: number
+        remainingBalance:
+          type: number
+        numberOfInstallments:
+          type: integer
+        installmentAmount:
+          type: number
+        frequency:
+          type: string
+          enum: [weekly, biweekly, monthly]
+        nextPaymentDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [active, completed, defaulted, cancelled]
+        paidInstallments:
+          type: integer
+        lastPaymentDate:
+          type: string
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+
+paths:
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+            example:
+              email: admin@luxette.com
+              password: LuxetteAdmin2025!
+      responses:
+        200:
+          description: Successful login
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: luxette.session.id=s%3A0Ko6_nyU1DCUjVNt6JqCo-IrRbOKjee4...; Path=/; Expires=Sun, 14 Sep 2025 03:06:27 GMT; HttpOnly
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+              example:
+                user:
+                  id: "b3900a00-d5f2-4769-b1a1-6b33c1ff845a"
+                  email: "admin@luxette.com"
+                  name: "Administrador LUXETTE"
+                  role: "admin"
+                  active: true
+        401:
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Credenciales inválidas"
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      operationId: logout
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Successful logout
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Sesión cerrada correctamente"
+
+  /api/auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      operationId: getCurrentUser
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        401:
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "No autorizado"
+
+  /api/auth/users:
+    get:
+      tags:
+        - Authentication
+      summary: Get all users (admin only)
+      operationId: getUsers
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        403:
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Authentication
+      summary: Create new user (admin only)
+      operationId: createUser
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - name
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                name:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, staff, readOnly]
+                active:
+                  type: boolean
+                  default: true
+            example:
+              email: "newuser@luxette.com"
+              password: "SecurePassword123!"
+              name: "New User"
+              role: "staff"
+              active: true
+      responses:
+        201:
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        409:
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/users/{id}:
+    put:
+      tags:
+        - Authentication
+      summary: Update user (admin only)
+      operationId: updateUser
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+                password:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, staff, readOnly]
+                active:
+                  type: boolean
+      responses:
+        200:
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        404:
+          description: User not found
+
+  /api/dashboard/metrics:
+    get:
+      tags:
+        - Dashboard
+      summary: Get dashboard metrics
+      operationId: getDashboardMetrics
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRevenue:
+                    type: number
+                  activeItems:
+                    type: integer
+                  pendingPayouts:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+                  netProfit:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+                  incomingPayments:
+                    type: number
+                  upcomingPayouts:
+                    type: number
+                  costRange:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+              example:
+                totalRevenue: 70700
+                activeItems: 41
+                pendingPayouts:
+                  min: 23500
+                  max: 27500
+                netProfit:
+                  min: 10700
+                  max: 14700
+
+  /api/dashboard/recent-items:
+    get:
+      tags:
+        - Dashboard
+      summary: Get recent items
+      operationId: getRecentItems
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        200:
+          description: List of recent items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/Item'
+                    - type: object
+                      properties:
+                        vendor:
+                          $ref: '#/components/schemas/Vendor'
+
+  /api/dashboard/top-performing:
+    get:
+      tags:
+        - Dashboard
+      summary: Get top performing items
+      operationId: getTopPerformingItems
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        200:
+          description: List of top performing items with profit
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/Item'
+                    - type: object
+                      properties:
+                        vendor:
+                          $ref: '#/components/schemas/Vendor'
+                        profit:
+                          type: number
+
+  /api/vendors:
+    get:
+      tags:
+        - Vendors
+      summary: Get all vendors
+      operationId: getVendors
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of vendors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vendor'
+    
+    post:
+      tags:
+        - Vendors
+      summary: Create new vendor
+      operationId: createVendor
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                taxId:
+                  type: string
+                bankAccountNumber:
+                  type: string
+                bankName:
+                  type: string
+                accountType:
+                  type: string
+            example:
+              name: "John Doe Vendor"
+              phone: "555-1234"
+              email: "vendor@example.com"
+              taxId: "TAX123456"
+              bankAccountNumber: "ACC123456789"
+              bankName: "Bank of America"
+              accountType: "Savings"
+      responses:
+        201:
+          description: Vendor created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+
+  /api/vendors/{id}:
+    get:
+      tags:
+        - Vendors
+      summary: Get vendor by ID
+      operationId: getVendor
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Vendor details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+        404:
+          description: Vendor not found
+    
+    put:
+      tags:
+        - Vendors
+      summary: Update vendor
+      operationId: updateVendor
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                taxId:
+                  type: string
+                bankAccountNumber:
+                  type: string
+                bankName:
+                  type: string
+                accountType:
+                  type: string
+      responses:
+        200:
+          description: Vendor updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+        404:
+          description: Vendor not found
+    
+    delete:
+      tags:
+        - Vendors
+      summary: Delete vendor
+      operationId: deleteVendor
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        204:
+          description: Vendor deleted successfully
+        409:
+          description: Cannot delete vendor with associated items
+
+  /api/clients:
+    get:
+      tags:
+        - Clients
+      summary: Get all clients
+      operationId: getClients
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Client'
+    
+    post:
+      tags:
+        - Clients
+      summary: Create new client
+      operationId: createClient
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                billingAddr:
+                  type: string
+                idNumber:
+                  type: string
+            example:
+              name: "Jane Doe Client"
+              phone: "555-5678"
+              email: "client@example.com"
+              billingAddr: "123 Main St, City, State 12345"
+              idNumber: "ID123456789"
+      responses:
+        201:
+          description: Client created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+
+  /api/clients/{id}:
+    get:
+      tags:
+        - Clients
+      summary: Get client by ID
+      operationId: getClient
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Client details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        404:
+          description: Client not found
+    
+    put:
+      tags:
+        - Clients
+      summary: Update client
+      operationId: updateClient
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                billingAddr:
+                  type: string
+                idNumber:
+                  type: string
+      responses:
+        200:
+          description: Client updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        404:
+          description: Client not found
+    
+    delete:
+      tags:
+        - Clients
+      summary: Delete client
+      operationId: deleteClient
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        204:
+          description: Client deleted successfully
+        409:
+          description: Cannot delete client with associated payments
+
+  /api/items:
+    get:
+      tags:
+        - Items
+      summary: Get all items
+      operationId: getItems
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: vendorId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter items by vendor ID
+      responses:
+        200:
+          description: List of items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/Item'
+                    - type: object
+                      properties:
+                        vendor:
+                          $ref: '#/components/schemas/Vendor'
+    
+    post:
+      tags:
+        - Items
+      summary: Create new item
+      operationId: createItem
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vendorId
+                - title
+                - status
+              properties:
+                vendorId:
+                  type: string
+                  format: uuid
+                brandId:
+                  type: string
+                  format: uuid
+                categoryId:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                model:
+                  type: string
+                serialNo:
+                  type: string
+                condition:
+                  type: string
+                acquisitionDate:
+                  type: string
+                  format: date
+                minCost:
+                  type: number
+                maxCost:
+                  type: number
+                minSalesPrice:
+                  type: number
+                maxSalesPrice:
+                  type: number
+                status:
+                  type: string
+                  enum: [in-store, sold, returned, consigned, pending]
+            example:
+              vendorId: "1701b044-a9c5-4fe6-81b0-01085521f28c"
+              brandId: "b441b560-c0a0-4dd5-bf82-47028165824c"
+              categoryId: "59dc88d0-830f-4636-8988-e333d109a36c"
+              title: "Rolex Submariner Date"
+              model: "116610LN"
+              serialNo: "ABC123456"
+              condition: "Excellent"
+              acquisitionDate: "2025-09-01"
+              minCost: 8000
+              maxCost: 9000
+              minSalesPrice: 12000
+              maxSalesPrice: 14000
+              status: "in-store"
+      responses:
+        201:
+          description: Item created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+
+  /api/items/{id}:
+    get:
+      tags:
+        - Items
+      summary: Get item by ID
+      operationId: getItem
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Item details with vendor
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Item'
+                  - type: object
+                    properties:
+                      vendor:
+                        $ref: '#/components/schemas/Vendor'
+        404:
+          description: Item not found
+    
+    put:
+      tags:
+        - Items
+      summary: Update item
+      operationId: updateItem
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vendorId:
+                  type: string
+                  format: uuid
+                brandId:
+                  type: string
+                  format: uuid
+                categoryId:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                model:
+                  type: string
+                serialNo:
+                  type: string
+                condition:
+                  type: string
+                acquisitionDate:
+                  type: string
+                  format: date
+                minCost:
+                  type: number
+                maxCost:
+                  type: number
+                minSalesPrice:
+                  type: number
+                maxSalesPrice:
+                  type: number
+                imageUrl:
+                  type: string
+                status:
+                  type: string
+                  enum: [in-store, sold, returned, consigned, pending]
+      responses:
+        200:
+          description: Item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        404:
+          description: Item not found
+    
+    delete:
+      tags:
+        - Items
+      summary: Delete item
+      operationId: deleteItem
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        204:
+          description: Item deleted successfully
+        409:
+          description: Cannot delete item with associated transactions
+
+  /api/items/{id}/upload:
+    post:
+      tags:
+        - Items
+      summary: Upload item image
+      operationId: uploadItemImage
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          description: Image uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imageUrl:
+                    type: string
+                  message:
+                    type: string
+        404:
+          description: Item not found
+
+  /api/payments:
+    get:
+      tags:
+        - Payments
+      summary: Get all payments
+      operationId: getPayments
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/Payment'
+                    - type: object
+                      properties:
+                        item:
+                          allOf:
+                            - $ref: '#/components/schemas/Item'
+                            - type: object
+                              properties:
+                                vendor:
+                                  $ref: '#/components/schemas/Vendor'
+                        client:
+                          $ref: '#/components/schemas/Client'
+    
+    post:
+      tags:
+        - Payments
+      summary: Create new payment
+      operationId: createPayment
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - itemId
+                - clientId
+                - paymentMethod
+                - amount
+                - paidAt
+              properties:
+                itemId:
+                  type: string
+                  format: uuid
+                clientId:
+                  type: string
+                  format: uuid
+                paymentMethod:
+                  type: string
+                amount:
+                  type: number
+                paidAt:
+                  type: string
+                  format: date-time
+            example:
+              itemId: "03274455-0847-42f6-9ad1-f3f663b366b3"
+              clientId: "b0f9229f-51c1-4da7-adbd-54eee1cd2aef"
+              paymentMethod: "Cash"
+              amount: 5000
+              paidAt: "2025-09-13T12:00:00Z"
+      responses:
+        201:
+          description: Payment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        400:
+          description: Invalid payment data
+
+  /api/payments/{id}:
+    put:
+      tags:
+        - Payments
+      summary: Update payment
+      operationId: updatePayment
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                paymentMethod:
+                  type: string
+                amount:
+                  type: number
+                paidAt:
+                  type: string
+                  format: date-time
+      responses:
+        200:
+          description: Payment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        404:
+          description: Payment not found
+    
+    delete:
+      tags:
+        - Payments
+      summary: Delete payment
+      operationId: deletePayment
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        204:
+          description: Payment deleted successfully
+        404:
+          description: Payment not found
+
+  /api/payouts:
+    get:
+      tags:
+        - Payouts
+      summary: Get all payouts
+      operationId: getPayouts
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of payouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/Payout'
+                    - type: object
+                      properties:
+                        item:
+                          $ref: '#/components/schemas/Item'
+                        vendor:
+                          $ref: '#/components/schemas/Vendor'
+    
+    post:
+      tags:
+        - Payouts
+      summary: Create new payout
+      operationId: createPayout
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - itemId
+                - vendorId
+                - amount
+                - paidAt
+              properties:
+                itemId:
+                  type: string
+                  format: uuid
+                vendorId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: number
+                paidAt:
+                  type: string
+                  format: date-time
+                bankAccount:
+                  type: string
+                transferId:
+                  type: string
+                notes:
+                  type: string
+            example:
+              itemId: "03274455-0847-42f6-9ad1-f3f663b366b3"
+              vendorId: "1701b044-a9c5-4fe6-81b0-01085521f28c"
+              amount: 8500
+              paidAt: "2025-09-13T12:00:00Z"
+              bankAccount: "ACC123456789"
+              transferId: "TRF123456"
+              notes: "Monthly payout for sold items"
+      responses:
+        201:
+          description: Payout created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payout'
+        400:
+          description: Invalid payout data
+
+  /api/reports/kpis:
+    get:
+      tags:
+        - Reports
+      summary: Get KPI report
+      operationId: getKPIs
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-01-01"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-12-31"
+        - name: vendorIds
+          in: query
+          schema:
+            type: string
+          description: Comma-separated vendor IDs
+        - name: clientIds
+          in: query
+          schema:
+            type: string
+          description: Comma-separated client IDs
+        - name: brandIds
+          in: query
+          schema:
+            type: string
+          description: Comma-separated brand IDs
+        - name: categoryIds
+          in: query
+          schema:
+            type: string
+          description: Comma-separated category IDs
+        - name: itemStatuses
+          in: query
+          schema:
+            type: string
+          description: Comma-separated item statuses
+      responses:
+        200:
+          description: KPI metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revenue:
+                    type: number
+                  cogs:
+                    type: number
+                  grossProfit:
+                    type: number
+                  grossMargin:
+                    type: number
+                  itemsSold:
+                    type: integer
+                  averageOrderValue:
+                    type: number
+                  vendorPayoutRatio:
+                    type: number
+                  averageDaysToSell:
+                    type: number
+                  inventoryTurnover:
+                    type: number
+                  cashConversion:
+                    type: number
+              example:
+                revenue: 37900
+                cogs: 32500
+                grossProfit: 5400
+                grossMargin: 14.25
+                itemsSold: 8
+                averageOrderValue: 4737.5
+
+  /api/reports/timeseries:
+    get:
+      tags:
+        - Reports
+      summary: Get time series data
+      operationId: getTimeSeries
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: metric
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [revenue, profit, itemsSold, payments]
+        - name: granularity
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [day, week, month]
+      responses:
+        200:
+          description: Time series data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    period:
+                      type: string
+                    value:
+                      type: number
+
+  /api/reports/grouped:
+    get:
+      tags:
+        - Reports
+      summary: Get grouped metrics
+      operationId: getGroupedMetrics
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: groupBy
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [brand, vendor, client, category]
+        - name: metrics
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated metrics (revenue,profit,itemsSold,avgOrderValue)
+      responses:
+        200:
+          description: Grouped metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    groupId:
+                      type: string
+                    groupName:
+                      type: string
+                    revenue:
+                      type: number
+                    profit:
+                      type: number
+                    itemsSold:
+                      type: integer
+                    avgOrderValue:
+                      type: number
+
+  /api/brands:
+    get:
+      tags:
+        - Configuration
+      summary: Get all brands
+      operationId: getBrands
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of brands
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    brandId:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                    active:
+                      type: string
+                    createdAt:
+                      type: string
+                      format: date-time
+
+    post:
+      tags:
+        - Configuration
+      summary: Create new brand
+      operationId: createBrand
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                active:
+                  type: string
+                  default: "true"
+      responses:
+        201:
+          description: Brand created successfully
+
+  /api/categories:
+    get:
+      tags:
+        - Configuration
+      summary: Get all categories
+      operationId: getCategories
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    categoryId:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                    active:
+                      type: string
+                    createdAt:
+                      type: string
+                      format: date-time
+
+    post:
+      tags:
+        - Configuration
+      summary: Create new category
+      operationId: createCategory
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                active:
+                  type: string
+                  default: "true"
+      responses:
+        201:
+          description: Category created successfully
+
+  /api/payment-methods:
+    get:
+      tags:
+        - Configuration
+      summary: Get all payment methods
+      operationId: getPaymentMethods
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of payment methods
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    paymentMethodId:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                    active:
+                      type: string
+                    createdAt:
+                      type: string
+                      format: date-time
+
+    post:
+      tags:
+        - Configuration
+      summary: Create new payment method
+      operationId: createPaymentMethod
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                active:
+                  type: string
+                  default: "true"
+      responses:
+        201:
+          description: Payment method created successfully
