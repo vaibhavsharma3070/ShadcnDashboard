@@ -272,7 +272,7 @@ export default function Inventory() {
     queryKey: ["/api/categories"],
   });
 
-  const { data: paymentMethods } = useQuery<Array<{ paymentMethodId: string; name: string; type: string; isActive: boolean }>>({
+  const { data: paymentMethods } = useQuery<Array<{ paymentMethodId: string; name: string; active: string }>>({
     queryKey: ["/api/payment-methods"],
   });
 
@@ -1488,7 +1488,7 @@ export default function Inventory() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {paymentMethods?.filter(method => method.isActive).map((method) => (
+                        {paymentMethods?.filter(method => method.active === "true").map((method) => (
                           <SelectItem key={method.paymentMethodId} value={method.paymentMethodId}>
                             {method.name}
                           </SelectItem>

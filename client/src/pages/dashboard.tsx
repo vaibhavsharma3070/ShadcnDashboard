@@ -216,10 +216,10 @@ export default function Dashboard() {
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
     date.setDate(date.getDate() - 30);
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split("T")[0];
   });
   const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toISOString().split("T")[0];
   });
 
   const { data: financialData, isLoading: financialLoading } = useQuery<{
@@ -230,7 +230,9 @@ export default function Dashboard() {
     averageOrderValue: number;
     totalExpenses: number;
   }>({
-    queryKey: [`/api/dashboard/financial-data?startDate=${startDate}&endDate=${endDate}`],
+    queryKey: [
+      `/api/dashboard/financial-data?startDate=${startDate}&endDate=${endDate}`,
+    ],
   });
 
   // Pagination logic for items
@@ -269,7 +271,7 @@ export default function Dashboard() {
     setDateRange(range);
     const endDate = new Date();
     const startDate = new Date();
-    
+
     switch (range) {
       case "7":
         startDate.setDate(endDate.getDate() - 7);
@@ -286,9 +288,9 @@ export default function Dashboard() {
       default:
         startDate.setDate(endDate.getDate() - 30);
     }
-    
-    setStartDate(startDate.toISOString().split('T')[0]);
-    setEndDate(endDate.toISOString().split('T')[0]);
+
+    setStartDate(startDate.toISOString().split("T")[0]);
+    setEndDate(endDate.toISOString().split("T")[0]);
   };
 
   return (
@@ -312,10 +314,6 @@ export default function Dashboard() {
                     {formatCurrencyAbbreviated(metrics?.totalRevenue || 0)}
                   </p>
                 )}
-                <p className="text-sm text-emerald-600 mt-1 flex items-center">
-                  <ArrowUp className="h-3 w-3 mr-1" />
-                  +12.5% del mes pasado
-                </p>
               </div>
               <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
                 <DollarSign className="h-6 w-6 text-emerald-600" />
@@ -338,10 +336,6 @@ export default function Dashboard() {
                     {metrics?.activeItems || 0}
                   </p>
                 )}
-                <p className="text-sm text-blue-600 mt-1 flex items-center">
-                  <Plus className="h-3 w-3 mr-1" />
-                  23 nuevos esta semana
-                </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
                 <Package className="h-6 w-6 text-blue-600" />
@@ -366,7 +360,8 @@ export default function Dashboard() {
                 )}
                 <p className="text-sm text-amber-600 mt-1 flex items-center">
                   <AlertTriangle className="h-3 w-3 mr-1" />
-                  Dinero Saliente: {formatCurrencyAbbreviated(metrics?.upcomingPayouts || 0)}
+                  Dinero Saliente:{" "}
+                  {formatCurrencyAbbreviated(metrics?.upcomingPayouts || 0)}
                 </p>
               </div>
               <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
@@ -387,18 +382,23 @@ export default function Dashboard() {
                   <Skeleton className="h-8 w-24 mt-2" />
                 ) : (
                   <p className="text-xl font-bold text-foreground">
-                    {metrics?.netProfit ? 
-                      formatCurrencyRangeAbbreviated(metrics.netProfit.min, metrics.netProfit.max) : 
-                      formatCurrencyAbbreviated(0)
-                    }
+                    {metrics?.netProfit
+                      ? formatCurrencyRangeAbbreviated(
+                          metrics.netProfit.min,
+                          metrics.netProfit.max,
+                        )
+                      : formatCurrencyAbbreviated(0)}
                   </p>
                 )}
                 <p className="text-sm text-emerald-600 mt-1 flex items-center">
                   <ArrowUp className="h-3 w-3 mr-1" />
-                  Costo Mercancia: {metrics?.costRange ? 
-                    formatCurrencyRangeAbbreviated(metrics.costRange.min, metrics.costRange.max) : 
-                    formatCurrencyAbbreviated(0)
-                  }
+                  Costo Mercancia:{" "}
+                  {metrics?.costRange
+                    ? formatCurrencyRangeAbbreviated(
+                        metrics.costRange.min,
+                        metrics.costRange.max,
+                      )
+                    : formatCurrencyAbbreviated(0)}
                 </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
@@ -424,16 +424,32 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <div className="mt-2">
-                    <p className="text-2xl font-bold text-foreground" data-testid="text-luxette-item-count">
+                    <p
+                      className="text-2xl font-bold text-foreground"
+                      data-testid="text-luxette-item-count"
+                    >
                       {luxetteInventory?.itemCount || 0} artículos
                     </p>
-                    <p className="text-sm text-blue-600 mt-1" data-testid="text-luxette-total-cost">
-                      Costo Total: {formatCurrencyAbbreviated(luxetteInventory?.totalCost || 0)}
+                    <p
+                      className="text-sm text-blue-600 mt-1"
+                      data-testid="text-luxette-total-cost"
+                    >
+                      Costo Total:{" "}
+                      {formatCurrencyAbbreviated(
+                        luxetteInventory?.totalCost || 0,
+                      )}
                     </p>
-                    <p className="text-sm text-green-600 mt-1" data-testid="text-luxette-price-range">
-                      Rango: {luxetteInventory?.priceRange ? 
-                        formatCurrencyRangeAbbreviated(luxetteInventory.priceRange.min, luxetteInventory.priceRange.max) : 
-                        formatCurrencyAbbreviated(0)}
+                    <p
+                      className="text-sm text-green-600 mt-1"
+                      data-testid="text-luxette-price-range"
+                    >
+                      Rango:{" "}
+                      {luxetteInventory?.priceRange
+                        ? formatCurrencyRangeAbbreviated(
+                            luxetteInventory.priceRange.min,
+                            luxetteInventory.priceRange.max,
+                          )
+                        : formatCurrencyAbbreviated(0)}
                     </p>
                   </div>
                 )}
@@ -453,7 +469,7 @@ export default function Dashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Resumen de Ingresos</CardTitle>
-              <select 
+              <select
                 className="text-sm border border-input rounded-lg px-3 py-2 bg-background"
                 value={dateRange}
                 onChange={(e) => handleDateRangeChange(e.target.value)}
@@ -485,45 +501,80 @@ export default function Dashboard() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                     <div className="text-2xl font-bold text-green-700 dark:text-green-300">
-                      {formatCurrencyAbbreviated(financialData?.totalRevenue || 0)}
+                      {formatCurrencyAbbreviated(
+                        financialData?.totalRevenue || 0,
+                      )}
                     </div>
-                    <div className="text-sm text-green-600 dark:text-green-400">Ingresos</div>
+                    <div className="text-sm text-green-600 dark:text-green-400">
+                      Ingresos
+                    </div>
                   </div>
                   <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                     <div className="text-2xl font-bold text-red-700 dark:text-red-300">
-                      {formatCurrencyAbbreviated((financialData?.totalCosts || 0) + (financialData?.totalExpenses || 0))}
+                      {formatCurrencyAbbreviated(
+                        (financialData?.totalCosts || 0) +
+                          (financialData?.totalExpenses || 0),
+                      )}
                     </div>
-                    <div className="text-sm text-red-600 dark:text-red-400">Costos Totales</div>
+                    <div className="text-sm text-red-600 dark:text-red-400">
+                      Costos Totales
+                    </div>
                   </div>
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                     <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                      {formatCurrencyAbbreviated(financialData?.totalProfit || 0)}
+                      {formatCurrencyAbbreviated(
+                        financialData?.totalProfit || 0,
+                      )}
                     </div>
-                    <div className="text-sm text-blue-600 dark:text-blue-400">Ganancia</div>
+                    <div className="text-sm text-blue-600 dark:text-blue-400">
+                      Ganancia
+                    </div>
                   </div>
                 </div>
 
                 {/* Additional Metrics */}
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Artículos Vendidos:</span>
-                    <span className="font-semibold">{financialData?.itemsSold || 0}</span>
+                    <span className="text-sm text-muted-foreground">
+                      Artículos Vendidos:
+                    </span>
+                    <span className="font-semibold">
+                      {financialData?.itemsSold || 0}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Valor Promedio Orden:</span>
-                    <span className="font-semibold">{formatCurrencyAbbreviated(financialData?.averageOrderValue || 0)}</span>
+                    <span className="text-sm text-muted-foreground">
+                      Valor Promedio Orden:
+                    </span>
+                    <span className="font-semibold">
+                      {formatCurrencyAbbreviated(
+                        financialData?.averageOrderValue || 0,
+                      )}
+                    </span>
                   </div>
                 </div>
 
                 {/* Cost Breakdown */}
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Costo Artículos:</span>
-                    <span className="font-semibold text-orange-600">{formatCurrencyAbbreviated(financialData?.totalCosts || 0)}</span>
+                    <span className="text-sm text-muted-foreground">
+                      Costo Artículos:
+                    </span>
+                    <span className="font-semibold text-orange-600">
+                      {formatCurrencyAbbreviated(
+                        financialData?.totalCosts || 0,
+                      )}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Gastos:</span>
-                    <span className="font-semibold text-orange-600">{formatCurrencyAbbreviated(financialData?.totalExpenses || 0)}</span>
+                    <span className="text-sm text-muted-foreground">
+                      Gastos:
+                    </span>
+                    <span className="font-semibold text-orange-600">
+                      {formatCurrencyAbbreviated(
+                        financialData?.totalExpenses || 0,
+                      )}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -596,12 +647,14 @@ export default function Dashboard() {
                     {paymentMetrics.upcomingPayments > 0 && (
                       <p>{paymentMetrics.upcomingPayments} pagos próximos</p>
                     )}
-                    {metrics && metrics.pendingPayouts && metrics.pendingPayouts.max > 0 && (
-                      <p>
-                        Pagos salientes pendientes:{" "}
-                        {formatCurrencyRange(metrics.pendingPayouts)}
-                      </p>
-                    )}
+                    {metrics &&
+                      metrics.pendingPayouts &&
+                      metrics.pendingPayouts.max > 0 && (
+                        <p>
+                          Pagos salientes pendientes:{" "}
+                          {formatCurrencyRange(metrics.pendingPayouts)}
+                        </p>
+                      )}
                   </div>
                   <Button
                     variant="link"
