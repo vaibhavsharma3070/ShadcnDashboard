@@ -1277,6 +1277,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Contract PDF generation endpoint
+  app.get("/api/contracts/:id/pdf", async (req, res) => {
+    try {
+      const contract = await storage.getContract(req.params.id);
+      if (!contract) {
+        return res.status(404).json({ error: "Contract not found" });
+      }
+      
+      // Return the complete contract data for PDF generation
+      res.json({
+        ...contract,
+        generatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      const { status, message } = handleStorageError(error);
+      res.status(status).json({ error: message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { pdf } from "@react-pdf/renderer";
+import ContractPDF from "@/components/ContractPDF";
 import type { Contract, ContractTemplate, ContractItemSnapshot, Vendor, Item } from "@shared/schema";
 
 // Extended contract type with vendor and template info
@@ -149,10 +151,8 @@ function ContractCreationWizard() {
         itemSnapshots
       };
 
-      return apiRequest('/api/contracts', {
-        method: 'POST',
-        body: JSON.stringify(contractData)
-      } as any);
+      const response = await apiRequest('POST', '/api/contracts', contractData);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
@@ -349,6 +349,8 @@ function ContractCreationWizard() {
 
 export default function Contracts() {
   const [activeTab, setActiveTab] = useState<"contracts" | "templates">("contracts");
+  const [downloadingContract, setDownloadingContract] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Fetch contracts
   const { data: contracts = [], isLoading: contractsLoading } = useQuery<ContractWithDetails[]>({
@@ -379,6 +381,44 @@ export default function Contracts() {
         return "Finalizado";
       default:
         return status;
+    }
+  };
+
+  const handleDownloadPDF = async (contract: ContractWithDetails) => {
+    try {
+      setDownloadingContract(contract.contractId);
+      
+      // Fetch complete contract data with vendor details
+      const response = await fetch(`/api/contracts/${contract.contractId}/pdf`);
+      if (!response.ok) throw new Error('Failed to fetch contract data');
+      const contractData = await response.json();
+      
+      // Generate PDF
+      const blob = await pdf(<ContractPDF contract={contractData} />).toBlob();
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Contrato_${contract.vendor.name.replace(/\s+/g, '_')}_${contract.contractId.slice(0, 8)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "¡Éxito!",
+        description: "PDF del contrato descargado exitosamente"
+      });
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast({
+        title: "Error",
+        description: "Error al generar el PDF del contrato",
+        variant: "destructive"
+      });
+    } finally {
+      setDownloadingContract(null);
     }
   };
 
@@ -482,11 +522,18 @@ export default function Contracts() {
                                 <Button variant="outline" size="sm" data-testid={`button-edit-${contract.contractId}`}>
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                {contract.status === "final" && contract.pdfUrl && (
-                                  <Button variant="outline" size="sm" data-testid={`button-download-${contract.contractId}`}>
-                                    <Download className="h-4 w-4" />
-                                  </Button>
-                                )}
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleDownloadPDF(contract)}
+                                  disabled={downloadingContract === contract.contractId}
+                                  data-testid={`button-download-${contract.contractId}`}
+                                >
+                                  <Download className="h-4 w-4" />
+                                  {downloadingContract === contract.contractId && (
+                                    <span className="ml-1">...</span>
+                                  )}
+                                </Button>
                                 <Button variant="outline" size="sm" data-testid={`button-delete-${contract.contractId}`}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
