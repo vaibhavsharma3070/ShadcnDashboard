@@ -1,0 +1,3859 @@
+openapi: 3.0.3
+info:
+  title: LUXETTE Luxury Consignment Management API
+  description: |
+    Comprehensive API for managing luxury consignment business operations including inventory, 
+    vendors, clients, payments, contracts, and business intelligence reporting.
+    
+    ## Authentication
+    All endpoints except /api/auth/login require session-based authentication.
+    Login with valid credentials to receive a session cookie that must be included in subsequent requests.
+    
+    ## API Statistics
+    - Total Endpoints: 93
+    - Authentication: 6 endpoints
+    - Dashboard: 5 endpoints  
+    - Configuration: 15 endpoints (Brands, Categories, Payment Methods)
+    - Core Business: 45+ endpoints
+    - Reports: 6 endpoints
+    - File Management: 2 endpoints
+    
+    ## Base URL
+    Development: http://localhost:5000
+    
+  version: 2.0.0
+  contact:
+    name: LUXETTE Support
+    email: support@luxette.com
+
+servers:
+  - url: http://localhost:5000
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: User authentication and management (6 endpoints)
+  - name: Dashboard
+    description: Dashboard metrics and analytics (5 endpoints)
+  - name: Vendors
+    description: Vendor management operations (5 endpoints)
+  - name: Brands
+    description: Brand configuration (5 endpoints)
+  - name: Categories
+    description: Category configuration (5 endpoints)
+  - name: Payment Methods
+    description: Payment method configuration (5 endpoints)
+  - name: Clients
+    description: Client management operations (5 endpoints)
+  - name: Items
+    description: Inventory item management (6 endpoints)
+  - name: Payments
+    description: Client payment operations (10 endpoints)
+  - name: Payouts
+    description: Vendor payout operations (5 endpoints)
+  - name: Expenses
+    description: Item expense tracking (3 endpoints)
+  - name: Installment Plans
+    description: Payment installment plan management (6 endpoints)
+  - name: Contract Templates
+    description: Contract template management (6 endpoints)
+  - name: Contracts
+    description: Contract generation and management (8 endpoints)
+  - name: Reports
+    description: Business intelligence and reporting (6 endpoints)
+  - name: File Management
+    description: Image upload and file serving (2 endpoints)
+  - name: Migration
+    description: Data migration utilities (1 endpoint)
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: connect.sid
+      description: Session cookie obtained from login endpoint
+      
+  parameters:
+    idParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID of the resource
+      
+    vendorIdParam:
+      name: vendorId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID of the vendor
+      
+    itemIdParam:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID of the item
+      
+    clientIdParam:
+      name: clientId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID of the client
+      
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, staff, readOnly]
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          
+    Vendor:
+      type: object
+      properties:
+        vendorId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        taxId:
+          type: string
+        bankAccountNumber:
+          type: string
+        bankName:
+          type: string
+        accountType:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+          
+    Client:
+      type: object
+      properties:
+        clientId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        billingAddr:
+          type: string
+        idNumber:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    
+    Brand:
+      type: object
+      properties:
+        brandId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        active:
+          type: string
+          enum: ["true", "false"]
+        createdAt:
+          type: string
+          format: date-time
+    
+    Category:
+      type: object
+      properties:
+        categoryId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        active:
+          type: string
+          enum: ["true", "false"]
+        createdAt:
+          type: string
+          format: date-time
+    
+    PaymentMethod:
+      type: object
+      properties:
+        paymentMethodId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        active:
+          type: string
+          enum: ["true", "false"]
+        createdAt:
+          type: string
+          format: date-time
+          
+    Item:
+      type: object
+      properties:
+        itemId:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        brandId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        model:
+          type: string
+        serialNo:
+          type: string
+        condition:
+          type: string
+        acquisitionDate:
+          type: string
+          format: date
+        minCost:
+          type: number
+        maxCost:
+          type: number
+        minSalesPrice:
+          type: number
+        maxSalesPrice:
+          type: number
+        imageUrl:
+          type: string
+        status:
+          type: string
+          enum: [in-store, sold, returned-to-vendor, reserved]
+        createdAt:
+          type: string
+          format: date-time
+          
+    Payment:
+      type: object
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        itemId:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        paymentMethod:
+          type: string
+        amount:
+          type: number
+        paidAt:
+          type: string
+          format: date-time
+          
+    Payout:
+      type: object
+      properties:
+        payoutId:
+          type: string
+          format: uuid
+        itemId:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        paidAt:
+          type: string
+          format: date-time
+        bankAccount:
+          type: string
+        transferId:
+          type: string
+        notes:
+          type: string
+    
+    Expense:
+      type: object
+      properties:
+        expenseId:
+          type: string
+          format: uuid
+        itemId:
+          type: string
+          format: uuid
+        expenseType:
+          type: string
+        amount:
+          type: number
+        incurredAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    InstallmentPlan:
+      type: object
+      properties:
+        installmentId:
+          type: string
+          format: uuid
+        itemId:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        dueDate:
+          type: string
+          format: date
+        paidAmount:
+          type: number
+        status:
+          type: string
+          enum: [pending, paid, overdue]
+        createdAt:
+          type: string
+          format: date-time
+    
+    ContractTemplate:
+      type: object
+      properties:
+        templateId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        termsText:
+          type: string
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    
+    Contract:
+      type: object
+      properties:
+        contractId:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        templateId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [draft, final]
+        termsText:
+          type: string
+        itemSnapshots:
+          type: array
+          items:
+            type: object
+        pdfUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+    
+    FilterParameters:
+      type: object
+      properties:
+        vendorIds:
+          type: string
+          description: Comma-separated list of vendor UUIDs
+        clientIds:
+          type: string
+          description: Comma-separated list of client UUIDs
+        brandIds:
+          type: string
+          description: Comma-separated list of brand UUIDs
+        categoryIds:
+          type: string
+          description: Comma-separated list of category UUIDs
+        itemStatuses:
+          type: string
+          description: Comma-separated list of item statuses
+
+paths:
+  # Authentication Endpoints (6)
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+            example:
+              email: admin@luxette.com
+              password: LuxetteAdmin2025!
+      responses:
+        200:
+          description: Successful login
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: connect.sid=s%3A0Ko6_nyU1DCUjVNt6JqCo-IrRbOKjee4...; Path=/; Expires=Sun, 14 Sep 2025 03:06:27 GMT; HttpOnly; SameSite=Lax
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        400:
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: Invalid credentials or account deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      operationId: logout
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Successful logout
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Sesión cerrada correctamente"
+        500:
+          description: Error closing session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      operationId: getCurrentUser
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        401:
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "No autorizado"
+
+  /api/auth/users:
+    get:
+      tags:
+        - Authentication
+      summary: Get all users (admin only)
+      operationId: getUsers
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        403:
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Authentication
+      summary: Create new user (admin only)
+      operationId: createUser
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - name
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                name:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, staff, readOnly]
+                active:
+                  type: boolean
+                  default: true
+      responses:
+        201:
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        400:
+          description: Invalid user data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        403:
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        409:
+          description: User with email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/users/{id}:
+    put:
+      tags:
+        - Authentication
+      summary: Update user (admin only)
+      operationId: updateUser
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+                role:
+                  type: string
+                  enum: [admin, staff, readOnly]
+                active:
+                  type: boolean
+      responses:
+        200:
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        400:
+          description: Invalid user data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        403:
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Dashboard Endpoints (5)
+  /api/dashboard/metrics:
+    get:
+      tags:
+        - Dashboard
+      summary: Get dashboard metrics
+      operationId: getDashboardMetrics
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRevenue:
+                    type: number
+                  activeItems:
+                    type: integer
+                  pendingPayouts:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+                  netProfit:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+                  incomingPayments:
+                    type: number
+                  upcomingPayouts:
+                    type: number
+                  costRange:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+        500:
+          description: Failed to fetch dashboard metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/dashboard/recent-items:
+    get:
+      tags:
+        - Dashboard
+      summary: Get recent items
+      operationId: getRecentItems
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of recent items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Item'
+        500:
+          description: Failed to fetch recent items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/dashboard/top-performing:
+    get:
+      tags:
+        - Dashboard
+      summary: Get top performing items
+      operationId: getTopPerformingItems
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of top performing items with profit
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/Item'
+                    - type: object
+                      properties:
+                        profit:
+                          type: number
+        500:
+          description: Failed to fetch top performing items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/dashboard/luxette-inventory:
+    get:
+      tags:
+        - Dashboard
+      summary: Get LUXETTE inventory data
+      operationId: getLuxetteInventory
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: LUXETTE inventory summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itemCount:
+                    type: integer
+                  totalCost:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+                  totalPrice:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+        500:
+          description: Failed to fetch Luxette inventory data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/dashboard/financial-data:
+    get:
+      tags:
+        - Dashboard
+      summary: Get financial data by date range
+      operationId: getFinancialData
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Start date (YYYY-MM-DD)
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: End date (YYYY-MM-DD)
+      responses:
+        200:
+          description: Financial data for date range
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRevenue:
+                    type: number
+                  totalCost:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+                  grossProfit:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+                  expenses:
+                    type: number
+                  netProfit:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+        400:
+          description: Start date and end date are required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch financial data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Vendor Endpoints (5)
+  /api/vendors:
+    get:
+      tags:
+        - Vendors
+      summary: Get all vendors
+      operationId: getVendors
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of vendors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vendor'
+        500:
+          description: Failed to fetch vendors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Vendors
+      summary: Create new vendor
+      operationId: createVendor
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                taxId:
+                  type: string
+                bankAccountNumber:
+                  type: string
+                bankName:
+                  type: string
+                accountType:
+                  type: string
+      responses:
+        201:
+          description: Vendor created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+        400:
+          description: Invalid vendor data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/vendors/{id}:
+    get:
+      tags:
+        - Vendors
+      summary: Get vendor by ID
+      operationId: getVendor
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        200:
+          description: Vendor details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+        404:
+          description: Vendor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch vendor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Vendors
+      summary: Update vendor
+      operationId: updateVendor
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                taxId:
+                  type: string
+                bankAccountNumber:
+                  type: string
+                bankName:
+                  type: string
+                accountType:
+                  type: string
+      responses:
+        200:
+          description: Vendor updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+        400:
+          description: Invalid vendor data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Vendor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Vendors
+      summary: Delete vendor
+      operationId: deleteVendor
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Vendor deleted successfully
+        409:
+          description: Cannot delete vendor with associated items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to delete vendor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Brand Endpoints (5)
+  /api/brands:
+    get:
+      tags:
+        - Brands
+      summary: Get all brands
+      operationId: getBrands
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of brands
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Brand'
+        500:
+          description: Failed to fetch brands
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Brands
+      summary: Create new brand
+      operationId: createBrand
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                active:
+                  type: string
+                  default: "true"
+      responses:
+        201:
+          description: Brand created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Brand'
+        400:
+          description: Invalid brand data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/brands/{id}:
+    get:
+      tags:
+        - Brands
+      summary: Get brand by ID
+      operationId: getBrand
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        200:
+          description: Brand details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Brand'
+        404:
+          description: Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch brand
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Brands
+      summary: Update brand
+      operationId: updateBrand
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                active:
+                  type: string
+                  enum: ["true", "false"]
+      responses:
+        200:
+          description: Brand updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Brand'
+        400:
+          description: Invalid brand data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Brands
+      summary: Delete brand
+      operationId: deleteBrand
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Brand deleted successfully
+        409:
+          description: Cannot delete brand - referenced by items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Brand not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Category Endpoints (5)
+  /api/categories:
+    get:
+      tags:
+        - Categories
+      summary: Get all categories
+      operationId: getCategories
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+        500:
+          description: Failed to fetch categories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Categories
+      summary: Create new category
+      operationId: createCategory
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                active:
+                  type: string
+                  default: "true"
+      responses:
+        201:
+          description: Category created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        400:
+          description: Invalid category data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/categories/{id}:
+    get:
+      tags:
+        - Categories
+      summary: Get category by ID
+      operationId: getCategory
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        200:
+          description: Category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        404:
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Categories
+      summary: Update category
+      operationId: updateCategory
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                active:
+                  type: string
+                  enum: ["true", "false"]
+      responses:
+        200:
+          description: Category updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        400:
+          description: Invalid category data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Categories
+      summary: Delete category
+      operationId: deleteCategory
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Category deleted successfully
+        409:
+          description: Cannot delete category - referenced by items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Payment Method Endpoints (5)
+  /api/payment-methods:
+    get:
+      tags:
+        - Payment Methods
+      summary: Get all payment methods
+      operationId: getPaymentMethods
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of payment methods
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentMethod'
+        500:
+          description: Failed to fetch payment methods
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Payment Methods
+      summary: Create new payment method
+      operationId: createPaymentMethod
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                active:
+                  type: string
+                  default: "true"
+      responses:
+        201:
+          description: Payment method created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        400:
+          description: Invalid payment method data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payment-methods/{id}:
+    get:
+      tags:
+        - Payment Methods
+      summary: Get payment method by ID
+      operationId: getPaymentMethod
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        200:
+          description: Payment method details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        404:
+          description: Payment method not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch payment method
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Payment Methods
+      summary: Update payment method
+      operationId: updatePaymentMethod
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                active:
+                  type: string
+                  enum: ["true", "false"]
+      responses:
+        200:
+          description: Payment method updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        400:
+          description: Invalid payment method data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Payment method not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Payment Methods
+      summary: Delete payment method
+      operationId: deletePaymentMethod
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Payment method deleted successfully
+        409:
+          description: Cannot delete payment method - referenced by payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Payment method not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Migration Endpoint (1)
+  /api/migration/brands:
+    post:
+      tags:
+        - Migration
+      summary: Migrate legacy brand data
+      operationId: migrateBrands
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Migration completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  result:
+                    type: object
+        500:
+          description: Migration failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  details:
+                    type: string
+
+  # Client Endpoints (5)
+  /api/clients:
+    get:
+      tags:
+        - Clients
+      summary: Get all clients
+      operationId: getClients
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Client'
+        500:
+          description: Failed to fetch clients
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Clients
+      summary: Create new client
+      operationId: createClient
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                billingAddr:
+                  type: string
+                idNumber:
+                  type: string
+      responses:
+        201:
+          description: Client created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        400:
+          description: Invalid client data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/clients/{id}:
+    get:
+      tags:
+        - Clients
+      summary: Get client by ID
+      operationId: getClient
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        200:
+          description: Client details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        404:
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Clients
+      summary: Update client
+      operationId: updateClient
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                billingAddr:
+                  type: string
+                idNumber:
+                  type: string
+      responses:
+        200:
+          description: Client updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        400:
+          description: Invalid client data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Clients
+      summary: Delete client
+      operationId: deleteClient
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Client deleted successfully
+        409:
+          description: Cannot delete client with associated payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to delete client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Item Endpoints (6)
+  /api/items:
+    get:
+      tags:
+        - Items
+      summary: Get all items
+      operationId: getItems
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: vendorId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by vendor ID
+      responses:
+        200:
+          description: List of items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Item'
+        500:
+          description: Failed to fetch items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Items
+      summary: Create new item
+      operationId: createItem
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vendorId
+              properties:
+                vendorId:
+                  type: string
+                  format: uuid
+                brandId:
+                  type: string
+                  format: uuid
+                categoryId:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                model:
+                  type: string
+                serialNo:
+                  type: string
+                condition:
+                  type: string
+                acquisitionDate:
+                  type: string
+                  format: date
+                minCost:
+                  type: number
+                maxCost:
+                  type: number
+                minSalesPrice:
+                  type: number
+                maxSalesPrice:
+                  type: number
+                imageUrl:
+                  type: string
+                status:
+                  type: string
+                  default: in-store
+      responses:
+        201:
+          description: Item created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        400:
+          description: Invalid item data or foreign key violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/items/{id}:
+    get:
+      tags:
+        - Items
+      summary: Get item by ID
+      operationId: getItem
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        200:
+          description: Item details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        404:
+          description: Item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Items
+      summary: Update item
+      operationId: updateItem
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vendorId:
+                  type: string
+                  format: uuid
+                brandId:
+                  type: string
+                  format: uuid
+                categoryId:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                model:
+                  type: string
+                serialNo:
+                  type: string
+                condition:
+                  type: string
+                acquisitionDate:
+                  type: string
+                  format: date
+                minCost:
+                  type: number
+                maxCost:
+                  type: number
+                minSalesPrice:
+                  type: number
+                maxSalesPrice:
+                  type: number
+                imageUrl:
+                  type: string
+                status:
+                  type: string
+      responses:
+        200:
+          description: Item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        400:
+          description: Invalid item data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Items
+      summary: Delete item
+      operationId: deleteItem
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Item deleted successfully
+        409:
+          description: Cannot delete item with associated transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to delete item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/items/{id}/status:
+    patch:
+      tags:
+        - Items
+      summary: Update item status
+      operationId: updateItemStatus
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [in-store, reserved, sold, returned-to-vendor]
+      responses:
+        200:
+          description: Item status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        400:
+          description: Invalid status value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Payment Endpoints (10)
+  /api/payments:
+    get:
+      tags:
+        - Payments
+      summary: Get all payments
+      operationId: getPayments
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+        500:
+          description: Failed to fetch payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Payments
+      summary: Create new payment
+      operationId: createPayment
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - itemId
+                - clientId
+                - paymentMethod
+                - amount
+                - paidAt
+              properties:
+                itemId:
+                  type: string
+                  format: uuid
+                clientId:
+                  type: string
+                  format: uuid
+                paymentMethod:
+                  type: string
+                amount:
+                  type: number
+                paidAt:
+                  type: string
+                  format: date-time
+      responses:
+        201:
+          description: Payment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        400:
+          description: Invalid payment data or item already fully paid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payments/{id}:
+    get:
+      tags:
+        - Payments
+      summary: Get payment by ID
+      operationId: getPayment
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        200:
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        404:
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch payment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Payments
+      summary: Update payment
+      operationId: updatePayment
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                paymentMethod:
+                  type: string
+                amount:
+                  type: number
+                paidAt:
+                  type: string
+                  format: date-time
+      responses:
+        200:
+          description: Payment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        400:
+          description: Invalid payment data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Payments
+      summary: Delete payment
+      operationId: deletePayment
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Payment deleted successfully
+        500:
+          description: Failed to delete payment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payments/item/{itemId}:
+    get:
+      tags:
+        - Payments
+      summary: Get payments by item
+      operationId: getPaymentsByItem
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+      responses:
+        200:
+          description: List of payments for item
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+        500:
+          description: Failed to fetch payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payments/client/{clientId}:
+    get:
+      tags:
+        - Payments
+      summary: Get payments by client
+      operationId: getPaymentsByClient
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/clientIdParam'
+      responses:
+        200:
+          description: List of payments by client
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+        500:
+          description: Failed to fetch payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payments/summary:
+    get:
+      tags:
+        - Payments
+      summary: Get payment summary
+      operationId: getPaymentSummary
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Payment summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalReceived:
+                    type: number
+                  pendingAmount:
+                    type: number
+                  itemsPaidInFull:
+                    type: integer
+                  itemsPartiallyPaid:
+                    type: integer
+        500:
+          description: Failed to fetch payment summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payments/pending:
+    get:
+      tags:
+        - Payments
+      summary: Get pending payments
+      operationId: getPendingPayments
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of pending payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    item:
+                      $ref: '#/components/schemas/Item'
+                    totalPaid:
+                      type: number
+                    remainingBalance:
+                      type: number
+        500:
+          description: Failed to fetch pending payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payments/received:
+    get:
+      tags:
+        - Payments
+      summary: Get received payments
+      operationId: getReceivedPayments
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        200:
+          description: List of received payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+        500:
+          description: Failed to fetch received payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payments/metrics:
+    get:
+      tags:
+        - Payments
+      summary: Get payment metrics
+      operationId: getPaymentMetrics
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Payment metrics and statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalPaymentsReceived:
+                    type: integer
+                  totalPaymentAmount:
+                    type: number
+                  averagePaymentAmount:
+                    type: number
+                  paymentsByMethod:
+                    type: object
+                    additionalProperties:
+                      type: number
+        500:
+          description: Failed to fetch payment metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payments/recent:
+    get:
+      tags:
+        - Payments
+      summary: Get recent payments
+      operationId: getRecentPayments
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        200:
+          description: List of recent payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+        500:
+          description: Failed to fetch recent payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Payout Endpoints (5)
+  /api/payouts:
+    get:
+      tags:
+        - Payouts
+      summary: Get all payouts
+      operationId: getPayouts
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of payouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payout'
+        500:
+          description: Failed to fetch payouts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Payouts
+      summary: Create new payout
+      operationId: createPayout
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - itemId
+                - vendorId
+                - amount
+                - paidAt
+              properties:
+                itemId:
+                  type: string
+                  format: uuid
+                vendorId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: number
+                paidAt:
+                  type: string
+                  format: date-time
+                bankAccount:
+                  type: string
+                transferId:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        201:
+          description: Payout created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payout'
+        400:
+          description: Invalid payout data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payouts/{id}:
+    delete:
+      tags:
+        - Payouts
+      summary: Delete payout
+      operationId: deletePayout
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Payout deleted successfully
+        500:
+          description: Failed to delete payout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payouts/vendor/{vendorId}:
+    get:
+      tags:
+        - Payouts
+      summary: Get payouts by vendor
+      operationId: getPayoutsByVendor
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/vendorIdParam'
+      responses:
+        200:
+          description: List of payouts for vendor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payout'
+        500:
+          description: Failed to fetch payouts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/payouts/vendor/{vendorId}/pending:
+    get:
+      tags:
+        - Payouts
+      summary: Get pending payouts for vendor
+      operationId: getPendingPayouts
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/vendorIdParam'
+      responses:
+        200:
+          description: List of items pending payout
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    item:
+                      $ref: '#/components/schemas/Item'
+                    paymentReceived:
+                      type: number
+                    payoutAmount:
+                      type: number
+        500:
+          description: Failed to fetch pending payouts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Expense Endpoints (3)
+  /api/expenses/item/{itemId}:
+    get:
+      tags:
+        - Expenses
+      summary: Get expenses by item
+      operationId: getExpensesByItem
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+      responses:
+        200:
+          description: List of expenses for item
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Expense'
+        500:
+          description: Failed to fetch expenses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/expenses:
+    post:
+      tags:
+        - Expenses
+      summary: Create new expense
+      operationId: createExpense
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - itemId
+                - expenseType
+                - amount
+                - incurredAt
+              properties:
+                itemId:
+                  type: string
+                  format: uuid
+                expenseType:
+                  type: string
+                amount:
+                  type: number
+                incurredAt:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+      responses:
+        201:
+          description: Expense created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        400:
+          description: Invalid expense data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/expenses/{id}:
+    delete:
+      tags:
+        - Expenses
+      summary: Delete expense
+      operationId: deleteExpense
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Expense deleted successfully
+        500:
+          description: Failed to delete expense
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Installment Plan Endpoints (6)
+  /api/installment-plans:
+    get:
+      tags:
+        - Installment Plans
+      summary: Get all installment plans
+      operationId: getInstallmentPlans
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of installment plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InstallmentPlan'
+        500:
+          description: Failed to fetch installment plans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Installment Plans
+      summary: Create new installment plan
+      operationId: createInstallmentPlan
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - itemId
+                - clientId
+                - amount
+                - dueDate
+              properties:
+                itemId:
+                  type: string
+                  format: uuid
+                clientId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: number
+                dueDate:
+                  type: string
+                  format: date
+                status:
+                  type: string
+                  default: pending
+      responses:
+        201:
+          description: Installment plan created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstallmentPlan'
+        400:
+          description: Invalid installment plan data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/installment-plans/{id}:
+    put:
+      tags:
+        - Installment Plans
+      summary: Update installment plan
+      operationId: updateInstallmentPlan
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                dueDate:
+                  type: string
+                  format: date
+                paidAmount:
+                  type: number
+                status:
+                  type: string
+                  enum: [pending, paid, overdue]
+      responses:
+        200:
+          description: Installment plan updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstallmentPlan'
+        400:
+          description: Invalid installment plan data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Installment Plans
+      summary: Delete installment plan
+      operationId: deleteInstallmentPlan
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Installment plan deleted successfully
+        500:
+          description: Failed to delete installment plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/installment-plans/item/{itemId}:
+    get:
+      tags:
+        - Installment Plans
+      summary: Get installment plans by item
+      operationId: getInstallmentPlansByItem
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/itemIdParam'
+      responses:
+        200:
+          description: List of installment plans for item
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InstallmentPlan'
+        500:
+          description: Failed to fetch installment plans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/installment-plans/client/{clientId}:
+    get:
+      tags:
+        - Installment Plans
+      summary: Get installment plans by client
+      operationId: getInstallmentPlansByClient
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/clientIdParam'
+      responses:
+        200:
+          description: List of installment plans for client
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InstallmentPlan'
+        500:
+          description: Failed to fetch installment plans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Report Endpoints (6)
+  /api/reports/kpis:
+    get:
+      tags:
+        - Reports
+      summary: Get KPI metrics
+      operationId: getKPIs
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Start date (YYYY-MM-DD)
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: End date (YYYY-MM-DD)
+        - name: vendorIds
+          in: query
+          schema:
+            type: string
+          description: Comma-separated vendor UUIDs
+        - name: clientIds
+          in: query
+          schema:
+            type: string
+          description: Comma-separated client UUIDs
+        - name: brandIds
+          in: query
+          schema:
+            type: string
+          description: Comma-separated brand UUIDs
+        - name: categoryIds
+          in: query
+          schema:
+            type: string
+          description: Comma-separated category UUIDs
+        - name: itemStatuses
+          in: query
+          schema:
+            type: string
+          description: Comma-separated item statuses
+      responses:
+        200:
+          description: KPI metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revenue:
+                    type: number
+                  profit:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+                  itemsSold:
+                    type: integer
+                  avgSalePrice:
+                    type: number
+                  margins:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+        400:
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch KPI data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/reports/timeseries:
+    get:
+      tags:
+        - Reports
+      summary: Get time series data
+      operationId: getTimeSeries
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: metric
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [revenue, profit, itemsSold, payments]
+        - name: granularity
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [day, week, month]
+        - name: vendorIds
+          in: query
+          schema:
+            type: string
+        - name: clientIds
+          in: query
+          schema:
+            type: string
+        - name: brandIds
+          in: query
+          schema:
+            type: string
+        - name: categoryIds
+          in: query
+          schema:
+            type: string
+        - name: itemStatuses
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: Time series data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                    value:
+                      type: number
+        400:
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch time series data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/reports/grouped:
+    get:
+      tags:
+        - Reports
+      summary: Get grouped metrics
+      operationId: getGroupedMetrics
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: groupBy
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [brand, vendor, client, category]
+        - name: metrics
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated metrics (revenue, profit, itemsSold, avgOrderValue)
+        - name: vendorIds
+          in: query
+          schema:
+            type: string
+        - name: clientIds
+          in: query
+          schema:
+            type: string
+        - name: brandIds
+          in: query
+          schema:
+            type: string
+        - name: categoryIds
+          in: query
+          schema:
+            type: string
+        - name: itemStatuses
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: Grouped metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    group:
+                      type: string
+                    metrics:
+                      type: object
+                      additionalProperties:
+                        type: number
+        400:
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch grouped metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/reports/items:
+    get:
+      tags:
+        - Reports
+      summary: Get item profitability report
+      operationId: getItemProfitability
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: vendorIds
+          in: query
+          schema:
+            type: string
+        - name: clientIds
+          in: query
+          schema:
+            type: string
+        - name: brandIds
+          in: query
+          schema:
+            type: string
+        - name: categoryIds
+          in: query
+          schema:
+            type: string
+        - name: itemStatuses
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: Item profitability data with pagination
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        item:
+                          $ref: '#/components/schemas/Item'
+                        revenue:
+                          type: number
+                        cost:
+                          type: number
+                        profit:
+                          type: number
+                        margin:
+                          type: number
+                  totalCount:
+                    type: integer
+                  pagination:
+                    type: object
+                    properties:
+                      limit:
+                        type: integer
+                      offset:
+                        type: integer
+                      hasMore:
+                        type: boolean
+        400:
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch item profitability data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/reports/inventory:
+    get:
+      tags:
+        - Reports
+      summary: Get inventory health metrics
+      operationId: getInventoryHealth
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: vendorIds
+          in: query
+          schema:
+            type: string
+        - name: brandIds
+          in: query
+          schema:
+            type: string
+        - name: categoryIds
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: Inventory health metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalItems:
+                    type: integer
+                  itemsByStatus:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  inventoryValue:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+                  avgDaysInInventory:
+                    type: number
+                  turnoverRate:
+                    type: number
+        400:
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch inventory health data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/reports/payment-methods:
+    get:
+      tags:
+        - Reports
+      summary: Get payment method breakdown
+      operationId: getPaymentMethodBreakdown
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: vendorIds
+          in: query
+          schema:
+            type: string
+        - name: clientIds
+          in: query
+          schema:
+            type: string
+        - name: brandIds
+          in: query
+          schema:
+            type: string
+        - name: categoryIds
+          in: query
+          schema:
+            type: string
+        - name: itemStatuses
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: Payment method breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    paymentMethod:
+                      type: string
+                    count:
+                      type: integer
+                    totalAmount:
+                      type: number
+                    percentage:
+                      type: number
+        400:
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch payment method breakdown
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # File Management Endpoints (2)
+  /api/upload-image:
+    post:
+      tags:
+        - File Management
+      summary: Upload and compress image
+      operationId: uploadImage
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Image file (max 10MB)
+      responses:
+        200:
+          description: Image uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imageUrl:
+                    type: string
+                    description: Public URL of uploaded image
+                  message:
+                    type: string
+              example:
+                imageUrl: "/public-objects/uploads/abc123.jpg"
+                message: "Image uploaded and compressed successfully"
+        400:
+          description: No image file provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        413:
+          description: File size exceeds 10MB limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        415:
+          description: Only image files are allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to upload image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /public-objects/{filePath}:
+    get:
+      tags:
+        - File Management
+      summary: Serve public object files
+      operationId: getPublicObject
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: filePath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Path to the file (e.g., uploads/image.jpg)
+      responses:
+        200:
+          description: File content
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        404:
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Contract Template Endpoints (6)
+  /api/contract-templates:
+    get:
+      tags:
+        - Contract Templates
+      summary: Get all contract templates
+      operationId: getContractTemplates
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of contract templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContractTemplate'
+        500:
+          description: Failed to fetch contract templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Contract Templates
+      summary: Create new contract template
+      operationId: createContractTemplate
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - termsText
+              properties:
+                name:
+                  type: string
+                termsText:
+                  type: string
+                isDefault:
+                  type: boolean
+                  default: false
+      responses:
+        201:
+          description: Contract template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractTemplate'
+        400:
+          description: Invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/contract-templates/default:
+    get:
+      tags:
+        - Contract Templates
+      summary: Get or create default contract template
+      operationId: getDefaultContractTemplate
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Default contract template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractTemplate'
+        500:
+          description: Failed to get default template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/contract-templates/{id}:
+    get:
+      tags:
+        - Contract Templates
+      summary: Get contract template by ID
+      operationId: getContractTemplate
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        200:
+          description: Contract template details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractTemplate'
+        404:
+          description: Contract template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch contract template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Contract Templates
+      summary: Update contract template
+      operationId: updateContractTemplate
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                termsText:
+                  type: string
+                isDefault:
+                  type: boolean
+      responses:
+        200:
+          description: Contract template updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractTemplate'
+        400:
+          description: Invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Contract template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Contract Templates
+      summary: Delete contract template
+      operationId: deleteContractTemplate
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Contract template deleted successfully
+        404:
+          description: Contract template not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        409:
+          description: Cannot delete template - referenced by contracts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Contract Endpoints (8)
+  /api/contracts:
+    get:
+      tags:
+        - Contracts
+      summary: Get all contracts
+      operationId: getContracts
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of contracts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Contract'
+        500:
+          description: Failed to fetch contracts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Contracts
+      summary: Create new contract
+      operationId: createContract
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vendorId
+                - termsText
+                - itemSnapshots
+              properties:
+                vendorId:
+                  type: string
+                  format: uuid
+                templateId:
+                  type: string
+                  format: uuid
+                status:
+                  type: string
+                  enum: [draft, final]
+                  default: draft
+                termsText:
+                  type: string
+                itemSnapshots:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        201:
+          description: Contract created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+        400:
+          description: Invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/contracts/vendor/{vendorId}:
+    get:
+      tags:
+        - Contracts
+      summary: Get contracts by vendor
+      operationId: getContractsByVendor
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/vendorIdParam'
+      responses:
+        200:
+          description: List of contracts for vendor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Contract'
+        500:
+          description: Failed to fetch contracts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/contracts/{id}:
+    get:
+      tags:
+        - Contracts
+      summary: Get contract by ID
+      operationId: getContract
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        200:
+          description: Contract details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+        404:
+          description: Contract not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to fetch contract
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      tags:
+        - Contracts
+      summary: Update contract
+      operationId: updateContract
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                templateId:
+                  type: string
+                  format: uuid
+                status:
+                  type: string
+                  enum: [draft, final]
+                termsText:
+                  type: string
+                itemSnapshots:
+                  type: array
+                  items:
+                    type: object
+                pdfUrl:
+                  type: string
+      responses:
+        200:
+          description: Contract updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+        400:
+          description: Invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Contract not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags:
+        - Contracts
+      summary: Delete contract
+      operationId: deleteContract
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        204:
+          description: Contract deleted successfully
+        404:
+          description: Contract not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to delete contract
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/contracts/{id}/finalize:
+    post:
+      tags:
+        - Contracts
+      summary: Finalize contract with PDF
+      operationId: finalizeContract
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pdfUrl
+              properties:
+                pdfUrl:
+                  type: string
+                  description: URL of generated PDF
+      responses:
+        200:
+          description: Contract finalized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+        400:
+          description: PDF URL is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Contract not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/contracts/{id}/pdf:
+    get:
+      tags:
+        - Contracts
+      summary: Get contract PDF data
+      operationId: getContractPDF
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        200:
+          description: Contract data for PDF generation
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Contract'
+                  - type: object
+                    properties:
+                      generatedAt:
+                        type: string
+                        format: date-time
+        404:
+          description: Contract not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Failed to get contract PDF data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+security:
+  - sessionAuth: []
