@@ -472,17 +472,53 @@ export type Contract = typeof contract.$inferSelect;
 
 export type ContractItemSnapshot = z.infer<typeof contractItemSnapshotSchema>;
 
-// Legacy user table (keeping for compatibility)
+// User role enum
+export const userRoleEnum = pgEnum("user_role", ["admin", "staff", "readOnly"]);
+
+// Users table for authentication
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  role: userRoleEnum("role").notNull().default("staff"),
+  active: boolean("active").notNull().default(true),
+  passwordHash: text("password_hash"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+}, (table) => ({
+  emailIdx: index("idx_user_email").on(table.email),
+  roleIdx: index("idx_user_role").on(table.role),
+  activeIdx: index("idx_user_active").on(table.active),
+}));
+
+// User schemas for validation
+export const insertUserSchema = createInsertSchema(users, {
+  email: z.string().email("Correo electrónico inválido"),
+  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
+  role: z.enum(["admin", "staff", "readOnly"]),
+  active: z.boolean(),
+}).pick({
+  email: true,
+  name: true,
+  role: true,
+  active: true,
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const loginSchema = z.object({
+  email: z.string().email("Correo electrónico inválido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+});
+
+export const createUserSchema = insertUserSchema.extend({
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+});
+
+export const updateUserSchema = insertUserSchema.partial().extend({
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type LoginRequest = z.infer<typeof loginSchema>;
+export type CreateUserRequest = z.infer<typeof createUserSchema>;
+export type UpdateUserRequest = z.infer<typeof updateUserSchema>;

@@ -1,8 +1,37 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { db } from "./db";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
+// Initialize PostgreSQL session store
+const PostgreSQLStore = connectPgSimple(session);
+
 const app = express();
+
+// Session configuration
+app.use(session({
+  store: new PostgreSQLStore({
+    // Use the existing database connection
+    conObject: {
+      connectionString: process.env.DATABASE_URL,
+    },
+    tableName: 'session', // will be created automatically
+    createTableIfMissing: true,
+  }),
+  secret: process.env.SESSION_SECRET || 'luxette-default-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax'
+  },
+  name: 'luxette.session.id'
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

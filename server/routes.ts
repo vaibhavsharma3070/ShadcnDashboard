@@ -3,15 +3,32 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import sharp from "sharp";
 import { randomUUID } from "crypto";
+import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import { ObjectStorageService } from "./objectStorage";
 import { 
   insertVendorSchema, insertClientSchema, insertItemSchema, 
   insertClientPaymentSchema, insertVendorPayoutSchema, insertItemExpenseSchema, insertInstallmentPlanSchema,
   insertBrandSchema, insertCategorySchema, insertPaymentMethodSchema,
-  insertContractTemplateSchema, insertContractSchema
+  insertContractTemplateSchema, insertContractSchema,
+  loginSchema, createUserSchema, updateUserSchema
 } from "@shared/schema";
 import { z } from "zod";
+
+// Extend Express Request type to include user session
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        name: string;
+        role: 'admin' | 'staff' | 'readOnly';
+        active: boolean;
+      };
+    }
+  }
+}
 
 // Zod schemas for query parameter validation
 const filtersSchema = z.object({
@@ -76,7 +93,161 @@ function handleStorageError(error: unknown) {
   return { status: 500, message: "An unexpected error occurred" };
 }
 
+// Authentication middleware
+function requireAuth(req: any, res: any, next: any) {
+  if (!req.session?.user) {
+    return res.status(401).json({ error: "No autorizado" });
+  }
+  req.user = req.session.user;
+  next();
+}
+
+// Admin-only middleware
+function requireAdmin(req: any, res: any, next: any) {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: "Acceso denegado. Se requiere rol de administrador." });
+  }
+  next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Authentication routes (no auth required)
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = loginSchema.parse(req.body);
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.passwordHash) {
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      
+      if (!user.active) {
+        return res.status(401).json({ error: "Cuenta desactivada" });
+      }
+      
+      const validPassword = await bcrypt.compare(password, user.passwordHash);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      
+      // Update last login
+      await storage.updateLastLogin(user.id);
+      
+      // Store user in session (excluding sensitive data)
+      req.session.user = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        active: user.active
+      };
+      
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          active: user.active
+        }
+      });
+    } catch (error) {
+      res.status(400).json({ error: "Datos de inicio de sesión inválidos" });
+    }
+  });
+  
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Error al cerrar sesión" });
+      }
+      res.clearCookie('connect.sid');
+      res.json({ message: "Sesión cerrada correctamente" });
+    });
+  });
+  
+  app.get("/api/auth/me", requireAuth, (req, res) => {
+    res.json({ user: req.user });
+  });
+  
+  // User management routes (admin only)
+  app.get("/api/auth/users", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      // Remove sensitive data
+      const safeUsers = users.map(user => ({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        active: user.active,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt
+      }));
+      res.json(safeUsers);
+    } catch (error) {
+      res.status(500).json({ error: "Error al obtener usuarios" });
+    }
+  });
+  
+  app.post("/api/auth/users", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const userData = createUserSchema.parse(req.body);
+      const user = await storage.createUser(userData);
+      
+      // Return user without sensitive data
+      res.status(201).json({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        active: user.active,
+        createdAt: user.createdAt
+      });
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+        res.status(409).json({ error: "Ya existe un usuario con este correo electrónico" });
+      } else {
+        res.status(400).json({ error: "Error al crear usuario" });
+      }
+    }
+  });
+  
+  app.put("/api/auth/users/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const userData = updateUserSchema.parse(req.body);
+      const user = await storage.updateUser(req.params.id, userData);
+      
+      // Return user without sensitive data
+      res.json({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        active: user.active,
+        createdAt: user.createdAt
+      });
+    } catch (error) {
+      if (error && typeof error === 'object' && 'message' in error) {
+        if (error.message.includes('not found') || error.message.includes('no encontrado')) {
+          res.status(404).json({ error: "Usuario no encontrado" });
+        } else {
+          res.status(400).json({ error: error.message });
+        }
+      } else {
+        res.status(500).json({ error: "Error al actualizar usuario" });
+      }
+    }
+  });
+
+  // Apply auth middleware to all other routes
+  app.use('/api/*', (req, res, next) => {
+    // Skip auth routes
+    if (req.path.startsWith('/api/auth/')) {
+      return next();
+    }
+    return requireAuth(req, res, next);
+  });
   // Dashboard routes
   app.get("/api/dashboard/metrics", async (req, res) => {
     try {

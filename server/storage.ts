@@ -1,7 +1,8 @@
 import { 
   vendor, client, item, clientPayment, vendorPayout, itemExpense, installmentPlan, users, brand, category, paymentMethod, contract, contractTemplate,
   type Vendor, type Client, type Item, type ClientPayment, type VendorPayout, type ItemExpense, type InstallmentPlan, type User, type Brand, type Category, type PaymentMethod, type Contract, type ContractTemplate, type ContractItemSnapshot,
-  type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser, type InsertBrand, type InsertCategory, type InsertPaymentMethod, type InsertContract, type InsertContractTemplate
+  type InsertVendor, type InsertClient, type InsertItem, type InsertClientPayment, type InsertVendorPayout, type InsertItemExpense, type InsertInstallmentPlan, type InsertUser, type InsertBrand, type InsertCategory, type InsertPaymentMethod, type InsertContract, type InsertContractTemplate,
+  type CreateUserRequest, type UpdateUserRequest
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sum, count, sql, and, isNull, isNotNull, inArray } from "drizzle-orm";
@@ -35,10 +36,13 @@ function toDbTimestamp(v?: string | Date | null): Date {
 }
 
 export interface IStorage {
-  // Legacy user methods
+  // Authentication user methods
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: CreateUserRequest): Promise<User>;
+  updateUser(id: string, user: UpdateUserRequest): Promise<User>;
+  updateLastLogin(id: string): Promise<void>;
+  getUsers(): Promise<User[]>;
   
   // Vendor methods
   getVendors(): Promise<Vendor[]>;
@@ -345,20 +349,66 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  // Legacy user methods
+  // Authentication user methods
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user || undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+  async createUser(userData: CreateUserRequest): Promise<User> {
+    const bcrypt = await import('bcrypt');
+    const passwordHash = await bcrypt.hash(userData.password, 12);
+    
+    const insertData = {
+      email: userData.email,
+      name: userData.name,
+      role: userData.role || 'staff' as const,
+      active: userData.active ?? true,
+      passwordHash: passwordHash
+    };
+    
+    const [user] = await db.insert(users).values(insertData).returning();
     return user;
+  }
+
+  async updateUser(id: string, userData: UpdateUserRequest): Promise<User> {
+    const updateData: any = {
+      email: userData.email,
+      name: userData.name,
+      role: userData.role,
+      active: userData.active
+    };
+    
+    if (userData.password) {
+      const bcrypt = await import('bcrypt');
+      updateData.passwordHash = await bcrypt.hash(userData.password, 12);
+    }
+    
+    // Remove undefined values
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
+    
+    const [user] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
+    if (!user) {
+      throw new Error("Usuario no encontrado");
+    }
+    return user;
+  }
+
+  async updateLastLogin(id: string): Promise<void> {
+    await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, id));
+  }
+
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
   }
 
   // Vendor methods
