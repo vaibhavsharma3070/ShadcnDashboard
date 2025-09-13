@@ -112,7 +112,7 @@ function ContractCreationWizard() {
       // Create item snapshots
       const itemSnapshots = items.map(item => ({
         itemId: item.itemId,
-        name: item.title || '',
+        title: item.title || '',
         description: item.model || '',
         currentPrice: Number(item.minSalesPrice || 0),
         originalPrice: Number(item.minCost || 0),
