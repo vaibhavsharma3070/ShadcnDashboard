@@ -325,6 +325,15 @@ export interface IStorage {
   getDefaultContractTemplate(): Promise<ContractTemplate | undefined>;
   ensureDefaultContractTemplate(): Promise<ContractTemplate>;
 
+  // Contract Template methods
+  getContractTemplates(): Promise<ContractTemplate[]>;
+  getContractTemplate(id: string): Promise<ContractTemplate | undefined>;
+  getDefaultTemplate(): Promise<ContractTemplate | undefined>;
+  createContractTemplate(template: InsertContractTemplate): Promise<ContractTemplate>;
+  updateContractTemplate(id: string, template: Partial<InsertContractTemplate>): Promise<ContractTemplate>;
+  deleteContractTemplate(id: string): Promise<void>;
+  setDefaultTemplate(id: string): Promise<ContractTemplate>;
+  
   // Contract methods
   getContracts(): Promise<Array<Contract & { vendor: Vendor, template?: ContractTemplate }>>;
   getContract(id: string): Promise<(Contract & { vendor: Vendor, template?: ContractTemplate }) | undefined>;
@@ -2650,6 +2659,30 @@ Fecha: _______________                          Fecha: _______________
     };
 
     return await this.createContractTemplate(defaultTemplate);
+  }
+  
+  async setDefaultTemplate(id: string): Promise<ContractTemplate> {
+    // Use transaction to ensure only one template can be default
+    const result = await db.transaction(async (tx) => {
+      // First, unset all other defaults
+      await tx.update(contractTemplate)
+        .set({ isDefault: false })
+        .where(eq(contractTemplate.isDefault, true));
+      
+      // Then set the specified template as default
+      const [updatedTemplate] = await tx.update(contractTemplate)
+        .set({ isDefault: true })
+        .where(eq(contractTemplate.templateId, id))
+        .returning();
+      
+      if (!updatedTemplate) {
+        throw new Error('Template not found');
+      }
+      
+      return updatedTemplate;
+    });
+    
+    return result;
   }
 
   // Contract methods

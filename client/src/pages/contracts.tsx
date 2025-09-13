@@ -30,6 +30,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { pdf } from "@react-pdf/renderer";
 import ContractPDF from "@/components/ContractPDF";
+import TemplateBuilder from "@/components/TemplateBuilder";
 import type { Contract, ContractTemplate, ContractItemSnapshot, Vendor, Item } from "@shared/schema";
 
 // Extended contract type with vendor and template info
@@ -350,6 +351,8 @@ function ContractCreationWizard() {
 export default function Contracts() {
   const [activeTab, setActiveTab] = useState<"contracts" | "templates">("contracts");
   const [downloadingContract, setDownloadingContract] = useState<string | null>(null);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<ContractTemplate | null>(null);
   const { toast } = useToast();
 
   // Fetch contracts
@@ -358,8 +361,74 @@ export default function Contracts() {
   });
 
   // Fetch contract templates
-  const { data: templates = [], isLoading: templatesLoading } = useQuery<ContractTemplate[]>({
+  const { data: templates = [], isLoading: templatesLoading, refetch: refetchTemplates } = useQuery<ContractTemplate[]>({
     queryKey: ["/api/contract-templates"],
+  });
+
+  // Template mutations
+  const createTemplateMutation = useMutation({
+    mutationFn: async (template: { name: string; termsText: string; isDefault?: boolean }) => {
+      const response = await apiRequest('POST', '/api/contract-templates', template);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "¡Éxito!",
+        description: "Plantilla creada exitosamente"
+      });
+      setIsCreatingTemplate(false);
+      refetchTemplates();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Error al crear la plantilla: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: async ({ id, template }: { id: string; template: { name: string; termsText: string; isDefault?: boolean } }) => {
+      const response = await apiRequest('PUT', `/api/contract-templates/${id}`, template);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "¡Éxito!",
+        description: "Plantilla actualizada exitosamente"
+      });
+      setEditingTemplate(null);
+      refetchTemplates();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Error al actualizar la plantilla: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('DELETE', `/api/contract-templates/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "¡Éxito!",
+        description: "Plantilla eliminada exitosamente"
+      });
+      refetchTemplates();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Error al eliminar la plantilla: ${error.message}`,
+        variant: "destructive"
+      });
+    }
   });
 
   const getStatusColor = (status: string) => {
@@ -441,11 +510,18 @@ export default function Contracts() {
                   </p>
                 </div>
                 <div className="flex space-x-3">
-                  <Button data-testid="button-create-template">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nueva Plantilla
-                  </Button>
-                  <ContractCreationWizard />
+                  {activeTab === "templates" && (
+                    <Button 
+                      onClick={() => setIsCreatingTemplate(true)}
+                      data-testid="button-create-template"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nueva Plantilla
+                    </Button>
+                  )}
+                  {activeTab === "contracts" && (
+                    <ContractCreationWizard />
+                  )}
                 </div>
               </div>
             </div>
@@ -549,7 +625,30 @@ export default function Contracts() {
 
               {/* Templates Tab */}
               <TabsContent value="templates" className="space-y-4">
-                {templatesLoading ? (
+                {/* Template Creation/Edit Dialog */}
+                {(isCreatingTemplate || editingTemplate) && (
+                  <div className="mb-6">
+                    <TemplateBuilder
+                      template={editingTemplate || undefined}
+                      onSave={(template) => {
+                        if (editingTemplate) {
+                          updateTemplateMutation.mutate({ 
+                            id: editingTemplate.templateId, 
+                            template 
+                          });
+                        } else {
+                          createTemplateMutation.mutate(template);
+                        }
+                      }}
+                      onCancel={() => {
+                        setIsCreatingTemplate(false);
+                        setEditingTemplate(null);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {!isCreatingTemplate && !editingTemplate && templatesLoading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                     <p className="mt-2 text-muted-foreground">Cargando plantillas...</p>
@@ -564,7 +663,10 @@ export default function Contracts() {
                       <p className="text-muted-foreground text-center mb-4">
                         Crea plantillas reutilizables para agilizar la creación de contratos
                       </p>
-                      <Button data-testid="button-create-first-template">
+                      <Button 
+                        onClick={() => setIsCreatingTemplate(true)}
+                        data-testid="button-create-first-template"
+                      >
                         <Plus className="h-4 w-4 mr-2" />
                         Crear Primera Plantilla
                       </Button>
@@ -600,12 +702,28 @@ export default function Contracts() {
                             
                             <div className="flex justify-between items-center pt-2">
                               <div className="flex space-x-2">
-                                <Button variant="outline" size="sm" data-testid={`button-edit-template-${template.templateId}`}>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => setEditingTemplate(template)}
+                                  data-testid={`button-edit-template-${template.templateId}`}
+                                >
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" data-testid={`button-delete-template-${template.templateId}`}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {!template.isDefault && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => {
+                                      if (confirm("¿Estás seguro de que deseas eliminar esta plantilla?")) {
+                                        deleteTemplateMutation.mutate(template.templateId);
+                                      }
+                                    }}
+                                    data-testid={`button-delete-template-${template.templateId}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </div>

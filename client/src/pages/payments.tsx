@@ -171,7 +171,8 @@ function getStatusBadge(status: string) {
   );
 }
 
-function getItemIcon(brand: string) {
+function getItemIcon(brand: string | null | undefined) {
+  if (!brand) return <Gem className="h-4 w-4" />;
   const brandLower = brand.toLowerCase();
   if (brandLower.includes('rolex') || brandLower.includes('omega') || brandLower.includes('cartier')) {
     return <Watch className="h-4 w-4" />;
@@ -293,7 +294,7 @@ export default function Payments() {
         const matchesSearch = 
           payment.client.name.toLowerCase().includes(recentSearchTerm.toLowerCase()) ||
           payment.item.title.toLowerCase().includes(recentSearchTerm.toLowerCase()) ||
-          payment.item.brand.toLowerCase().includes(recentSearchTerm.toLowerCase());
+          (payment.item.brand || '').toLowerCase().includes(recentSearchTerm.toLowerCase());
         
         const matchesPaymentMethod = recentPaymentMethodFilter === "all" || 
           payment.paymentMethod === recentPaymentMethodFilter;
@@ -345,7 +346,7 @@ export default function Payments() {
         const matchesSearch = 
           payment.client.name.toLowerCase().includes(upcomingSearchTerm.toLowerCase()) ||
           payment.item.title.toLowerCase().includes(upcomingSearchTerm.toLowerCase()) ||
-          payment.item.brand.toLowerCase().includes(upcomingSearchTerm.toLowerCase());
+          (payment.item.brand || '').toLowerCase().includes(upcomingSearchTerm.toLowerCase());
         
         const paymentStatus = isOverdue(payment.dueDate) ? "overdue" : payment.status;
         const matchesStatus = upcomingStatusFilter === "all" || paymentStatus === upcomingStatusFilter;

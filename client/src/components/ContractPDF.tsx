@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
-import type { Contract, Vendor } from '@shared/schema';
+import type { Contract, Vendor, ContractItemSnapshot } from '@shared/schema';
 
 // Define styles for the PDF
 const styles = StyleSheet.create({
@@ -152,7 +152,7 @@ export const ContractPDF = ({ contract }: ContractPDFProps) => {
   });
 
   // Parse item snapshots if they exist
-  const items = contract.itemSnapshots || [];
+  const items = (contract.itemSnapshots as ContractItemSnapshot[]) || [];
 
   return (
     <Document>
@@ -216,14 +216,14 @@ export const ContractPDF = ({ contract }: ContractPDFProps) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Artículos en Consignación</Text>
             <View style={styles.itemsTable}>
-              {items.map((item: any, index: number) => (
+              {items.map((item, index) => (
                 <View key={index} style={styles.itemRow}>
                   <Text style={styles.itemNumber}>{index + 1}.</Text>
                   <Text style={styles.itemDescription}>
-                    {item.name || 'Sin nombre'} - {item.brand || 'N/A'} - {item.description || 'N/A'}
+                    {item.title || 'Sin nombre'} - {item.brand || 'N/A'} - {item.model || 'N/A'}
                   </Text>
                   <Text style={styles.itemPrice}>
-                    ${Number(item.currentPrice || 0).toFixed(2)}
+                    ${Number(item.marketValue || 0).toFixed(2)}
                   </Text>
                 </View>
               ))}
