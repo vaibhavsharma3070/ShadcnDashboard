@@ -62,12 +62,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function login(email: string, password: string) {
     setLoading(true);
     try {
-      const response = await apiRequest('/api/auth/login', {
-        method: 'POST',
-        body: { email, password }
-      });
+      const response = await apiRequest('POST', '/api/auth/login', { email, password });
+      const data = await response.json();
 
-      setUser(response.user);
+      setUser(data.user);
       
       // Invalidate all queries to refresh data with authenticated context
       queryClient.invalidateQueries();
@@ -80,9 +78,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   async function logout() {
     try {
-      await apiRequest('/api/auth/logout', {
-        method: 'POST'
-      });
+      await apiRequest('POST', '/api/auth/logout');
     } catch (error) {
       // Logout on client side even if server request fails
       console.error('Logout request failed:', error);
