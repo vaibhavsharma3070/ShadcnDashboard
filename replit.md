@@ -20,7 +20,7 @@ The application is built with a modern web stack, featuring a React frontend and
 *   **Inventory Management:** Detailed item cataloging, status tracking, bulk operations, and photo uploads.
 *   **Client & Vendor Management:** Comprehensive profiles, transaction history, and relationship tracking.
 *   **Financial Management:** Payment processing (including flexible installment plans with balance protection), vendor payout management, and item-specific expense tracking.
-*   **Contract Management:** Complete contract creation wizard with vendor/item selection, automatic template variable replacement, and professional PDF generation in Spanish with LUXETTE branding.
+*   **Contract Management:** Complete contract creation wizard with vendor/item selection, automatic template variable replacement, professional PDF generation in Spanish with LUXETTE branding, and comprehensive template builder with variable reference guide and live preview.
 *   **Business Intelligence:** Comprehensive reporting suite with KPIs, time-series analysis, grouped performance metrics (by brand, vendor, client, category), item profitability, inventory health, and payment method audits.
 *   **UI/UX:** Responsive design, dark/light mode, accessible components, and intuitive dashboards.
 
