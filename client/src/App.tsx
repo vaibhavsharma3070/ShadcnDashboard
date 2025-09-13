@@ -20,6 +20,7 @@ import Expenses from "@/pages/expenses";
 import Reports from "@/pages/reports";
 import Profitability from "@/pages/profitability";
 import Settings from "@/pages/settings";
+import UserManagement from "@/pages/user-management";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { Loader2, Crown } from "lucide-react";
@@ -60,6 +61,7 @@ function Router() {
       <Route path="/reports" component={Reports} />
       <Route path="/profitability" component={Profitability} />
       <Route path="/settings" component={Settings} />
+      <Route path="/user-management" component={UserManagement} />
       <Route component={NotFound} />
     </Switch>
   );

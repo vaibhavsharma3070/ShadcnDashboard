@@ -1,5 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
   Package,
@@ -14,6 +16,8 @@ import {
   Settings,
   User,
   FileText,
+  LogOut,
+  UserCog,
 } from "lucide-react";
 
 const navigation = [
@@ -47,6 +51,7 @@ const navigation = [
 
 export function Sidebar() {
   const [location] = useLocation();
+  const { user, logout, hasRole } = useAuth();
 
   return (
     <div className="w-72 bg-white dark:bg-gray-900 sidebar-shadow flex flex-col border-r border-border">
@@ -106,22 +111,51 @@ export function Sidebar() {
             )}
           </div>
         ))}
+        
+        {/* Admin-only Usuarios link */}
+        {hasRole('admin') && (
+          <Link
+            href="/user-management"
+            className={cn(
+              "flex items-center px-4 py-3 mx-2 text-sm font-medium rounded-lg transition-colors",
+              location === "/user-management"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
+            data-testid="link-user-management"
+          >
+            <UserCog className="mr-3 h-5 w-5" />
+            Usuarios
+          </Link>
+        )}
       </nav>
 
       {/* User Profile */}
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border space-y-3">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
             <User className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-foreground">Salomón Cohen</p>
-            <p className="text-xs text-muted-foreground">Propietario</p>
+            <p className="text-sm font-medium text-foreground">{user?.name || 'Usuario'}</p>
+            <p className="text-xs text-muted-foreground">
+              {user?.role === 'admin' ? 'Administrador' : 
+               user?.role === 'staff' ? 'Personal' : 
+               user?.role === 'readOnly' ? 'Solo Lectura' : 'Usuario'}
+            </p>
           </div>
-          <button className="text-muted-foreground hover:text-foreground">
-            <Settings className="h-4 w-4" />
-          </button>
         </div>
+        
+        {/* Logout Button */}
+        <Button 
+          variant="ghost" 
+          onClick={logout}
+          className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 dark:text-red-400 dark:hover:text-red-300"
+          data-testid="button-logout"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Cerrar Sesión
+        </Button>
       </div>
     </div>
   );

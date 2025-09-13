@@ -134,7 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateLastLogin(user.id);
       
       // Store user in session (excluding sensitive data)
-      req.session.user = {
+      (req.session as any).user = {
         id: user.id,
         email: user.email,
         name: user.name,
@@ -229,10 +229,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       if (error && typeof error === 'object' && 'message' in error) {
-        if (error.message.includes('not found') || error.message.includes('no encontrado')) {
+        if (String(error.message).includes('not found') || String(error.message).includes('no encontrado')) {
           res.status(404).json({ error: "Usuario no encontrado" });
         } else {
-          res.status(400).json({ error: error.message });
+          res.status(400).json({ error: String(error.message) });
         }
       } else {
         res.status(500).json({ error: "Error al actualizar usuario" });
