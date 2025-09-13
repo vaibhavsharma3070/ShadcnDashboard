@@ -21,7 +21,7 @@ The application is built with a modern web stack, featuring a React frontend and
 *   **Client & Vendor Management:** Comprehensive profiles, transaction history, and relationship tracking.
 *   **Financial Management:** Payment processing (including flexible installment plans with balance protection), vendor payout management, and item-specific expense tracking.
 *   **Contract Management:** Complete contract creation wizard with vendor/item selection, automatic template variable replacement, professional PDF generation in Spanish with LUXETTE branding, and comprehensive template builder with variable reference guide and live preview.
-*   **Authentication & Security:** Secure login system with Spanish UI, bcrypt password hashing, session-based authentication using PostgreSQL, route protection for all pages, and API endpoint protection with proper session management.
+*   **Authentication & Security:** Secure login system with Spanish UI, bcrypt password hashing, session-based authentication using PostgreSQL, route protection for all pages, API endpoint protection with proper session management, and admin-only user management functionality with role-based access control.
 *   **Business Intelligence:** Comprehensive reporting suite with KPIs, time-series analysis, grouped performance metrics (by brand, vendor, client, category), item profitability, inventory health, and payment method audits.
 *   **UI/UX:** Responsive design, dark/light mode, accessible components, and intuitive dashboards.
 
