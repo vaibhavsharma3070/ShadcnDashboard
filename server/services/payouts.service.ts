@@ -143,6 +143,7 @@ export async function getUpcomingPayouts(): Promise<Array<{
     const priceDifference = maxSalesPrice - salePrice;
     const adjustmentFactor = 1 - (priceDifference * 0.01);
     const vendorTarget = adjustmentFactor * maxCost;
+    
     const remainingBalance = Math.max(0, vendorTarget - totalPaid);
     const paymentProgress = vendorTarget > 0 ? (totalPaid / vendorTarget) * 100 : 0;
 
@@ -156,6 +157,7 @@ export async function getUpcomingPayouts(): Promise<Array<{
       salePrice,
       minCost,
       maxCost,
+      vendorPayoutAmount: vendorTarget, // Total amount to be paid to vendor
       totalPaid,
       remainingBalance,
       paymentProgress,
