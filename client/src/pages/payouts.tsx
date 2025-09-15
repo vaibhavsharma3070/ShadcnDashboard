@@ -788,13 +788,16 @@ export default function Payouts() {
                                 <div className="space-y-2">
                                   <div className="flex items-center justify-between">
                                     <span className="text-sm font-medium">
-                                      {formatCurrency(payout.totalPaid)} / {formatCurrency(payout.salePrice)}
+                                      Client Payments: {formatCurrency(payout.salePrice)}
                                     </span>
                                     <span className="text-sm text-muted-foreground">
                                       {payout.paymentProgress.toFixed(1)}%
                                     </span>
                                   </div>
                                   <Progress value={payout.paymentProgress} className="h-2" />
+                                  <div className="text-xs text-muted-foreground">
+                                    Fully paid • Sale price: {formatCurrency(payout.salePrice)}
+                                  </div>
                                   {payout.remainingBalance > 0 && (
                                     <div className="text-xs text-muted-foreground">
                                       Remaining: {formatCurrency(payout.remainingBalance)}

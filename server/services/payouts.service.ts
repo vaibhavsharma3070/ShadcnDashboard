@@ -145,7 +145,14 @@ export async function getUpcomingPayouts(): Promise<Array<{
     const vendorTarget = adjustmentFactor * maxCost;
     
     const remainingBalance = Math.max(0, vendorTarget - totalPaid);
-    const paymentProgress = vendorTarget > 0 ? (totalPaid / vendorTarget) * 100 : 0;
+    
+    // Payment progress should show CLIENT payment progress (paid by client / total sale price)
+    // NOT vendor payout progress
+    // salePrice = totalClientPayments (how much client has actually paid)
+    // maxSalesPrice = target sale price for this item
+    const targetSalePrice = salePrice; // For sold items, salePrice IS the final sale price
+    const clientPayments = salePrice; // How much client has paid (full amount for sold items)
+    const paymentProgress = targetSalePrice > 0 ? (clientPayments / targetSalePrice) * 100 : 0;
 
     return {
       itemId: row.item.itemId,
