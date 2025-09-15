@@ -86,7 +86,8 @@ interface RecentPayment {
     title: string;
     brand: string;
     model: string;
-    listPrice: number;
+    minSalesPrice: number | null;
+    maxSalesPrice: number | null;
     vendor: {
       name: string;
     };
@@ -109,7 +110,8 @@ interface UpcomingPayment {
     title: string;
     brand: string;
     model: string;
-    listPrice: number;
+    minSalesPrice: number | null;
+    maxSalesPrice: number | null;
     vendor: {
       name: string;
     };
@@ -692,7 +694,10 @@ export default function Payments() {
                                   {formatCurrency(payment.amount)}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  of {formatCurrency(payment.item.listPrice)}
+                                  of{" "}
+                                  {formatCurrency(
+                                    payment.item.maxSalesPrice ?? 0,
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -1021,7 +1026,9 @@ export default function Payments() {
                                   </div>
                                   <div className="text-sm text-muted-foreground">
                                     List:{" "}
-                                    {formatCurrency(payment.item.listPrice)}
+                                    {formatCurrency(
+                                      payment.item.maxSalesPrice ?? 0,
+                                    )}
                                   </div>
                                 </TableCell>
                                 <TableCell>
