@@ -57,7 +57,7 @@ export async function createPayout(insertPayout: InsertVendorPayout): Promise<Ve
         vendorId: insertPayout.vendorId,
         amount: toDbNumeric(insertPayout.amount),
         paidAt: toDbTimestamp(insertPayout.paidAt),
-        description: insertPayout.description,
+        notes: insertPayout.notes,
       })
       .returning();
 
@@ -136,10 +136,13 @@ export async function getUpcomingPayouts(): Promise<Array<{
     const maxCost = Number(row.item.maxCost || 0);
     const totalPaid = Number(row.totalPaid);
     const salePrice = Number(row.totalClientPayments);
+    const maxSalesPrice = Number(row.item.maxSalesPrice || 0);
     
-    // Calculate vendor payout target: 70% of final sale price (LUXETTE takes 30% commission)
-    const vendorShare = 0.70;
-    const vendorTarget = salePrice * vendorShare;
+    // Calculate vendor payout target using correct formula:
+    // Payout = (1 - ((MaxSalesPrice - ActualSalesPrice) × 0.01)) × MaxCost
+    const priceDifference = maxSalesPrice - salePrice;
+    const adjustmentFactor = 1 - (priceDifference * 0.01);
+    const vendorTarget = adjustmentFactor * maxCost;
     const remainingBalance = Math.max(0, vendorTarget - totalPaid);
     const paymentProgress = vendorTarget > 0 ? (totalPaid / vendorTarget) * 100 : 0;
 
