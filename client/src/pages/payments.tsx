@@ -86,8 +86,7 @@ interface RecentPayment {
     title: string;
     brand: string;
     model: string;
-    minSalesPrice: number | null;
-    maxSalesPrice: number | null;
+    listPrice: number;
     vendor: {
       name: string;
     };
@@ -110,8 +109,7 @@ interface UpcomingPayment {
     title: string;
     brand: string;
     model: string;
-    minSalesPrice: number | null;
-    maxSalesPrice: number | null;
+    listPrice: number;
     vendor: {
       name: string;
     };
@@ -256,7 +254,7 @@ export default function Payments() {
   >({
     queryKey: ["/api/payments/upcoming"],
     queryFn: async () => {
-      const response = await fetch("/api/payments/upcoming?limit=50");
+      const response = await fetch("/api/payments/upcoming");
       if (!response.ok) throw new Error("Failed to fetch upcoming payments");
       return response.json();
     },
