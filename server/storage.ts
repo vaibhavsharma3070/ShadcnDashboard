@@ -494,11 +494,11 @@ export interface IStorage {
 
   // Business Intelligence API methods
   getTotalSalesMonthToDate(): Promise<{ totalSales: number }>;
-  getSumUpcomingPayments(): Promise<{ sumUpcomingPayments: number }>;
-  getSumReadyPayouts(): Promise<{ sumReadyPayouts: number }>;
-  getSumUpcomingPayouts(): Promise<{ sumUpcomingPayouts: number }>;
-  getInventoryCostRange(): Promise<{ minTotalCost: number; maxTotalCost: number }>;
-  getInventoryMarketPriceRange(): Promise<{ minTotalMarketPrice: number; maxTotalMarketPrice: number }>;
+  getSumUpcomingPayments(): Promise<{ totalUpcomingPayments: number }>;
+  getSumReadyPayouts(): Promise<{ totalReadyPayouts: number }>;
+  getSumUpcomingPayouts(): Promise<{ totalUpcomingPayouts: number }>;
+  getInventoryCostRange(): Promise<{ min: number; max: number }>;
+  getInventoryMarketPriceRange(): Promise<{ min: number; max: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3550,11 +3550,7 @@ Fecha: _______________                          Fecha: _______________
 
   // Business Intelligence API method implementations
   async getTotalSalesMonthToDate(): Promise<{ totalSales: number }> {
-    const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startDate = firstDayOfMonth.toISOString().slice(0, 10);
-    const endDate = now.toISOString().slice(0, 10);
-
+    // Get payments for items with status 'sold' made this month
     const [result] = await db
       .select({
         totalSales: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
@@ -3564,60 +3560,69 @@ Fecha: _______________                          Fecha: _______________
       .where(
         and(
           eq(item.status, "sold"),
-          sql`${clientPayment.paidAt}::date >= ${startDate}`,
-          sql`${clientPayment.paidAt}::date <= ${endDate}`
+          sql`${clientPayment.paidAt} >= DATE_TRUNC('month', CURRENT_DATE)`,
+          sql`${clientPayment.paidAt} < CURRENT_DATE + INTERVAL '1 day'`
         )
       );
 
     return { totalSales: Number(result.totalSales) || 0 };
   }
 
-  async getSumUpcomingPayments(): Promise<{ sumUpcomingPayments: number }> {
+  async getSumUpcomingPayments(): Promise<{ totalUpcomingPayments: number }> {
     const [result] = await db
       .select({
-        sumUpcomingPayments: sql<number>`COALESCE(SUM(${installmentPlan.amount} - ${installmentPlan.paidAmount}), 0)`,
+        totalUpcomingPayments: sql<number>`COALESCE(SUM(${installmentPlan.amount} - ${installmentPlan.paidAmount}), 0)`,
       })
       .from(installmentPlan)
-      .where(eq(installmentPlan.status, "pending"));
+      .where(
+        and(
+          eq(installmentPlan.status, "pending"),
+          sql`${installmentPlan.dueDate} >= CURRENT_DATE`
+        )
+      );
 
-    return { sumUpcomingPayments: Number(result.sumUpcomingPayments) || 0 };
+    return { totalUpcomingPayments: Number(result.totalUpcomingPayments) || 0 };
   }
 
-  async getSumReadyPayouts(): Promise<{ sumReadyPayouts: number }> {
+  async getSumReadyPayouts(): Promise<{ totalReadyPayouts: number }> {
     // Items that are fully paid but haven't been paid out yet
     const fullyPaidItems = await db
       .select({
         itemId: item.itemId,
         maxSalesPrice: item.maxSalesPrice,
         totalPaid: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
-        totalPaidOut: sql<number>`COALESCE(SUM(${vendorPayout.amount}), 0)`,
+        hasPayout: sql<number>`COUNT(${vendorPayout.payoutId})`,
       })
       .from(item)
       .leftJoin(clientPayment, eq(clientPayment.itemId, item.itemId))
       .leftJoin(vendorPayout, eq(vendorPayout.itemId, item.itemId))
+      .where(isNotNull(item.maxSalesPrice))
       .groupBy(item.itemId, item.maxSalesPrice)
       .having(
         and(
-          sql`COALESCE(SUM(${clientPayment.amount}), 0) >= COALESCE(${item.maxSalesPrice}, 0)`,
-          sql`COALESCE(SUM(${vendorPayout.amount}), 0) = 0`
+          sql`COALESCE(SUM(${clientPayment.amount}), 0) >= COALESCE(CAST(${item.maxSalesPrice} AS NUMERIC), 0)`,
+          sql`COUNT(${vendorPayout.payoutId}) = 0`
         )
       );
 
-    let sumReadyPayouts = 0;
+    let totalReadyPayouts = 0;
     for (const itemData of fullyPaidItems) {
       // Calculate vendor share (assuming 70% to vendor, 30% to house)
       const vendorShare = Number(itemData.maxSalesPrice || 0) * 0.7;
-      sumReadyPayouts += vendorShare;
+      totalReadyPayouts += vendorShare;
     }
 
-    return { sumReadyPayouts };
+    return { totalReadyPayouts };
   }
 
-  async getSumUpcomingPayouts(): Promise<{ sumUpcomingPayouts: number }> {
-    // Items with upcoming scheduled payouts (items not yet fully paid)
-    const [result] = await db
+  async getSumUpcomingPayouts(): Promise<{ totalUpcomingPayouts: number }> {
+    // Items with partial payments but not yet fully paid (future payouts when they become fully paid)
+    const partiallyPaidItems = await db
       .select({
-        sumUpcomingPayouts: sql<number>`COALESCE(SUM(${item.maxSalesPrice} * 0.7), 0)`,
+        itemId: item.itemId,
+        maxSalesPrice: item.maxSalesPrice,
+        totalPaid: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+        hasPayout: sql<number>`COUNT(${vendorPayout.payoutId})`,
       })
       .from(item)
       .leftJoin(clientPayment, eq(clientPayment.itemId, item.itemId))
@@ -3625,42 +3630,54 @@ Fecha: _______________                          Fecha: _______________
       .where(
         and(
           isNotNull(item.maxSalesPrice),
-          sql`COALESCE(SUM(${vendorPayout.amount}), 0) = 0`
+          sql`COALESCE(SUM(${clientPayment.amount}), 0) > 0`
         )
       )
       .groupBy(item.itemId, item.maxSalesPrice)
-      .having(sql`COALESCE(SUM(${clientPayment.amount}), 0) < COALESCE(${item.maxSalesPrice}, 0)`);
+      .having(
+        and(
+          sql`COALESCE(SUM(${clientPayment.amount}), 0) < COALESCE(CAST(${item.maxSalesPrice} AS NUMERIC), 0)`,
+          sql`COUNT(${vendorPayout.payoutId}) = 0`
+        )
+      );
 
-    return { sumUpcomingPayouts: Number(result.sumUpcomingPayouts) || 0 };
+    let totalUpcomingPayouts = 0;
+    for (const itemData of partiallyPaidItems) {
+      // Calculate vendor share (assuming 70% to vendor, 30% to house)
+      const vendorShare = Number(itemData.maxSalesPrice || 0) * 0.7;
+      totalUpcomingPayouts += vendorShare;
+    }
+
+    return { totalUpcomingPayouts };
   }
 
-  async getInventoryCostRange(): Promise<{ minTotalCost: number; maxTotalCost: number }> {
+  async getInventoryCostRange(): Promise<{ min: number; max: number }> {
     const [result] = await db
       .select({
-        minTotalCost: sql<number>`COALESCE(SUM(${item.minCost}), 0)`,
-        maxTotalCost: sql<number>`COALESCE(SUM(${item.maxCost}), 0)`,
+        min: sql<number>`COALESCE(SUM(CAST(${item.minCost} AS NUMERIC)), 0)`,
+        max: sql<number>`COALESCE(SUM(CAST(${item.maxCost} AS NUMERIC)), 0)`,
       })
       .from(item)
       .where(eq(item.status, "in-store"));
 
     return {
-      minTotalCost: Number(result.minTotalCost) || 0,
-      maxTotalCost: Number(result.maxTotalCost) || 0,
+      min: Number(result.min) || 0,
+      max: Number(result.max) || 0,
     };
   }
 
-  async getInventoryMarketPriceRange(): Promise<{ minTotalMarketPrice: number; maxTotalMarketPrice: number }> {
+  async getInventoryMarketPriceRange(): Promise<{ min: number; max: number }> {
     const [result] = await db
       .select({
-        minTotalMarketPrice: sql<number>`COALESCE(SUM(${item.minSalesPrice}), 0)`,
-        maxTotalMarketPrice: sql<number>`COALESCE(SUM(${item.maxSalesPrice}), 0)`,
+        min: sql<number>`COALESCE(SUM(CAST(${item.minSalesPrice} AS NUMERIC)), 0)`,
+        max: sql<number>`COALESCE(SUM(CAST(${item.maxSalesPrice} AS NUMERIC)), 0)`,
       })
       .from(item)
       .where(eq(item.status, "in-store"));
 
     return {
-      minTotalMarketPrice: Number(result.minTotalMarketPrice) || 0,
-      maxTotalMarketPrice: Number(result.maxTotalMarketPrice) || 0,
+      min: Number(result.min) || 0,
+      max: Number(result.max) || 0,
     };
   }
 }
