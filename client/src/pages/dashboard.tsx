@@ -86,8 +86,7 @@ interface PaymentMetrics {
   totalPaymentsReceived: number;
   totalPaymentsAmount: number;
   overduePayments: number;
-  upcomingPayments: number; // count
-  upcomingPaymentsAmount: number; // 💰 total value
+  upcomingPayments: number;
   averagePaymentAmount: number;
   monthlyPaymentTrend: number;
 }
@@ -206,11 +205,6 @@ export default function Dashboard() {
   const { data: paymentMetrics, isLoading: paymentMetricsLoading } =
     useQuery<PaymentMetrics>({
       queryKey: ["/api/payments/metrics"],
-      queryFn: async () => {
-        const res = await fetch("/api/payments/metrics");
-        if (!res.ok) throw new Error("Failed to fetch payment metrics");
-        return res.json();
-      },
     });
 
   const { data: luxetteInventory, isLoading: luxetteLoading } =
@@ -373,37 +367,6 @@ export default function Dashboard() {
               </div>
               <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
                 <Users className="h-6 w-6 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Upcoming Payments (from clients) */}
-        <Card className="hover-lift">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Pagos Próximos (Clientes)
-                </p>
-                {paymentMetricsLoading ? (
-                  <Skeleton className="h-8 w-24 mt-2" />
-                ) : (
-                  <p className="text-2xl font-bold text-foreground">
-                    {formatCurrencyAbbreviated(
-                      paymentMetrics?.upcomingPaymentsAmount || 0,
-                    )}
-                  </p>
-                )}
-                <p className="text-sm text-muted-foreground mt-1 flex items-center">
-                  <Calendar className="h-3 w-3 mr-1" />
-                  {paymentMetricsLoading
-                    ? "Cargando…"
-                    : `${paymentMetrics?.upcomingPayments || 0} pagos próximos`}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-rose-100 dark:bg-rose-900 rounded-lg flex items-center justify-center">
-                <Calendar className="h-6 w-6 text-rose-600" />
               </div>
             </div>
           </CardContent>
