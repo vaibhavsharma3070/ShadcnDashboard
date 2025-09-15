@@ -491,6 +491,14 @@ export interface IStorage {
   ): Promise<Contract>;
   deleteContract(id: string): Promise<void>;
   finalizeContract(id: string, pdfUrl: string): Promise<Contract>;
+
+  // Business Intelligence API methods
+  getTotalSalesMonthToDate(): Promise<{ totalSales: number }>;
+  getSumUpcomingPayments(): Promise<{ sumUpcomingPayments: number }>;
+  getSumReadyPayouts(): Promise<{ sumReadyPayouts: number }>;
+  getSumUpcomingPayouts(): Promise<{ sumUpcomingPayouts: number }>;
+  getInventoryCostRange(): Promise<{ minTotalCost: number; maxTotalCost: number }>;
+  getInventoryMarketPriceRange(): Promise<{ minTotalMarketPrice: number; maxTotalMarketPrice: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3538,6 +3546,122 @@ Fecha: _______________                          Fecha: _______________
     }
 
     return result;
+  }
+
+  // Business Intelligence API method implementations
+  async getTotalSalesMonthToDate(): Promise<{ totalSales: number }> {
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = firstDayOfMonth.toISOString().slice(0, 10);
+    const endDate = now.toISOString().slice(0, 10);
+
+    const [result] = await db
+      .select({
+        totalSales: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+      })
+      .from(clientPayment)
+      .innerJoin(item, eq(item.itemId, clientPayment.itemId))
+      .where(
+        and(
+          eq(item.status, "sold"),
+          sql`${clientPayment.paidAt}::date >= ${startDate}`,
+          sql`${clientPayment.paidAt}::date <= ${endDate}`
+        )
+      );
+
+    return { totalSales: Number(result.totalSales) || 0 };
+  }
+
+  async getSumUpcomingPayments(): Promise<{ sumUpcomingPayments: number }> {
+    const [result] = await db
+      .select({
+        sumUpcomingPayments: sql<number>`COALESCE(SUM(${installmentPlan.amount} - ${installmentPlan.paidAmount}), 0)`,
+      })
+      .from(installmentPlan)
+      .where(eq(installmentPlan.status, "pending"));
+
+    return { sumUpcomingPayments: Number(result.sumUpcomingPayments) || 0 };
+  }
+
+  async getSumReadyPayouts(): Promise<{ sumReadyPayouts: number }> {
+    // Items that are fully paid but haven't been paid out yet
+    const fullyPaidItems = await db
+      .select({
+        itemId: item.itemId,
+        maxSalesPrice: item.maxSalesPrice,
+        totalPaid: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+        totalPaidOut: sql<number>`COALESCE(SUM(${vendorPayout.amount}), 0)`,
+      })
+      .from(item)
+      .leftJoin(clientPayment, eq(clientPayment.itemId, item.itemId))
+      .leftJoin(vendorPayout, eq(vendorPayout.itemId, item.itemId))
+      .groupBy(item.itemId, item.maxSalesPrice)
+      .having(
+        and(
+          sql`COALESCE(SUM(${clientPayment.amount}), 0) >= COALESCE(${item.maxSalesPrice}, 0)`,
+          sql`COALESCE(SUM(${vendorPayout.amount}), 0) = 0`
+        )
+      );
+
+    let sumReadyPayouts = 0;
+    for (const itemData of fullyPaidItems) {
+      // Calculate vendor share (assuming 70% to vendor, 30% to house)
+      const vendorShare = Number(itemData.maxSalesPrice || 0) * 0.7;
+      sumReadyPayouts += vendorShare;
+    }
+
+    return { sumReadyPayouts };
+  }
+
+  async getSumUpcomingPayouts(): Promise<{ sumUpcomingPayouts: number }> {
+    // Items with upcoming scheduled payouts (items not yet fully paid)
+    const [result] = await db
+      .select({
+        sumUpcomingPayouts: sql<number>`COALESCE(SUM(${item.maxSalesPrice} * 0.7), 0)`,
+      })
+      .from(item)
+      .leftJoin(clientPayment, eq(clientPayment.itemId, item.itemId))
+      .leftJoin(vendorPayout, eq(vendorPayout.itemId, item.itemId))
+      .where(
+        and(
+          isNotNull(item.maxSalesPrice),
+          sql`COALESCE(SUM(${vendorPayout.amount}), 0) = 0`
+        )
+      )
+      .groupBy(item.itemId, item.maxSalesPrice)
+      .having(sql`COALESCE(SUM(${clientPayment.amount}), 0) < COALESCE(${item.maxSalesPrice}, 0)`);
+
+    return { sumUpcomingPayouts: Number(result.sumUpcomingPayouts) || 0 };
+  }
+
+  async getInventoryCostRange(): Promise<{ minTotalCost: number; maxTotalCost: number }> {
+    const [result] = await db
+      .select({
+        minTotalCost: sql<number>`COALESCE(SUM(${item.minCost}), 0)`,
+        maxTotalCost: sql<number>`COALESCE(SUM(${item.maxCost}), 0)`,
+      })
+      .from(item)
+      .where(eq(item.status, "in-store"));
+
+    return {
+      minTotalCost: Number(result.minTotalCost) || 0,
+      maxTotalCost: Number(result.maxTotalCost) || 0,
+    };
+  }
+
+  async getInventoryMarketPriceRange(): Promise<{ minTotalMarketPrice: number; maxTotalMarketPrice: number }> {
+    const [result] = await db
+      .select({
+        minTotalMarketPrice: sql<number>`COALESCE(SUM(${item.minSalesPrice}), 0)`,
+        maxTotalMarketPrice: sql<number>`COALESCE(SUM(${item.maxSalesPrice}), 0)`,
+      })
+      .from(item)
+      .where(eq(item.status, "in-store"));
+
+    return {
+      minTotalMarketPrice: Number(result.minTotalMarketPrice) || 0,
+      maxTotalMarketPrice: Number(result.maxTotalMarketPrice) || 0,
+    };
   }
 }
 
