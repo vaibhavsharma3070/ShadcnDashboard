@@ -41,6 +41,7 @@ interface DashboardMetrics {
   incomingPayments: number;
   upcomingPayouts: number;
   costRange: { min: number; max: number };
+  inventoryValueRange: { min: number; max: number };
 }
 
 interface Item {
@@ -382,14 +383,15 @@ export default function Dashboard() {
                   <Skeleton className="h-8 w-24 mt-2" />
                 ) : (
                   <p className="text-xl font-bold text-foreground">
-                    {metrics?.netProfit
+                    {metrics?.inventoryValueRange
                       ? formatCurrencyRangeAbbreviated(
-                          metrics.netProfit.min,
-                          metrics.netProfit.max,
+                          metrics.inventoryValueRange.min,
+                          metrics.inventoryValueRange.max,
                         )
                       : formatCurrencyAbbreviated(0)}
                   </p>
                 )}
+
                 <p className="text-sm text-emerald-600 mt-1 flex items-center">
                   <ArrowUp className="h-3 w-3 mr-1" />
                   Costo Mercancia:{" "}
