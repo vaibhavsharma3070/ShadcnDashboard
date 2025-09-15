@@ -7,8 +7,8 @@ import {
   installmentPlan, item, vendor, client,
   type InstallmentPlan, type InsertInstallmentPlan, type Item, type Vendor, type Client
 } from '@shared/schema';
-import { eq, desc, and, lte, isNull, gte } from 'drizzle-orm';
-import { toDbNumeric, toDbTimestamp } from './utils/db-helpers.js';
+import { eq, desc, and, lte, gte } from 'drizzle-orm';
+import { toDbNumeric } from './utils/db-helpers.js';
 import { NotFoundError } from './utils/errors.js';
 
 export async function getInstallmentPlans(): Promise<Array<InstallmentPlan & { item: Item & { vendor: Vendor }; client: Client }>> {
@@ -18,7 +18,7 @@ export async function getInstallmentPlans(): Promise<Array<InstallmentPlan & { i
     .innerJoin(item, eq(installmentPlan.itemId, item.itemId))
     .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
     .innerJoin(client, eq(installmentPlan.clientId, client.clientId))
-    .orderBy(desc(installmentPlan.nextDueDate));
+    .orderBy(desc(installmentPlan.dueDate));
 
   return results.map((row) => ({
     ...row.installment_plan,
@@ -36,7 +36,7 @@ export async function getInstallmentPlansByItem(itemId: string): Promise<Array<I
     .from(installmentPlan)
     .innerJoin(client, eq(installmentPlan.clientId, client.clientId))
     .where(eq(installmentPlan.itemId, itemId))
-    .orderBy(desc(installmentPlan.nextDueDate));
+    .orderBy(desc(installmentPlan.dueDate));
 
   return results.map((row) => ({
     ...row.installment_plan,
@@ -51,7 +51,7 @@ export async function getInstallmentPlansByClient(clientId: string): Promise<Arr
     .innerJoin(item, eq(installmentPlan.itemId, item.itemId))
     .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
     .where(eq(installmentPlan.clientId, clientId))
-    .orderBy(desc(installmentPlan.nextDueDate));
+    .orderBy(desc(installmentPlan.dueDate));
 
   return results.map((row) => ({
     ...row.installment_plan,
@@ -88,15 +88,8 @@ export async function createInstallmentPlan(insertPlan: InsertInstallmentPlan): 
     .values({
       itemId: insertPlan.itemId,
       clientId: insertPlan.clientId,
-      totalAmount: toDbNumeric(insertPlan.totalAmount),
-      installmentAmount: toDbNumeric(insertPlan.installmentAmount),
-      frequency: insertPlan.frequency,
-      nextDueDate: toDbTimestamp(insertPlan.nextDueDate),
-      remainingAmount: toDbNumeric(insertPlan.remainingAmount || insertPlan.totalAmount),
-      status: insertPlan.status || "active",
-      startDate: toDbTimestamp(insertPlan.startDate),
-      lastPaidDate: insertPlan.lastPaidDate ? toDbTimestamp(insertPlan.lastPaidDate) : undefined,
-      reminderSent: insertPlan.reminderSent || false,
+      amount: toDbNumeric(insertPlan.amount),
+      dueDate: typeof insertPlan.dueDate === 'string' ? insertPlan.dueDate : insertPlan.dueDate.toISOString().split('T')[0],
     })
     .returning();
 
@@ -116,14 +109,8 @@ export async function updateInstallmentPlan(id: string, updatePlan: Partial<Inse
   const [updatedPlan] = await db
     .update(installmentPlan)
     .set({
-      ...(updatePlan.totalAmount !== undefined && { totalAmount: toDbNumeric(updatePlan.totalAmount) }),
-      ...(updatePlan.installmentAmount !== undefined && { installmentAmount: toDbNumeric(updatePlan.installmentAmount) }),
-      ...(updatePlan.frequency !== undefined && { frequency: updatePlan.frequency }),
-      ...(updatePlan.nextDueDate !== undefined && { nextDueDate: toDbTimestamp(updatePlan.nextDueDate) }),
-      ...(updatePlan.remainingAmount !== undefined && { remainingAmount: toDbNumeric(updatePlan.remainingAmount) }),
-      ...(updatePlan.status !== undefined && { status: updatePlan.status }),
-      ...(updatePlan.lastPaidDate !== undefined && { lastPaidDate: toDbTimestamp(updatePlan.lastPaidDate) }),
-      ...(updatePlan.reminderSent !== undefined && { reminderSent: updatePlan.reminderSent }),
+      ...(updatePlan.amount !== undefined && { amount: toDbNumeric(updatePlan.amount) }),
+      ...(updatePlan.dueDate !== undefined && { dueDate: typeof updatePlan.dueDate === 'string' ? updatePlan.dueDate : updatePlan.dueDate.toISOString().split('T')[0] }),
     })
     .where(eq(installmentPlan.installmentId, id))
     .returning();
@@ -144,46 +131,47 @@ export async function deleteInstallmentPlan(id: string): Promise<void> {
   await db.delete(installmentPlan).where(eq(installmentPlan.installmentId, id));
 }
 
-export async function markInstallmentPaid(installmentId: string): Promise<InstallmentPlan> {
-  const [plan] = await db
+export async function getInstallmentPlan(id: string): Promise<(InstallmentPlan & { item: Item & { vendor: Vendor }; client: Client }) | undefined> {
+  const results = await db
+    .select()
+    .from(installmentPlan)
+    .innerJoin(item, eq(installmentPlan.itemId, item.itemId))
+    .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+    .innerJoin(client, eq(installmentPlan.clientId, client.clientId))
+    .where(eq(installmentPlan.installmentId, id));
+
+  if (results.length === 0) {
+    return undefined;
+  }
+
+  return {
+    ...results[0].installment_plan,
+    item: {
+      ...results[0].item,
+      vendor: results[0].vendor,
+    },
+    client: results[0].client,
+  };
+}
+
+export async function markInstallmentPaid(installmentId: string, paidAmount: number): Promise<InstallmentPlan> {
+  const [existingPlan] = await db
     .select()
     .from(installmentPlan)
     .where(eq(installmentPlan.installmentId, installmentId));
 
-  if (!plan) {
+  if (!existingPlan) {
     throw new NotFoundError('Installment Plan', installmentId);
   }
 
-  const remainingAmount = Number(plan.remainingAmount) - Number(plan.installmentAmount);
-  const newStatus = remainingAmount <= 0 ? "completed" : "active";
-
-  // Calculate next due date based on frequency
-  const currentDueDate = new Date(plan.nextDueDate);
-  let nextDueDate = new Date(currentDueDate);
-
-  switch (plan.frequency) {
-    case "weekly":
-      nextDueDate.setDate(nextDueDate.getDate() + 7);
-      break;
-    case "biweekly":
-      nextDueDate.setDate(nextDueDate.getDate() + 14);
-      break;
-    case "monthly":
-      nextDueDate.setMonth(nextDueDate.getMonth() + 1);
-      break;
-    case "quarterly":
-      nextDueDate.setMonth(nextDueDate.getMonth() + 3);
-      break;
-  }
+  const totalPaid = Number(existingPlan.paidAmount) + paidAmount;
+  const newStatus = totalPaid >= Number(existingPlan.amount) ? "paid" : "pending";
 
   const [updatedPlan] = await db
     .update(installmentPlan)
     .set({
-      remainingAmount: toDbNumeric(Math.max(0, remainingAmount)),
-      lastPaidDate: new Date(),
-      nextDueDate: newStatus === "active" ? nextDueDate : currentDueDate,
+      paidAmount: toDbNumeric(totalPaid),
       status: newStatus,
-      reminderSent: false,
     })
     .where(eq(installmentPlan.installmentId, installmentId))
     .returning();
@@ -200,12 +188,6 @@ export async function sendPaymentReminder(installmentId: string): Promise<boolea
   if (!plan) {
     throw new NotFoundError('Installment Plan', installmentId);
   }
-
-  // Mark reminder as sent
-  await db
-    .update(installmentPlan)
-    .set({ reminderSent: true })
-    .where(eq(installmentPlan.installmentId, installmentId));
 
   // In a real implementation, this would send an actual reminder
   // For now, just return true to indicate success
@@ -224,11 +206,11 @@ export async function getUpcomingPayments(limit: number = 10): Promise<Array<Ins
     .innerJoin(client, eq(installmentPlan.clientId, client.clientId))
     .where(
       and(
-        eq(installmentPlan.status, "active"),
-        lte(installmentPlan.nextDueDate, sevenDaysFromNow)
+        eq(installmentPlan.status, "pending"),
+        lte(installmentPlan.dueDate, sevenDaysFromNow.toISOString().split('T')[0])
       )
     )
-    .orderBy(installmentPlan.nextDueDate)
+    .orderBy(installmentPlan.dueDate)
     .limit(limit);
 
   return results.map((row) => ({
@@ -252,11 +234,11 @@ export async function getOverduePayments(): Promise<Array<InstallmentPlan & { it
     .innerJoin(client, eq(installmentPlan.clientId, client.clientId))
     .where(
       and(
-        eq(installmentPlan.status, "active"),
-        lte(installmentPlan.nextDueDate, today)
+        eq(installmentPlan.status, "pending"),
+        lte(installmentPlan.dueDate, today.toISOString().split('T')[0])
       )
     )
-    .orderBy(installmentPlan.nextDueDate);
+    .orderBy(installmentPlan.dueDate);
 
   return results.map((row) => ({
     ...row.installment_plan,
