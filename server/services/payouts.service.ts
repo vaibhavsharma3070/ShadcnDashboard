@@ -131,50 +131,56 @@ export async function getUpcomingPayouts(): Promise<Array<{
     .where(eq(item.status, "sold"))
     .groupBy(item.itemId, vendor.vendorId);
 
-  return results.map((row) => {
-    const minCost = Number(row.item.minCost || 0);
-    const maxCost = Number(row.item.maxCost || 0);
-    const totalPaid = Number(row.totalPaid);
-    const salePrice = Number(row.totalClientPayments);
-    const maxSalesPrice = Number(row.item.maxSalesPrice || 0);
-    
-    // Calculate vendor payout target using correct formula:
-    // Payout = (1 - ((MaxSalesPrice - ActualSalesPrice) × 0.01)) × MaxCost
-    const priceDifference = maxSalesPrice - salePrice;
-    const adjustmentFactor = 1 - (priceDifference * 0.01);
-    const vendorTarget = adjustmentFactor * maxCost;
-    
-    const remainingBalance = Math.max(0, vendorTarget - totalPaid);
-    
-    // Payment progress should show CLIENT payment progress (paid by client / total sale price)
-    // NOT vendor payout progress
-    // salePrice = totalClientPayments (how much client has actually paid)
-    // maxSalesPrice = target sale price for this item
-    const targetSalePrice = salePrice; // For sold items, salePrice IS the final sale price
-    const clientPayments = salePrice; // How much client has paid (full amount for sold items)
-    const paymentProgress = targetSalePrice > 0 ? (clientPayments / targetSalePrice) * 100 : 0;
+  return results
+    .map((row) => {
+      const minCost = Number(row.item.minCost || 0);
+      const maxCost = Number(row.item.maxCost || 0);
+      const totalPaid = Number(row.totalPaid);
+      const salePrice = Number(row.totalClientPayments);
+      const maxSalesPrice = Number(row.item.maxSalesPrice || 0);
+      
+      // Calculate vendor payout target using correct formula:
+      // Payout = (1 - ((MaxSalesPrice - ActualSalesPrice) × 0.01)) × MaxCost
+      const priceDifference = maxSalesPrice - salePrice;
+      const adjustmentFactor = 1 - (priceDifference * 0.01);
+      const vendorTarget = adjustmentFactor * maxCost;
+      
+      const remainingBalance = Math.max(0, vendorTarget - totalPaid);
+      
+      // Payment progress should show CLIENT payment progress (paid by client / total sale price)
+      // NOT vendor payout progress
+      // salePrice = totalClientPayments (how much client has actually paid)
+      // maxSalesPrice = target sale price for this item
+      const targetSalePrice = salePrice; // For sold items, salePrice IS the final sale price
+      const clientPayments = salePrice; // How much client has paid (full amount for sold items)
+      const paymentProgress = targetSalePrice > 0 ? (clientPayments / targetSalePrice) * 100 : 0;
 
-    return {
-      itemId: row.item.itemId,
-      title: row.item.title || "",
-      brand: row.item.brand || "",
-      model: row.item.model || "",
-      minSalesPrice: Number(row.item.minSalesPrice || 0),
-      maxSalesPrice: Number(row.item.maxSalesPrice || 0),
-      salePrice,
-      minCost,
-      maxCost,
-      vendorPayoutAmount: vendorTarget, // Total amount to be paid to vendor
-      totalPaid,
-      remainingBalance,
-      paymentProgress,
-      isFullyPaid: paymentProgress >= 100,
-      fullyPaidAt: undefined, // Field doesn't exist in schema
-      firstPaymentDate: row.firstPaymentDate || undefined,
-      lastPaymentDate: row.lastPaymentDate || undefined,
-      vendor: row.vendor,
-    };
-  });
+      return {
+        itemId: row.item.itemId,
+        title: row.item.title || "",
+        brand: row.item.brand || "",
+        model: row.item.model || "",
+        minSalesPrice: Number(row.item.minSalesPrice || 0),
+        maxSalesPrice: Number(row.item.maxSalesPrice || 0),
+        salePrice,
+        minCost,
+        maxCost,
+        vendorPayoutAmount: vendorTarget, // Total amount to be paid to vendor
+        totalPaid,
+        remainingBalance,
+        paymentProgress,
+        isFullyPaid: paymentProgress >= 100,
+        fullyPaidAt: undefined, // Field doesn't exist in schema
+        firstPaymentDate: row.firstPaymentDate || undefined,
+        lastPaymentDate: row.lastPaymentDate || undefined,
+        vendor: row.vendor,
+      };
+    })
+    .filter((payout) => {
+      // Filter out items that have been fully paid out to vendor
+      // Only show items where there's still money owed to the vendor
+      return payout.remainingBalance > 0;
+    });
 }
 
 export async function getPayoutMetrics(): Promise<{
