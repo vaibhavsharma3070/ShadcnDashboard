@@ -1359,7 +1359,7 @@ export class DatabaseStorage implements IStorage {
         count: count(),
       })
       .from(item)
-      .where(sql`${item.status} IN ('in-store', 'reserved')`);
+      .where(sql`${item.status} IN ('in-store')`);
 
     const [valueAgg] = await db
       .select({
@@ -1369,7 +1369,7 @@ export class DatabaseStorage implements IStorage {
         maxValue: sql<number>`COALESCE(SUM(COALESCE(${item.maxSalesPrice}, ${item.minSalesPrice}, 0)), 0)`,
       })
       .from(item)
-      .where(sql`${item.status} IN ('in-store','reserved')`);
+      .where(sql`${item.status} IN ('in-store')`);
 
     const pendingPayouts = await this.getPendingPayouts();
 
@@ -1442,7 +1442,7 @@ export class DatabaseStorage implements IStorage {
     const activeItems = await db
       .select()
       .from(item)
-      .where(sql`${item.status} IN ('in-store', 'reserved')`);
+      .where(sql`${item.status} IN ('in-store')`);
 
     const costRange = activeItems.reduce(
       (acc, item) => ({
