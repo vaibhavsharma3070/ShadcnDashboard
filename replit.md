@@ -14,3 +14,28 @@ The system is built with a modern web stack. The frontend utilizes React 18 with
 - **Cloud Storage**: Google Cloud Storage (for item images)
 - **PDF Generation**: React PDF (for contracts)
 - **Image Processing**: Sharp (for compression)
+
+## Business Intelligence API Endpoints
+LUXETTE includes 6 real-time business intelligence API endpoints for financial metrics and inventory tracking:
+
+### Sales & Payments
+- **`GET /api/bi/sales-month-to-date`** - Total sales for items marked as "sold" this month
+  - Returns: `{ "totalSales": number }`
+- **`GET /api/bi/sum-upcoming-payments`** - Sum of pending installment payments
+  - Returns: `{ "totalUpcomingPayments": number }`
+
+### Vendor Payouts  
+- **`GET /api/bi/sum-ready-payouts`** - Sum of payouts ready for fully paid items
+  - Returns: `{ "totalReadyPayouts": number }`
+- **`GET /api/bi/sum-upcoming-payouts`** - Sum of future payouts for partially paid items  
+  - Returns: `{ "totalUpcomingPayouts": number }`
+
+### Inventory Metrics
+- **`GET /api/bi/inventory-cost-range`** - Sum of min/max cost values for in-store inventory
+  - Returns: `{ "min": number, "max": number }`
+- **`GET /api/bi/inventory-market-price-range`** - Sum of min/max sales price values for in-store inventory
+  - Returns: `{ "min": number, "max": number }`
+
+**Security**: All BI endpoints require session authentication and return aggregated data only.
+
+**Usage**: Access via TanStack Query in frontend or direct fetch calls when authenticated.

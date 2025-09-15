@@ -61,6 +61,8 @@ tags:
     description: Contract generation and management (8 endpoints)
   - name: Reports
     description: Business intelligence and reporting (6 endpoints)
+  - name: Business Intelligence
+    description: Real-time business intelligence metrics (6 endpoints)
   - name: File Management
     description: Image upload and file serving (2 endpoints)
   - name: Migration
@@ -888,6 +890,175 @@ paths:
                 $ref: '#/components/schemas/Error'
         500:
           description: Failed to fetch financial data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Business Intelligence Endpoints (6)
+  /api/bi/sales-month-to-date:
+    get:
+      tags:
+        - Business Intelligence
+      summary: Get total sales month to date
+      operationId: getTotalSalesMonthToDate
+      description: Returns sum of payments for items marked as "sold" made this month
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Total sales for current month
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalSales:
+                    type: number
+                    description: Sum of sales payments for sold items this month
+        500:
+          description: Failed to fetch sales month-to-date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bi/sum-upcoming-payments:
+    get:
+      tags:
+        - Business Intelligence
+      summary: Get sum of upcoming payments
+      operationId: getSumUpcomingPayments
+      description: Returns sum of pending installment payments due today or later
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Sum of upcoming installment payments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalUpcomingPayments:
+                    type: number
+                    description: Sum of pending installment payments
+        500:
+          description: Failed to fetch sum of upcoming payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bi/sum-ready-payouts:
+    get:
+      tags:
+        - Business Intelligence
+      summary: Get sum of ready payouts
+      operationId: getSumReadyPayouts
+      description: Returns sum of payouts ready for items that are fully paid but vendor hasn't been paid out yet
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Sum of payouts ready to be processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalReadyPayouts:
+                    type: number
+                    description: Sum of vendor payouts ready to be processed
+        500:
+          description: Failed to fetch sum of ready payouts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bi/sum-upcoming-payouts:
+    get:
+      tags:
+        - Business Intelligence
+      summary: Get sum of upcoming payouts
+      operationId: getSumUpcomingPayouts
+      description: Returns sum of future payouts for items that are partially paid (future payouts when they become fully paid)
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Sum of upcoming vendor payouts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalUpcomingPayouts:
+                    type: number
+                    description: Sum of future vendor payouts for partially paid items
+        500:
+          description: Failed to fetch sum of upcoming payouts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bi/inventory-cost-range:
+    get:
+      tags:
+        - Business Intelligence
+      summary: Get inventory cost range
+      operationId: getInventoryCostRange
+      description: Returns sum of min and max cost values for all in-store inventory
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Inventory cost range totals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  min:
+                    type: number
+                    description: Sum of minimum cost values for in-store inventory
+                  max:
+                    type: number
+                    description: Sum of maximum cost values for in-store inventory
+        500:
+          description: Failed to fetch inventory cost range
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bi/inventory-market-price-range:
+    get:
+      tags:
+        - Business Intelligence
+      summary: Get inventory market price range
+      operationId: getInventoryMarketPriceRange
+      description: Returns sum of min and max sales price values for all in-store inventory
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: Inventory market price range totals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  min:
+                    type: number
+                    description: Sum of minimum sales price values for in-store inventory
+                  max:
+                    type: number
+                    description: Sum of maximum sales price values for in-store inventory
+        500:
+          description: Failed to fetch inventory market price range
           content:
             application/json:
               schema:
