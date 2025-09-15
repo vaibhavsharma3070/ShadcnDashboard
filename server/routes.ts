@@ -808,6 +808,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Business Intelligence API routes
+  app.get("/api/bi/sales-month-to-date", async (req, res) => {
+    try {
+      const result = await storage.getTotalSalesMonthToDate();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sales month-to-date" });
+    }
+  });
+
+  app.get("/api/bi/sum-upcoming-payments", async (req, res) => {
+    try {
+      const result = await storage.getSumUpcomingPayments();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sum of upcoming payments" });
+    }
+  });
+
+  app.get("/api/bi/sum-ready-payouts", async (req, res) => {
+    try {
+      const result = await storage.getSumReadyPayouts();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sum of ready payouts" });
+    }
+  });
+
+  app.get("/api/bi/sum-upcoming-payouts", async (req, res) => {
+    try {
+      const result = await storage.getSumUpcomingPayouts();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sum of upcoming payouts" });
+    }
+  });
+
+  app.get("/api/bi/inventory-cost-range", async (req, res) => {
+    try {
+      const result = await storage.getInventoryCostRange();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch inventory cost range" });
+    }
+  });
+
+  app.get("/api/bi/inventory-market-price-range", async (req, res) => {
+    try {
+      const result = await storage.getInventoryMarketPriceRange();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch inventory market price range" });
+    }
+  });
+
   app.patch("/api/installments/:id/mark-paid", async (req, res) => {
     try {
       const installment = await storage.markInstallmentPaid(req.params.id);
