@@ -90,28 +90,8 @@ export async function createContract(insertContract: InsertContract): Promise<Co
       }
     }
 
-    // If items specified, create snapshots
-    let itemSnapshots: ContractItemSnapshot[] = [];
-    if (insertContract.itemIds && insertContract.itemIds.length > 0) {
-      const items = await tx
-        .select()
-        .from(item)
-        .where(inArray(item.itemId, insertContract.itemIds));
-
-      itemSnapshots = items.map(itm => ({
-        itemId: itm.itemId,
-        title: itm.title || "",
-        brand: itm.brand || "",
-        model: itm.model || "",
-        serialNo: itm.serialNo || "",
-        condition: itm.condition || "",
-        minCost: itm.minCost || "0",
-        maxCost: itm.maxCost || "0",
-        minSalesPrice: itm.minSalesPrice || "0",
-        maxSalesPrice: itm.maxSalesPrice || "0",
-        status: itm.status,
-      }));
-    }
+    // Use provided itemSnapshots or empty array
+    const itemSnapshots = insertContract.itemSnapshots || [];
 
     // Create the contract
     const [newContract] = await tx
@@ -119,18 +99,9 @@ export async function createContract(insertContract: InsertContract): Promise<Co
       .values({
         vendorId: insertContract.vendorId,
         templateId: insertContract.templateId,
-        content: insertContract.content,
-        metadata: insertContract.metadata,
         status: insertContract.status || "draft",
-        signedAt: insertContract.signedAt ? toDbTimestamp(insertContract.signedAt) : undefined,
-        expiresAt: insertContract.expiresAt ? toDbTimestamp(insertContract.expiresAt) : undefined,
-        itemIds: insertContract.itemIds,
-        itemSnapshots: itemSnapshots.length > 0 ? itemSnapshots : undefined,
-        signatureUrl: insertContract.signatureUrl,
-        pdfUrl: insertContract.pdfUrl,
-        terms: insertContract.terms,
-        commissionPercentage: insertContract.commissionPercentage,
-        paymentTermsDays: insertContract.paymentTermsDays,
+        termsText: insertContract.termsText || "Términos y condiciones estándar",
+        itemSnapshots: itemSnapshots,
       })
       .returning();
 
@@ -151,44 +122,17 @@ export async function updateContract(
     throw new NotFoundError('Contract', id);
   }
 
-  // If updating items, create new snapshots
-  let itemSnapshots: ContractItemSnapshot[] | undefined;
-  if (updateContract.itemIds && updateContract.itemIds.length > 0) {
-    const items = await db
-      .select()
-      .from(item)
-      .where(inArray(item.itemId, updateContract.itemIds));
-
-    itemSnapshots = items.map(itm => ({
-      itemId: itm.itemId,
-      title: itm.title || "",
-      brand: itm.brand || "",
-      model: itm.model || "",
-      serialNo: itm.serialNo || "",
-      condition: itm.condition || "",
-      minCost: itm.minCost || "0",
-      maxCost: itm.maxCost || "0",
-      minSalesPrice: itm.minSalesPrice || "0",
-      maxSalesPrice: itm.maxSalesPrice || "0",
-      status: itm.status,
-    }));
-  }
+  // Use provided itemSnapshots if available
+  const itemSnapshots = updateContract.itemSnapshots;
 
   const [updatedContract] = await db
     .update(contract)
     .set({
-      ...(updateContract.content !== undefined && { content: updateContract.content }),
-      ...(updateContract.metadata !== undefined && { metadata: updateContract.metadata }),
+      ...(updateContract.vendorId !== undefined && { vendorId: updateContract.vendorId }),
+      ...(updateContract.templateId !== undefined && { templateId: updateContract.templateId }),
       ...(updateContract.status !== undefined && { status: updateContract.status }),
-      ...(updateContract.signedAt !== undefined && { signedAt: toDbTimestamp(updateContract.signedAt) }),
-      ...(updateContract.expiresAt !== undefined && { expiresAt: toDbTimestamp(updateContract.expiresAt) }),
-      ...(updateContract.itemIds !== undefined && { itemIds: updateContract.itemIds }),
+      ...(updateContract.termsText !== undefined && { termsText: updateContract.termsText }),
       ...(itemSnapshots !== undefined && { itemSnapshots }),
-      ...(updateContract.signatureUrl !== undefined && { signatureUrl: updateContract.signatureUrl }),
-      ...(updateContract.pdfUrl !== undefined && { pdfUrl: updateContract.pdfUrl }),
-      ...(updateContract.terms !== undefined && { terms: updateContract.terms }),
-      ...(updateContract.commissionPercentage !== undefined && { commissionPercentage: updateContract.commissionPercentage }),
-      ...(updateContract.paymentTermsDays !== undefined && { paymentTermsDays: updateContract.paymentTermsDays }),
     })
     .where(eq(contract.contractId, id))
     .returning();
@@ -206,8 +150,8 @@ export async function deleteContract(id: string): Promise<void> {
     throw new NotFoundError('Contract', id);
   }
 
-  if (existingContract.status === "active") {
-    throw new Error("Cannot delete an active contract");
+  if (existingContract.status === "final") {
+    throw new Error("Cannot delete a final contract");
   }
 
   await db.delete(contract).where(eq(contract.contractId, id));
