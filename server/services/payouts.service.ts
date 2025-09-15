@@ -69,14 +69,7 @@ export async function createPayout(insertPayout: InsertVendorPayout): Promise<Ve
       .from(vendorPayout)
       .where(eq(vendorPayout.itemId, insertPayout.itemId));
 
-    // Check if fully paid and update fullyPaidAt
-    const itemCost = existingItem.minCost || existingItem.maxCost || 0;
-    if (Number(totalPaid) >= Number(itemCost) && !existingItem.fullyPaidAt) {
-      await tx
-        .update(item)
-        .set({ fullyPaidAt: new Date().toISOString() })
-        .where(eq(item.itemId, insertPayout.itemId));
-    }
+    // Note: fullyPaidAt field doesn't exist in schema, removed update logic
 
     return newPayout;
   });
@@ -143,9 +136,12 @@ export async function getUpcomingPayouts(): Promise<Array<{
     const maxCost = Number(row.item.maxCost || 0);
     const totalPaid = Number(row.totalPaid);
     const salePrice = Number(row.totalClientPayments);
-    const cost = minCost || maxCost;
-    const remainingBalance = Math.max(0, cost - totalPaid);
-    const paymentProgress = cost > 0 ? (totalPaid / cost) * 100 : 0;
+    
+    // Calculate vendor payout target: 70% of final sale price (LUXETTE takes 30% commission)
+    const vendorShare = 0.70;
+    const vendorTarget = salePrice * vendorShare;
+    const remainingBalance = Math.max(0, vendorTarget - totalPaid);
+    const paymentProgress = vendorTarget > 0 ? (totalPaid / vendorTarget) * 100 : 0;
 
     return {
       itemId: row.item.itemId,
@@ -161,7 +157,7 @@ export async function getUpcomingPayouts(): Promise<Array<{
       remainingBalance,
       paymentProgress,
       isFullyPaid: paymentProgress >= 100,
-      fullyPaidAt: row.item.fullyPaidAt || undefined,
+      fullyPaidAt: undefined, // Field doesn't exist in schema
       firstPaymentDate: row.firstPaymentDate || undefined,
       lastPaymentDate: row.lastPaymentDate || undefined,
       vendor: row.vendor,
@@ -186,28 +182,29 @@ export async function getPayoutMetrics(): Promise<{
     })
     .from(vendorPayout);
 
-  // Pending payouts (sold items not fully paid out)
-  const [pendingStats] = await db
-    .select({
-      pendingCount: count(),
-    })
-    .from(item)
-    .where(and(eq(item.status, "sold"), isNull(item.fullyPaidAt)));
-
-  // Upcoming payouts (items with partial payouts)
-  const upcomingResults = await db
+  // Pending payouts (sold items not fully paid out to vendor)
+  const pendingResults = await db
     .select({
       itemId: item.itemId,
       totalPaid: sql<number>`COALESCE(SUM(${vendorPayout.amount}), 0)`,
-      itemCost: sql<number>`COALESCE(${item.minCost}, ${item.maxCost}, 0)`,
+      salePrice: sql<number>`
+        COALESCE((
+          SELECT SUM(${clientPayment.amount})
+          FROM ${clientPayment}
+          WHERE ${clientPayment.itemId} = ${item.itemId}
+        ), 0)
+      `,
     })
     .from(item)
     .leftJoin(vendorPayout, eq(vendorPayout.itemId, item.itemId))
     .where(eq(item.status, "sold"))
     .groupBy(item.itemId)
-    .having(sql`COALESCE(SUM(${vendorPayout.amount}), 0) < COALESCE(${item.minCost}, ${item.maxCost}, 0)`);
+    .having(sql`COALESCE(SUM(${vendorPayout.amount}), 0) < (COALESCE((SELECT SUM(${clientPayment.amount}) FROM ${clientPayment} WHERE ${clientPayment.itemId} = ${item.itemId}), 0) * 0.70)`);
 
-  const upcomingCount = upcomingResults.length;
+  const pendingCount = pendingResults.length;
+
+  // Use same logic as pending for upcoming count
+  const upcomingCount = pendingCount;
 
   // Monthly trend (compare last 30 days to previous 30 days)
   const thirtyDaysAgo = new Date();
@@ -243,7 +240,7 @@ export async function getPayoutMetrics(): Promise<{
   return {
     totalPayoutsPaid: Number(payoutStats.totalCount),
     totalPayoutsAmount: Number(payoutStats.totalAmount),
-    pendingPayouts: Number(pendingStats.pendingCount),
+    pendingPayouts: pendingCount,
     upcomingPayouts: upcomingCount,
     averagePayoutAmount: Number(payoutStats.avgAmount),
     monthlyPayoutTrend: monthlyTrend,
