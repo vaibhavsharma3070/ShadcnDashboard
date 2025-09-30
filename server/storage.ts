@@ -297,6 +297,17 @@ export interface IStorage {
     uniqueClients: number;
     averageDaysToSell: number;
     inventoryTurnover: number;
+    totalRevenue: number;
+    totalProfit: number;
+    totalItems: number;
+    averageProfit: number;
+    profitMargin: number;
+    pendingPayments: number;
+    overduePayments: number;
+    revenueChange: number;
+    profitChange: number;
+    topPerformingBrand: string;
+    topPerformingVendor: string;
   }>;
 
   getTimeSeries(
@@ -339,6 +350,9 @@ export interface IStorage {
       profit?: number;
       itemsSold?: number;
       avgOrderValue?: number;
+      profitMargin?: number;
+      change?: number;
+      itemCount?: number;
     }>
   >;
 
@@ -367,6 +381,8 @@ export interface IStorage {
       margin: number;
       soldDate?: string;
       daysToSell?: number;
+      status?: string;
+      acquisitionDate?: string;
     }>;
     totalCount: number;
   }>;
@@ -380,9 +396,11 @@ export interface IStorage {
     inStoreItems: number;
     reservedItems: number;
     soldItems: number;
-    partialPaidItems: number;
+    returnedItems: number;
     totalValue: number;
-    avgDaysInInventory: number;
+    averageAge: number;
+    slowMovingItems: number;
+    fastMovingItems: number;
     categoriesBreakdown: Array<{
       categoryId: string;
       categoryName: string;
@@ -411,9 +429,10 @@ export interface IStorage {
     Array<{
       paymentMethod: string;
       totalAmount: number;
-      transactionCount: number;
+      totalTransactions: number;
       percentage: number;
-      avgTransactionAmount: number;
+      averageAmount: number;
+      trend: number;
     }>
   >;
 
@@ -674,9 +693,10 @@ export class DatabaseStorage implements IStorage {
   ): Promise<Array<{
     paymentMethod: string;
     totalAmount: number;
-    transactionCount: number;
+    totalTransactions: number;
     percentage: number;
-    avgTransactionAmount: number;
+    averageAmount: number;
+    trend: number;
   }>> {
     // For now, use the simpler version without filters
     return paymentsService.getPaymentMethodBreakdown(startDate, endDate);
@@ -871,6 +891,17 @@ export class DatabaseStorage implements IStorage {
     uniqueClients: number;
     averageDaysToSell: number;
     inventoryTurnover: number;
+    totalRevenue: number;
+    totalProfit: number;
+    totalItems: number;
+    averageProfit: number;
+    profitMargin: number;
+    pendingPayments: number;
+    overduePayments: number;
+    revenueChange: number;
+    profitChange: number;
+    topPerformingBrand: string;
+    topPerformingVendor: string;
   }> {
     return biService.getReportKPIs(startDate, endDate, filters);
   }
@@ -910,6 +941,9 @@ export class DatabaseStorage implements IStorage {
     profit?: number;
     itemsSold?: number;
     avgOrderValue?: number;
+    profitMargin?: number;
+    change?: number;
+    itemCount?: number;
   }>> {
     return biService.getGroupedMetrics(groupBy, metrics, startDate, endDate, filters);
   }
@@ -939,6 +973,8 @@ export class DatabaseStorage implements IStorage {
       margin: number;
       soldDate?: string;
       daysToSell?: number;
+      status?: string;
+      acquisitionDate?: string;
     }>;
     totalCount: number;
   }> {
@@ -954,9 +990,11 @@ export class DatabaseStorage implements IStorage {
     inStoreItems: number;
     reservedItems: number;
     soldItems: number;
-    partialPaidItems: number;
+    returnedItems: number;
     totalValue: number;
-    avgDaysInInventory: number;
+    averageAge: number;
+    slowMovingItems: number;
+    fastMovingItems: number;
     categoriesBreakdown: Array<{
       categoryId: string;
       categoryName: string;

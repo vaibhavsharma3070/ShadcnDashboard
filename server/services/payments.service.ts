@@ -174,10 +174,14 @@ export async function getPaymentMethodBreakdown(
 ): Promise<Array<{
   paymentMethod: string;
   totalAmount: number;
-  transactionCount: number;
+  totalTransactions: number;
   percentage: number;
-  avgTransactionAmount: number;
+  averageAmount: number;
+  trend: number;
 }>> {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
   const results = await db
     .select({
       paymentMethod: clientPayment.paymentMethod,
@@ -188,21 +192,51 @@ export async function getPaymentMethodBreakdown(
     .from(clientPayment)
     .where(
       and(
-        gte(clientPayment.paidAt, new Date(startDate)),
-        lte(clientPayment.paidAt, new Date(endDate))
+        gte(clientPayment.paidAt, start),
+        lte(clientPayment.paidAt, end)
       )
     )
     .groupBy(clientPayment.paymentMethod)
     .orderBy(desc(sql`SUM(${clientPayment.amount})`));
 
+  // Calculate previous period for trend
+  const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const prevStart = new Date(start);
+  prevStart.setDate(prevStart.getDate() - daysDiff);
+  const prevEnd = new Date(start);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+
+  const prevResults = await db
+    .select({
+      paymentMethod: clientPayment.paymentMethod,
+      totalAmount: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+    })
+    .from(clientPayment)
+    .where(
+      and(
+        gte(clientPayment.paidAt, prevStart),
+        lte(clientPayment.paidAt, prevEnd)
+      )
+    )
+    .groupBy(clientPayment.paymentMethod);
+
+  const prevRevenueMap = new Map(prevResults.map(r => [r.paymentMethod, Number(r.totalAmount)]));
+
   // Calculate grand total for percentage
   const grandTotal = results.reduce((sum, r) => sum + Number(r.totalAmount), 0);
 
-  return results.map((row) => ({
-    paymentMethod: row.paymentMethod,
-    totalAmount: Number(row.totalAmount),
-    transactionCount: Number(row.transactionCount),
-    percentage: grandTotal > 0 ? (Number(row.totalAmount) / grandTotal) * 100 : 0,
-    avgTransactionAmount: Number(row.avgTransactionAmount),
-  }));
+  return results.map((row) => {
+    const currentAmount = Number(row.totalAmount);
+    const prevAmount = Number(prevRevenueMap.get(row.paymentMethod) || 0);
+    const trend = prevAmount > 0 ? ((currentAmount - prevAmount) / prevAmount) * 100 : 0;
+
+    return {
+      paymentMethod: row.paymentMethod,
+      totalAmount: currentAmount,
+      totalTransactions: Number(row.transactionCount), // Renamed from transactionCount
+      percentage: grandTotal > 0 ? (currentAmount / grandTotal) * 100 : 0,
+      averageAmount: Number(row.avgTransactionAmount), // Renamed from avgTransactionAmount
+      trend, // Added trend calculation
+    };
+  });
 }

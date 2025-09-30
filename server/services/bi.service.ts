@@ -28,6 +28,18 @@ export async function getReportKPIs(
   uniqueClients: number;
   averageDaysToSell: number;
   inventoryTurnover: number;
+  // Additional fields for frontend compatibility
+  totalRevenue: number;
+  totalProfit: number;
+  totalItems: number;
+  averageProfit: number;
+  profitMargin: number;
+  pendingPayments: number;
+  overduePayments: number;
+  revenueChange: number;
+  profitChange: number;
+  topPerformingBrand: string;
+  topPerformingVendor: string;
 }> {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -110,9 +122,112 @@ export async function getReportKPIs(
   const [inventoryStats] = await db
     .select({
       avgInventoryValue: sql<number>`AVG(${item.minCost})`,
+      totalItems: count(),
     })
     .from(item)
     .where(buildFilterCondition(itemConditions) || undefined);
+
+  // Get pending and overdue payments from installment plans
+  const today = new Date();
+  const [paymentStatus] = await db
+    .select({
+      pendingPayments: sql<number>`SUM(CASE WHEN ${installmentPlan.status} = 'pending' AND ${installmentPlan.dueDate} > ${today.toISOString().split('T')[0]} THEN 1 ELSE 0 END)`,
+      overduePayments: sql<number>`SUM(CASE WHEN ${installmentPlan.status} = 'pending' AND ${installmentPlan.dueDate} <= ${today.toISOString().split('T')[0]} THEN 1 ELSE 0 END)`,
+    })
+    .from(installmentPlan);
+
+  // Get top performing brand
+  const [topBrand] = await db
+    .select({
+      brandName: brand.name,
+      totalRevenue: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+    })
+    .from(clientPayment)
+    .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+    .innerJoin(brand, eq(item.brandId, brand.brandId))
+    .where(
+      and(
+        gte(clientPayment.paidAt, start),
+        lte(clientPayment.paidAt, end),
+        ...itemConditions
+      )
+    )
+    .groupBy(brand.brandId, brand.name)
+    .orderBy(desc(sql`SUM(${clientPayment.amount})`))
+    .limit(1);
+
+  // Get top performing vendor
+  const [topVendor] = await db
+    .select({
+      vendorName: vendor.name,
+      totalRevenue: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+    })
+    .from(clientPayment)
+    .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+    .innerJoin(vendor, eq(item.vendorId, vendor.vendorId))
+    .where(
+      and(
+        gte(clientPayment.paidAt, start),
+        lte(clientPayment.paidAt, end),
+        ...itemConditions
+      )
+    )
+    .groupBy(vendor.vendorId, vendor.name)
+    .orderBy(desc(sql`SUM(${clientPayment.amount})`))
+    .limit(1);
+
+  // Calculate previous period metrics for change percentage
+  const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const prevStart = new Date(start);
+  prevStart.setDate(prevStart.getDate() - daysDiff);
+  const prevEnd = new Date(start);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+
+  const [prevPaymentStats] = await db
+    .select({
+      totalRevenue: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+    })
+    .from(clientPayment)
+    .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+    .where(
+      and(
+        gte(clientPayment.paidAt, prevStart),
+        lte(clientPayment.paidAt, prevEnd),
+        ...itemConditions
+      )
+    );
+
+  const [prevItemStats] = await db
+    .select({
+      totalMinCost: sql<number>`COALESCE(SUM(${item.minCost}), 0)`,
+    })
+    .from(item)
+    .where(
+      and(
+        eq(item.status, "sold"),
+        sql`EXISTS (
+          SELECT 1 FROM ${clientPayment}
+          WHERE ${clientPayment.itemId} = ${item.itemId}
+          AND ${clientPayment.paidAt} >= ${prevStart}
+          AND ${clientPayment.paidAt} <= ${prevEnd}
+        )`,
+        ...itemConditions
+      )
+    );
+
+  const [prevExpenseStats] = await db
+    .select({
+      totalExpenses: sql<number>`COALESCE(SUM(${itemExpense.amount}), 0)`,
+    })
+    .from(itemExpense)
+    .innerJoin(item, eq(itemExpense.itemId, item.itemId))
+    .where(
+      and(
+        gte(itemExpense.expenseDate, prevStart.toISOString().split('T')[0]),
+        lte(itemExpense.expenseDate, prevEnd.toISOString().split('T')[0]),
+        ...itemConditions
+      )
+    );
 
   // Calculate metrics
   const revenue = Number(paymentStats.totalRevenue);
@@ -130,6 +245,22 @@ export async function getReportKPIs(
   const avgInventory = Number(inventoryStats.avgInventoryValue) || 0;
   const inventoryTurnover = avgInventory > 0 ? cogs / avgInventory : 0;
 
+  // Calculate additional metrics for frontend
+  const totalItems = Number(inventoryStats.totalItems);
+  const averageProfit = itemsSold > 0 ? netProfit / itemsSold : 0;
+  const profitMargin = grossMargin; // Use gross margin as profit margin
+  const pendingPayments = Number(paymentStatus.pendingPayments) || 0;
+  const overduePayments = Number(paymentStatus.overduePayments) || 0;
+  
+  // Calculate change percentages
+  const prevRevenue = Number(prevPaymentStats.totalRevenue);
+  const prevCogs = Number(prevItemStats.totalMinCost);
+  const prevExpenses = Number(prevExpenseStats.totalExpenses);
+  const prevProfit = prevRevenue - prevCogs - prevExpenses;
+  
+  const revenueChange = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
+  const profitChange = prevProfit > 0 ? ((netProfit - prevProfit) / prevProfit) * 100 : 0;
+
   return {
     revenue,
     cogs,
@@ -144,6 +275,18 @@ export async function getReportKPIs(
     uniqueClients,
     averageDaysToSell,
     inventoryTurnover,
+    // Additional fields for frontend compatibility
+    totalRevenue: revenue,
+    totalProfit: netProfit,
+    totalItems,
+    averageProfit,
+    profitMargin,
+    pendingPayments,
+    overduePayments,
+    revenueChange,
+    profitChange,
+    topPerformingBrand: topBrand?.brandName || 'N/A',
+    topPerformingVendor: topVendor?.vendorName || 'N/A',
   };
 }
 
@@ -253,6 +396,9 @@ export async function getGroupedMetrics(
   profit?: number;
   itemsSold?: number;
   avgOrderValue?: number;
+  profitMargin?: number;
+  change?: number;
+  itemCount?: number;
 }>> {
   const itemConditions = applyItemFilters(filters);
 
@@ -312,24 +458,63 @@ export async function getGroupedMetrics(
 
   const results = await query;
 
+  // Get previous period data for change calculation
+  const daysDiff = Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
+  const prevStart = new Date(startDate);
+  prevStart.setDate(prevStart.getDate() - daysDiff);
+  const prevEnd = new Date(startDate);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+
+  const prevQuery = db
+    .select({
+      groupId: groupIdColumn,
+      revenue: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+    })
+    .from(clientPayment)
+    .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+    .innerJoin(groupTable, joinCondition)
+    .where(
+      and(
+        gte(clientPayment.paidAt, prevStart),
+        lte(clientPayment.paidAt, prevEnd),
+        ...itemConditions
+      )
+    )
+    .groupBy(groupIdColumn);
+
+  const prevResults = await prevQuery;
+  const prevRevenueMap = new Map(prevResults.map(r => [r.groupId, Number(r.revenue)]));
+
   return results.map((row) => {
+    const revenue = Number(row.revenue);
+    const costs = Number(row.costs);
+    const profit = revenue - costs;
+    const profitMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
+    
+    // Calculate change from previous period
+    const prevRevenue = Number(prevRevenueMap.get(row.groupId) || 0);
+    const change = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
+
     const result: any = {
       groupId: row.groupId,
       groupName: row.groupName || "Unknown",
+      itemCount: Number(row.itemCount), // Always include for frontend use
+      profitMargin,
+      change,
     };
 
     if (metrics.includes("revenue")) {
-      result.revenue = Number(row.revenue);
+      result.revenue = revenue;
     }
     if (metrics.includes("profit")) {
-      result.profit = Number(row.revenue) - Number(row.costs);
+      result.profit = profit;
     }
     if (metrics.includes("itemsSold")) {
       result.itemsSold = Number(row.itemCount);
     }
     if (metrics.includes("avgOrderValue")) {
       result.avgOrderValue = Number(row.paymentCount) > 0
-        ? Number(row.revenue) / Number(row.paymentCount)
+        ? revenue / Number(row.paymentCount)
         : 0;
     }
 
@@ -356,6 +541,8 @@ export async function getItemProfitability(
     margin: number;
     soldDate?: string;
     daysToSell?: number;
+    status?: string;
+    acquisitionDate?: string;
   }>;
   totalCount: number;
 }> {
@@ -425,6 +612,8 @@ export async function getItemProfitability(
       margin,
       soldDate: row.firstPaymentDate?.toISOString().split('T')[0],
       daysToSell: Number(row.daysToSell) || undefined,
+      status: row.item.status, // Added for frontend
+      acquisitionDate: row.item.acquisitionDate || undefined, // Added for frontend
     };
   });
 
@@ -443,9 +632,11 @@ export async function getInventoryHealth(filters?: {
   inStoreItems: number;
   reservedItems: number;
   soldItems: number;
-  partialPaidItems: number;
+  returnedItems: number;
   totalValue: number;
-  avgDaysInInventory: number;
+  averageAge: number;
+  slowMovingItems: number;
+  fastMovingItems: number;
   categoriesBreakdown: Array<{
     categoryId: string;
     categoryName: string;
@@ -480,9 +671,11 @@ export async function getInventoryHealth(filters?: {
       inStoreItems: sql<number>`SUM(CASE WHEN ${item.status} = 'in-store' THEN 1 ELSE 0 END)`,
       reservedItems: sql<number>`SUM(CASE WHEN ${item.status} = 'reserved' THEN 1 ELSE 0 END)`,
       soldItems: sql<number>`SUM(CASE WHEN ${item.status} = 'sold' THEN 1 ELSE 0 END)`,
-      partialPaidItems: sql<number>`SUM(CASE WHEN ${item.status} = 'partial-paid' THEN 1 ELSE 0 END)`,
+      returnedItems: sql<number>`SUM(CASE WHEN ${item.status} = 'returned-to-vendor' THEN 1 ELSE 0 END)`,
       totalValue: sql<number>`COALESCE(SUM(${item.minCost}), 0)`,
       avgDaysInInventory: sql<number>`AVG(EXTRACT(DAY FROM CURRENT_DATE - ${item.createdAt}))`,
+      slowMovingItems: sql<number>`SUM(CASE WHEN EXTRACT(DAY FROM CURRENT_DATE - ${item.createdAt}) > 90 AND ${item.status} IN ('in-store', 'reserved') THEN 1 ELSE 0 END)`,
+      fastMovingItems: sql<number>`SUM(CASE WHEN EXTRACT(DAY FROM CURRENT_DATE - ${item.createdAt}) < 30 AND ${item.status} = 'sold' THEN 1 ELSE 0 END)`,
     })
     .from(item)
     .where(whereCondition);
@@ -517,9 +710,11 @@ export async function getInventoryHealth(filters?: {
     inStoreItems: Number(stats.inStoreItems),
     reservedItems: Number(stats.reservedItems),
     soldItems: Number(stats.soldItems),
-    partialPaidItems: Number(stats.partialPaidItems),
+    returnedItems: Number(stats.returnedItems), // Renamed from partialPaidItems
     totalValue: Number(stats.totalValue),
-    avgDaysInInventory: Number(stats.avgDaysInInventory) || 0,
+    averageAge: Number(stats.avgDaysInInventory) || 0, // Renamed from avgDaysInInventory
+    slowMovingItems: Number(stats.slowMovingItems), // Added
+    fastMovingItems: Number(stats.fastMovingItems), // Added
     categoriesBreakdown: categoriesResults.map((cat) => ({
       categoryId: cat.categoryId,
       categoryName: cat.categoryName || "Unknown",
