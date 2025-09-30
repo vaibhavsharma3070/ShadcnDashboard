@@ -154,7 +154,7 @@ export async function getInstallmentPlan(id: string): Promise<(InstallmentPlan &
   };
 }
 
-export async function markInstallmentPaid(installmentId: string, paidAmount: number): Promise<InstallmentPlan> {
+export async function markInstallmentPaid(installmentId: string): Promise<InstallmentPlan> {
   const [existingPlan] = await db
     .select()
     .from(installmentPlan)
@@ -164,14 +164,12 @@ export async function markInstallmentPaid(installmentId: string, paidAmount: num
     throw new NotFoundError('Installment Plan', installmentId);
   }
 
-  const totalPaid = Number(existingPlan.paidAmount) + paidAmount;
-  const newStatus = totalPaid >= Number(existingPlan.amount) ? "paid" : "pending";
-
+  // Mark as fully paid with the full amount
   const [updatedPlan] = await db
     .update(installmentPlan)
     .set({
-      paidAmount: toDbNumeric(totalPaid),
-      status: newStatus,
+      paidAmount: existingPlan.amount,
+      status: "paid",
     })
     .where(eq(installmentPlan.installmentId, installmentId))
     .returning();

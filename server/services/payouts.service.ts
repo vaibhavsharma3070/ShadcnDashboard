@@ -75,9 +75,20 @@ export async function createPayout(insertPayout: InsertVendorPayout): Promise<Ve
   });
 }
 
-export async function getRecentPayouts(limit: number = 10): Promise<Array<VendorPayout & { item: Item; vendor: Vendor }>> {
+export async function getRecentPayouts(limit: number = 10): Promise<Array<VendorPayout & { item: Item & { listPrice: number; salePrice: number }; vendor: Vendor }>> {
   const results = await db
-    .select()
+    .select({
+      payout: vendorPayout,
+      item: item,
+      vendor: vendor,
+      salePrice: sql<number>`
+        COALESCE((
+          SELECT SUM(${clientPayment.amount})
+          FROM ${clientPayment}
+          WHERE ${clientPayment.itemId} = ${item.itemId}
+        ), 0)
+      `,
+    })
     .from(vendorPayout)
     .innerJoin(item, eq(vendorPayout.itemId, item.itemId))
     .innerJoin(vendor, eq(vendorPayout.vendorId, vendor.vendorId))
@@ -85,8 +96,12 @@ export async function getRecentPayouts(limit: number = 10): Promise<Array<Vendor
     .limit(limit);
 
   return results.map((row) => ({
-    ...row.vendor_payout,
-    item: row.item,
+    ...row.payout,
+    item: {
+      ...row.item,
+      listPrice: Number(row.item.maxSalesPrice || 0),
+      salePrice: Number(row.salePrice),
+    },
     vendor: row.vendor,
   }));
 }
@@ -98,9 +113,11 @@ export async function getUpcomingPayouts(): Promise<Array<{
   model: string;
   minSalesPrice: number;
   maxSalesPrice: number;
+  listPrice: number;
   salePrice: number;
   minCost: number;
   maxCost: number;
+  vendorPayoutAmount: number;
   totalPaid: number;
   remainingBalance: number;
   paymentProgress: number;
@@ -162,6 +179,7 @@ export async function getUpcomingPayouts(): Promise<Array<{
         model: row.item.model || "",
         minSalesPrice: Number(row.item.minSalesPrice || 0),
         maxSalesPrice: Number(row.item.maxSalesPrice || 0),
+        listPrice: Number(row.item.maxSalesPrice || 0), // Add listPrice for frontend compatibility
         salePrice,
         minCost,
         maxCost,
