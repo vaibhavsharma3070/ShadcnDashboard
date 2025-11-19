@@ -51,13 +51,14 @@ export function daysBetween(startColumn: any, endColumn: any) {
 
 /**
  * Helper to format date for grouping
+ * Returns SQL that formats the date as YYYY-MM-DD string for consistency
  */
 export function formatDateForGrouping(column: any, granularity: 'day' | 'week' | 'month') {
   if (granularity === 'day') {
-    return sql`DATE(${column})`;
+    return sql<string>`TO_CHAR(DATE(${column}), 'YYYY-MM-DD')`;
   } else if (granularity === 'week') {
-    return sql`DATE_TRUNC('week', ${column})`;
+    return sql<string>`TO_CHAR(DATE_TRUNC('week', ${column}), 'YYYY-MM-DD')`;
   } else {
-    return sql`DATE_TRUNC('month', ${column})`;
+    return sql<string>`TO_CHAR(DATE_TRUNC('month', ${column}), 'YYYY-MM-DD')`;
   }
 }

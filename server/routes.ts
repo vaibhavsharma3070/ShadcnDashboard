@@ -49,7 +49,7 @@ const dateRangeSchema = z.object({
 }).merge(filtersSchema);
 
 const timeseriesSchema = dateRangeSchema.extend({
-  metric: z.enum(['revenue', 'profit', 'itemsSold', 'payments']),
+  metric: z.enum(['revenue', 'profit', 'itemsSold', 'payments', 'expenses']),
   granularity: z.enum(['day', 'week', 'month'])
 });
 
@@ -115,19 +115,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = loginSchema.parse(req.body);
+      const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip) as string | undefined;
       
       const user = await storage.getUserByEmail(email);
-      if (!user || !user.passwordHash) {
+      if (!user) {
         return res.status(401).json({ error: "Credenciales inválidas" });
       }
-      
+
+      if (!user.passwordHash) {
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+
       if (!user.active) {
         return res.status(401).json({ error: "Cuenta desactivada" });
       }
-      
-      const validPassword = await bcrypt.compare(password, user.passwordHash);
-      if (!validPassword) {
-        return res.status(401).json({ error: "Credenciales inválidas" });
+
+      // Log hash length (avoid logging the hash itself in logs)
+      try {
+        const validPassword = await bcrypt.compare(password, user.passwordHash);
+        if (!validPassword) {
+          return res.status(401).json({ error: "Credenciales inválidas" });
+        }
+      } catch (err) {
+        return res.status(500).json({ error: "Error interno de autenticación" });
       }
       
       // Update last login
@@ -1241,6 +1251,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/reports/export - Export report data as CSV
+  app.get("/api/reports/export", requireAuth, async (req, res) => {
+    try {
+      const exportSchema = z.object({
+        reportType: z.enum(['overview', 'performance', 'profitability', 'inventory', 'payments']),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format. Use YYYY-MM-DD").optional(),
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format. Use YYYY-MM-DD").optional(),
+        granularity: z.enum(['day', 'week', 'month']).optional(),
+        groupBy: z.enum(['brand', 'vendor', 'client', 'category']).optional(),
+        vendorIds: z.string().optional().transform(val => val ? val.split(',') : undefined),
+        clientIds: z.string().optional().transform(val => val ? val.split(',') : undefined),
+        brandIds: z.string().optional().transform(val => val ? val.split(',') : undefined),
+        categoryIds: z.string().optional().transform(val => val ? val.split(',') : undefined),
+        itemStatuses: z.string().optional().transform(val => val ? val.split(',') : undefined),
+      });
+
+      const validation = exportSchema.safeParse(req.query);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid query parameters", 
+          details: validation.error.issues 
+        });
+      }
+
+      const { reportType, startDate, endDate, granularity, groupBy, vendorIds, clientIds, brandIds, categoryIds, itemStatuses } = validation.data;
+      
+      const filters = {
+        vendorIds,
+        clientIds,
+        brandIds,
+        categoryIds,
+        itemStatuses
+      };
+
+      // Helper function to escape CSV values
+      const escapeCsv = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      // Helper function to convert array of objects to CSV
+      const arrayToCsv = (data: any[], headers: string[]): string => {
+        if (data.length === 0) {
+          return headers.join(',') + '\n';
+        }
+        const rows = [
+          headers.join(','),
+          ...data.map(row => headers.map(header => escapeCsv(row[header])).join(','))
+        ];
+        return rows.join('\n');
+      };
+
+      let csvContent = '';
+      let filename = '';
+
+      switch (reportType) {
+        case 'overview': {
+          if (!startDate || !endDate) {
+            return res.status(400).json({ error: "startDate and endDate are required for overview export" });
+          }
+          const kpis = await storage.getReportKPIs(startDate, endDate, filters);
+          const timeseriesRevenue = await storage.getTimeSeries('revenue', granularity || 'day', startDate, endDate, filters);
+          const timeseriesProfit = await storage.getTimeSeries('profit', granularity || 'day', startDate, endDate, filters);
+          
+          // Create overview summary
+          const summaryData = [{
+            'Metric': 'Total Revenue',
+            'Value': kpis.totalRevenue,
+            'Period': `${startDate} to ${endDate}`
+          }, {
+            'Metric': 'Total Profit',
+            'Value': kpis.totalProfit,
+            'Period': `${startDate} to ${endDate}`
+          }, {
+            'Metric': 'Items Sold',
+            'Value': kpis.itemsSold,
+            'Period': `${startDate} to ${endDate}`
+          }, {
+            'Metric': 'Total Expenses',
+            'Value': kpis.totalExpenses,
+            'Period': `${startDate} to ${endDate}`
+          }, {
+            'Metric': 'Profit Margin %',
+            'Value': kpis.profitMargin.toFixed(2),
+            'Period': `${startDate} to ${endDate}`
+          }];
+
+          // Combine timeseries data
+          const timeseriesData = timeseriesRevenue.map((r, i) => ({
+            'Date': r.period,
+            'Revenue': r.value,
+            'Profit': timeseriesProfit[i]?.value || 0
+          }));
+
+          csvContent = arrayToCsv(summaryData, ['Metric', 'Value', 'Period']) + '\n\n' +
+                      arrayToCsv(timeseriesData, ['Date', 'Revenue', 'Profit']);
+          filename = `overview-report-${startDate}-to-${endDate}.csv`;
+          break;
+        }
+
+        case 'performance': {
+          if (!startDate || !endDate || !groupBy) {
+            return res.status(400).json({ error: "startDate, endDate, and groupBy are required for performance export" });
+          }
+          const groupedMetrics = await storage.getGroupedMetrics(
+            groupBy,
+            ['revenue', 'profit', 'itemsSold'],
+            startDate,
+            endDate,
+            filters
+          );
+          
+          const performanceData = groupedMetrics.map((item: any) => ({
+            'Group Name': item.groupName,
+            'Revenue': item.revenue || 0,
+            'Profit': item.profit || 0,
+            'Items Sold': item.itemsSold || 0,
+            'Profit Margin %': item.profitMargin ? item.profitMargin.toFixed(2) : '0.00',
+            'Change %': item.change ? item.change.toFixed(2) : '0.00'
+          }));
+
+          csvContent = arrayToCsv(performanceData, ['Group Name', 'Revenue', 'Profit', 'Items Sold', 'Profit Margin %', 'Change %']);
+          filename = `performance-${groupBy}-${startDate}-to-${endDate}.csv`;
+          break;
+        }
+
+        case 'profitability': {
+          if (!startDate || !endDate) {
+            return res.status(400).json({ error: "startDate and endDate are required for profitability export" });
+          }
+          // Fetch all items (no pagination for export)
+          const profitability = await storage.getItemProfitability(startDate, endDate, filters, 10000, 0);
+          
+          const profitabilityData = profitability.items.map((item: any) => ({
+            'Item ID': item.itemId,
+            'Title': item.title || '',
+            'Brand': item.brand || '',
+            'Model': item.model || '',
+            'Vendor': item.vendor || '',
+            'Revenue': item.revenue || 0,
+            'Cost': item.cost || 0,
+            'Profit': item.profit || 0,
+            'Profit Margin %': (item.margin || 0).toFixed(2),
+            'Sold Date': item.soldDate || 'N/A',
+            'Days to Sell': item.daysToSell || 'N/A'
+          }));
+
+          csvContent = arrayToCsv(profitabilityData, [
+            'Item ID', 'Title', 'Brand', 'Model', 'Vendor', 
+            'Revenue', 'Cost', 'Profit', 'Profit Margin %', 'Sold Date', 'Days to Sell'
+          ]);
+          filename = `profitability-${startDate}-to-${endDate}.csv`;
+          break;
+        }
+
+        case 'inventory': {
+          const inventoryHealth = await storage.getInventoryHealth(filters);
+          
+          const inventoryData = [{
+            'Total Items': inventoryHealth.totalItems,
+            'In Store': inventoryHealth.inStoreItems,
+            'Reserved': inventoryHealth.reservedItems,
+            'Sold': inventoryHealth.soldItems,
+            'Average Age (Days)': inventoryHealth.averageAge.toFixed(2),
+            'Total Inventory Value': inventoryHealth.totalValue
+          }];
+
+          // Add aging analysis
+          const agingData = Object.entries(inventoryHealth.agingAnalysis || {}).map(([range, data]: [string, any]) => ({
+            'Age Range': range,
+            'Item Count': data.count || 0,
+            'Total Value': data.totalValue || 0,
+            'Percentage': data.percentage ? data.percentage.toFixed(2) : '0.00'
+          }));
+
+          csvContent = arrayToCsv(inventoryData, ['Total Items', 'In Store', 'Reserved', 'Sold', 'Average Days in Inventory', 'Total Inventory Value']) + '\n\n' +
+                      arrayToCsv(agingData, ['Age Range', 'Item Count', 'Total Value', 'Percentage']);
+          filename = `inventory-health-${new Date().toISOString().split('T')[0]}.csv`;
+          break;
+        }
+
+        case 'payments': {
+          if (!startDate || !endDate) {
+            return res.status(400).json({ error: "startDate and endDate are required for payments export" });
+          }
+          const paymentMethods = await storage.getPaymentMethodBreakdown(startDate, endDate, filters);
+          
+          const paymentData = paymentMethods.map((method: any) => ({
+            'Payment Method': method.methodName || 'Unknown',
+            'Transaction Count': method.transactionCount || 0,
+            'Total Amount': method.totalAmount || 0,
+            'Average Amount': method.averageAmount ? method.averageAmount.toFixed(2) : '0.00',
+            'Percentage of Total': method.percentage ? method.percentage.toFixed(2) : '0.00'
+          }));
+
+          csvContent = arrayToCsv(paymentData, ['Payment Method', 'Transaction Count', 'Total Amount', 'Average Amount', 'Percentage of Total']);
+          filename = `payment-methods-${startDate}-to-${endDate}.csv`;
+          break;
+        }
+
+        default:
+          return res.status(400).json({ error: "Invalid report type" });
+      }
+
+      // Set headers for CSV download
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send('\ufeff' + csvContent); // Add BOM for Excel compatibility
+    } catch (error) {
+      console.error("Error exporting report:", error);
+      res.status(500).json({ error: "Failed to export report data" });
+    }
+  });
+
   // Configure multer for image uploads (memory storage for processing)
   const upload = multer({
     storage: multer.memoryStorage(),
@@ -1283,7 +1511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Upload compressed image to object storage
       const uploadResponse = await fetch(uploadURL, {
         method: 'PUT',
-        body: compressedImageBuffer,
+        body: Buffer.from(compressedImageBuffer),
         headers: {
           'Content-Type': 'image/jpeg',
         },

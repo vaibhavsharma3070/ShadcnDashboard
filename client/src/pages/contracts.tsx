@@ -472,8 +472,13 @@ export default function Contracts() {
       link.download = `Contrato_${contract.vendor.name.replace(/\s+/g, '_')}_${contract.contractId.slice(0, 8)}.pdf`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Remove link after a short delay to ensure click completes
+      setTimeout(() => {
+        if (link.parentNode) {
+          link.remove();
+        }
+        URL.revokeObjectURL(url);
+      }, 100);
       
       toast({
         title: "¡Éxito!",

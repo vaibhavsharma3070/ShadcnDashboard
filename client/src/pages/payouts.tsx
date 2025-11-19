@@ -193,7 +193,7 @@ export default function Payouts() {
   const payoutForm = useForm<PayoutFormData>({
     resolver: zodResolver(payoutFormSchema),
     defaultValues: {
-      amount: "",
+      amount: 0,
       bankAccount: "",
       transferId: "",
       notes: "",
@@ -263,7 +263,7 @@ export default function Payouts() {
 
   const openPayoutModal = (payout: UpcomingPayout) => {
     setSelectedPayout(payout);
-    payoutForm.setValue('amount', payout.vendorPayoutAmount.toString());
+    payoutForm.setValue('amount', payout.vendorPayoutAmount);
     setIsPayoutModalOpen(true);
   };
 
@@ -377,7 +377,8 @@ export default function Payouts() {
   }, [upcomingPayouts, upcomingSearchTerm, upcomingStatusFilter, upcomingSortBy, upcomingSortOrder]);
 
   return (
-    <MainLayout 
+    <>
+      <MainLayout
       title="Payouts" 
       subtitle="Manage vendor payouts and track payment obligations"
     >
@@ -392,7 +393,7 @@ export default function Payouts() {
             <CardContent>
               <div className="text-2xl font-bold">{payoutMetrics?.totalPayoutsPaid || 0}</div>
               <p className="text-xs text-muted-foreground">
-                {payoutMetrics?.monthlyPayoutTrend >= 0 ? '+' : ''}{payoutMetrics?.monthlyPayoutTrend || 0}% from last month
+                {payoutMetrics?.monthlyPayoutTrend && payoutMetrics.monthlyPayoutTrend >= 0 ? '+' : ''}{payoutMetrics?.monthlyPayoutTrend || 0}% from last month
               </p>
             </CardContent>
           </Card>
@@ -452,7 +453,7 @@ export default function Payouts() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Monthly Trend</CardTitle>
-              {payoutMetrics?.monthlyPayoutTrend >= 0 ? (
+              {payoutMetrics?.monthlyPayoutTrend && payoutMetrics.monthlyPayoutTrend >= 0 ? (
                 <TrendingUp className="h-4 w-4 text-green-500" />
               ) : (
                 <TrendingDown className="h-4 w-4 text-red-500" />
@@ -460,9 +461,9 @@ export default function Payouts() {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${
-                payoutMetrics?.monthlyPayoutTrend >= 0 ? 'text-green-600' : 'text-red-600'
+                payoutMetrics?.monthlyPayoutTrend && payoutMetrics.monthlyPayoutTrend && payoutMetrics.monthlyPayoutTrend >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
-                {payoutMetrics?.monthlyPayoutTrend >= 0 ? '+' : ''}{payoutMetrics?.monthlyPayoutTrend || 0}%
+                {payoutMetrics?.monthlyPayoutTrend && payoutMetrics.monthlyPayoutTrend && payoutMetrics.monthlyPayoutTrend >= 0 ? '+' : ''}{payoutMetrics?.monthlyPayoutTrend || 0}%
               </div>
               <p className="text-xs text-muted-foreground">
                 vs last month
@@ -1007,6 +1008,130 @@ export default function Payouts() {
           </Form>
         </DialogContent>
       </Dialog>
-    </MainLayout>
+      </MainLayout>
+
+      {/* Payout Form Modal (portal moved outside MainLayout/TabsContent to avoid DOM mismatch) */}
+      <Dialog open={isPayoutModalOpen} onOpenChange={setIsPayoutModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Process Payout</DialogTitle>
+            <DialogDescription>
+              {selectedPayout && (
+                <>
+                  Processing payout for <strong>{selectedPayout.brand} {selectedPayout.model}</strong> to vendor <strong>{selectedPayout.vendor.name}</strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...payoutForm}>
+            <form onSubmit={payoutForm.handleSubmit(onPayoutSubmit)} className="space-y-4">
+              <FormField
+                control={payoutForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payout Amount</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00" 
+                        {...field}
+                        data-testid="input-payout-amount"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={payoutForm.control}
+                name="bankAccount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bank Account</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Which bank account did you send from?" 
+                        {...field}
+                        data-testid="input-bank-account"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={payoutForm.control}
+                name="transferId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Transfer ID / Reference</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Bank transfer reference or ID" 
+                        {...field}
+                        data-testid="input-transfer-id"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={payoutForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Additional notes about this payout..." 
+                        className="h-20"
+                        {...field}
+                        data-testid="textarea-payout-notes"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsPayoutModalOpen(false)}
+                  data-testid="button-cancel-payout"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createPayoutMutation.isPending}
+                  data-testid="button-process-payout"
+                >
+                  {createPayoutMutation.isPending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Process Payout
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -587,6 +587,7 @@ export default function Inventory() {
     items?.reduce((sum, item) => sum + Number(item.maxSalesPrice || 0), 0) || 0;
 
   return (
+    <>
     <MainLayout title="Inventario" subtitle="Administra tu inventario de artículos de lujo">
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
@@ -761,379 +762,14 @@ export default function Inventory() {
             </div>
 
             {/* Add Item Button */}
-            <Dialog
-              open={isCreateModalOpen}
-              onOpenChange={setIsCreateModalOpen}
+            <Button
+              className="hidden md:flex"
+              data-testid="button-add-item"
+              onClick={() => setIsCreateModalOpen(true)}
             >
-              <DialogTrigger asChild>
-                <Button
-                  className="hidden md:flex"
-                  data-testid="button-add-item"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Add New Item</DialogTitle>
-                </DialogHeader>
-                <Form {...form}>
-                  <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="space-y-4"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="vendorId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Vendor</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-vendor">
-                                  <SelectValue placeholder="Seleccionar consignador" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {vendorsLoading ? (
-                                  <SelectItem value="loading" disabled>
-                                    Loading vendors...
-                                  </SelectItem>
-                                ) : (
-                                  vendors?.map((vendor) => (
-                                    <SelectItem
-                                      key={vendor.vendorId}
-                                      value={vendor.vendorId}
-                                    >
-                                      {vendor.name}
-                                    </SelectItem>
-                                  ))
-                                )}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="title"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Title</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Título del artículo" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="brandId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Brand</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-brand">
-                                  <SelectValue placeholder="Seleccionar marca" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {brandsLoading ? (
-                                  <SelectItem value="loading" disabled>
-                                    Loading brands...
-                                  </SelectItem>
-                                ) : (
-                                  brands?.filter(brand => brand.active === "true").map((brand) => (
-                                    <SelectItem
-                                      key={brand.brandId}
-                                      value={brand.brandId}
-                                    >
-                                      {brand.name}
-                                    </SelectItem>
-                                  ))
-                                )}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="categoryId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Category (Optional)</FormLabel>
-                            <Select
-                              onValueChange={(value) => field.onChange(value === "none" ? undefined : value)}
-                              value={field.value || "none"}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-category">
-                                  <SelectValue placeholder="Seleccionar categoría" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="none">No category</SelectItem>
-                                {categoriesLoading ? (
-                                  <SelectItem value="loading" disabled>
-                                    Loading categories...
-                                  </SelectItem>
-                                ) : (
-                                  categories?.filter(category => category.active === "true").map((category) => (
-                                    <SelectItem
-                                      key={category.categoryId}
-                                      value={category.categoryId}
-                                    >
-                                      {category.name}
-                                    </SelectItem>
-                                  ))
-                                )}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="model"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Model</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Número/nombre del modelo"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="serialNo"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Serial Number</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Número de serie"
-                                {...field}
-                                value={field.value || ""}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="condition"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Condition</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value || undefined}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar condición" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="New">Nuevo</SelectItem>
-                                <SelectItem value="Excellent">
-                                  Excelente
-                                </SelectItem>
-                                <SelectItem value="Very Good">
-                                  Muy Bueno
-                                </SelectItem>
-                                <SelectItem value="Good">Bueno</SelectItem>
-                                <SelectItem value="Fair">Regular</SelectItem>
-                                <SelectItem value="Poor">Malo</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="minCost"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Min Cost ($)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="maxCost"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Max Cost ($)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="minSalesPrice"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Min Sales Price ($)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="maxSalesPrice"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Max Sales Price ($)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="acquisitionDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Acquisition Date</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="status"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Status</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar estado" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="in-store">
-                                  In Store
-                                </SelectItem>
-                                <SelectItem value="reserved">
-                                  Reserved
-                                </SelectItem>
-                                <SelectItem value="sold">Sold</SelectItem>
-                                <SelectItem value="returned">
-                                  Returned
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    {/* Product Image Upload */}
-                    <div className="space-y-2">
-                      <Label>Product Image</Label>
-                      <ImageUploader
-                        onImageUploaded={(url) => form.setValue('imageUrl', url)}
-                        currentImageUrl={form.watch('imageUrl') || undefined}
-                        onImageRemoved={() => form.setValue('imageUrl', '')}
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div className="flex justify-end space-x-2 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsCreateModalOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={createItemMutation.isPending}
-                      >
-                        {createItemMutation.isPending
-                          ? "Creando..."
-                          : "Crear Artículo"}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -1348,79 +984,61 @@ export default function Inventory() {
       </Card>
 
       {/* Mobile Floating Action Button */}
-      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogTrigger asChild>
-          <Button
-            className="md:hidden fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full shadow-lg"
-            size="sm"
-            data-testid="fab-add-item"
+      <Button
+        className="md:hidden fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full shadow-lg"
+        size="sm"
+        data-testid="fab-add-item"
+        onClick={() => setIsCreateModalOpen(true)}
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
+    </MainLayout>
+
+    {/* Create Item Modal moved outside MainLayout to avoid DOM mismatch */}
+    <Dialog
+      open={isCreateModalOpen}
+      onOpenChange={setIsCreateModalOpen}
+    >
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add New Item</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4"
           >
-            <Plus className="h-6 w-6" />
-          </Button>
-        </DialogTrigger>
-      </Dialog>
-
-      {/* Sale Modal */}
-      <Dialog open={isSaleModalOpen} onOpenChange={setIsSaleModalOpen}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Sell Item</DialogTitle>
-          </DialogHeader>
-          {selectedItem && (
-            <div className="mb-4 p-4 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                  {(() => {
-                    const IconComponent = getItemIcon(selectedItem.brand || "");
-                    return <IconComponent className="h-6 w-6 text-primary" />;
-                  })()}
-                </div>
-                <div>
-                  <h3 className="font-semibold">{selectedItem.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedItem.brand} {selectedItem.model}
-                  </p>
-                  <p className="text-sm font-medium">
-                    Price: {selectedItem.minSalesPrice && selectedItem.maxSalesPrice 
-                      ? `${formatCurrency(selectedItem.minSalesPrice)} - ${formatCurrency(selectedItem.maxSalesPrice)}`
-                      : formatCurrency(selectedItem.maxSalesPrice || selectedItem.minSalesPrice || 0)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          <Form {...saleForm}>
-            <form
-              onSubmit={saleForm.handleSubmit(onSaleSubmit, (errors) => {
-                toast({
-                  title: "Error de Validación del Formulario",
-                  description: "Por favor verifica todos los campos requeridos",
-                  variant: "destructive",
-                });
-              })}
-              className="space-y-4"
-            >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
-                control={saleForm.control}
-                name="clientId"
+                control={form.control}
+                name="vendorId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Client</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <FormLabel>Vendor</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar un cliente" />
+                        <SelectTrigger data-testid="select-vendor">
+                          <SelectValue placeholder="Seleccionar consignador" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {clients?.map((client) => (
-                          <SelectItem
-                            key={client.clientId}
-                            value={client.clientId}
-                          >
-                            {client.name} - {client.email}
+                        {vendorsLoading ? (
+                          <SelectItem value="loading" disabled>
+                            Loading vendors...
                           </SelectItem>
-                        ))}
+                        ) : (
+                          vendors?.map((vendor) => (
+                            <SelectItem
+                              key={vendor.vendorId}
+                              value={vendor.vendorId}
+                            >
+                              {vendor.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -1429,22 +1047,49 @@ export default function Inventory() {
               />
 
               <FormField
-                control={saleForm.control}
-                name="paymentType"
+                control={form.control}
+                name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Payment Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Título del artículo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="brandId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Brand</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar tipo de pago" />
+                        <SelectTrigger data-testid="select-brand">
+                          <SelectValue placeholder="Seleccionar marca" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="full">Full Payment</SelectItem>
-                        <SelectItem value="installment">
-                          Installment Plan
-                        </SelectItem>
+                        {brandsLoading ? (
+                          <SelectItem value="loading" disabled>
+                            Loading brands...
+                          </SelectItem>
+                        ) : (
+                          brands?.filter(brand => brand.active === "true").map((brand) => (
+                            <SelectItem
+                              key={brand.brandId}
+                              value={brand.brandId}
+                            >
+                              {brand.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -1453,15 +1098,117 @@ export default function Inventory() {
               />
 
               <FormField
-                control={saleForm.control}
-                name="amount"
+                control={form.control}
+                name="categoryId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      {saleForm.watch("paymentType") === "installment"
-                        ? "Monto del Pago Inicial"
-                        : "Monto del Pago"}
-                    </FormLabel>
+                    <FormLabel>Category (Optional)</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "none" ? undefined : value)}
+                      value={field.value || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-category">
+                          <SelectValue placeholder="Seleccionar categoría" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">No category</SelectItem>
+                        {categoriesLoading ? (
+                          <SelectItem value="loading" disabled>
+                            Loading categories...
+                          </SelectItem>
+                        ) : (
+                          categories?.filter(category => category.active === "true").map((category) => (
+                            <SelectItem
+                              key={category.categoryId}
+                              value={category.categoryId}
+                            >
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="model"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Model</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Número/nombre del modelo"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="serialNo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Serial Number</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Número de serie"
+                        {...field}
+                        value={field.value || ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="condition"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Condition</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || undefined}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar condición" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="New">Nuevo</SelectItem>
+                        <SelectItem value="Excellent">
+                          Excelente
+                        </SelectItem>
+                        <SelectItem value="Very Good">
+                          Muy Bueno
+                        </SelectItem>
+                        <SelectItem value="Good">Bueno</SelectItem>
+                        <SelectItem value="Fair">Regular</SelectItem>
+                        <SelectItem value="Poor">Malo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="minCost"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Min Cost ($)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -1476,148 +1223,401 @@ export default function Inventory() {
               />
 
               <FormField
-                control={saleForm.control}
-                name="paymentMethod"
+                control={form.control}
+                name="maxCost"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Payment Method</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <FormLabel>Max Cost ($)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="minSalesPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Min Sales Price ($)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="maxSalesPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Max Sales Price ($)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="acquisitionDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Acquisition Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar método de pago" />
+                          <SelectValue placeholder="Seleccionar estado" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {paymentMethods?.filter(method => method.active === "true").map((method) => (
-                          <SelectItem key={method.paymentMethodId} value={method.paymentMethodId}>
-                            {method.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="in-store">
+                          In Store
+                        </SelectItem>
+                        <SelectItem value="reserved">
+                          Reserved
+                        </SelectItem>
+                        <SelectItem value="sold">Sold</SelectItem>
+                        <SelectItem value="returned">
+                          Returned
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            </div>
 
-              {saleForm.watch("paymentType") === "installment" && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <FormLabel>Installment Schedule</FormLabel>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addInstallment}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Installment
-                    </Button>
+            {/* Product Image Upload */}
+            <div className="space-y-2">
+              <Label>Product Image</Label>
+              <ImageUploader
+                onImageUploaded={(url) => form.setValue('imageUrl', url)}
+                currentImageUrl={form.watch('imageUrl') || undefined}
+                onImageRemoved={() => form.setValue('imageUrl', '')}
+                className="w-full"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createItemMutation.isPending}
+              >
+                {createItemMutation.isPending
+                  ? "Creando..."
+                  : "Crear Artículo"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+
+    {/* Sale Modal moved outside MainLayout to avoid DOM mismatch */}
+    <Dialog open={isSaleModalOpen} onOpenChange={setIsSaleModalOpen}>
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Sell Item</DialogTitle>
+        </DialogHeader>
+        {selectedItem && (
+          <div className="mb-4 p-4 border rounded-lg">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                {(() => {
+                  const IconComponent = getItemIcon(selectedItem.brand || "");
+                  return <IconComponent className="h-6 w-6 text-primary" />;
+                })()}
+              </div>
+              <div>
+                <h3 className="font-semibold">{selectedItem.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {selectedItem.brand} {selectedItem.model}
+                </p>
+                <p className="text-sm font-medium">
+                  Price: {selectedItem.minSalesPrice && selectedItem.maxSalesPrice 
+                    ? `${formatCurrency(selectedItem.minSalesPrice)} - ${formatCurrency(selectedItem.maxSalesPrice)}`
+                    : formatCurrency(selectedItem.maxSalesPrice || selectedItem.minSalesPrice || 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        <Form {...saleForm}>
+          <form
+            onSubmit={saleForm.handleSubmit(onSaleSubmit, (errors) => {
+              toast({
+                title: "Error de Validación del Formulario",
+                description: "Por favor verifica todos los campos requeridos",
+                variant: "destructive",
+              });
+            })}
+            className="space-y-4"
+          >
+            <FormField
+              control={saleForm.control}
+              name="clientId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Client</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar un cliente" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {clients?.map((client) => (
+                        <SelectItem
+                          key={client.clientId}
+                          value={client.clientId}
+                        >
+                          {client.name} - {client.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={saleForm.control}
+              name="paymentType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar tipo de pago" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="full">Full Payment</SelectItem>
+                      <SelectItem value="installment">
+                        Installment Plan
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={saleForm.control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {saleForm.watch("paymentType") === "installment"
+                      ? "Monto del Pago Inicial"
+                      : "Monto del Pago"}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={saleForm.control}
+              name="paymentMethod"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Method</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar método de pago" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {paymentMethods?.filter(method => method.active === "true").map((method) => (
+                        <SelectItem key={method.paymentMethodId} value={method.paymentMethodId}>
+                          {method.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {saleForm.watch("paymentType") === "installment" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <FormLabel>Installment Schedule</FormLabel>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addInstallment}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Installment
+                  </Button>
+                </div>
+
+                {/* Remaining Amount Display */}
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      Initial Payment:
+                    </span>
+                    <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                      {formatCurrency(
+                        parseFloat(saleForm.watch("amount")) || 0,
+                      )}
+                    </span>
                   </div>
-
-                  {/* Remaining Amount Display */}
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                        Initial Payment:
-                      </span>
-                      <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
-                        {formatCurrency(
-                          parseFloat(saleForm.watch("amount")) || 0,
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center mt-1">
-                      <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                        Installment Total:
-                      </span>
-                      <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
-                        {formatCurrency(
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      Installment Total:
+                    </span>
+                    <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                      {formatCurrency(
+                        installments.reduce(
+                          (sum, inst) => sum + (parseFloat(inst.amount) || 0),
+                          0,
+                        ),
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1 pt-1 border-t border-blue-200 dark:border-blue-700">
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      Remaining Amount:
+                    </span>
+                    <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                      {formatCurrency(
+                        parseFloat(
+                          selectedItem?.maxSalesPrice?.toString() || "0",
+                        ) -
+                          parseFloat(saleForm.watch("amount")) -
                           installments.reduce(
-                            (sum, inst) => sum + (parseFloat(inst.amount) || 0),
+                            (sum, inst) =>
+                              sum + (parseFloat(inst.amount) || 0),
                             0,
                           ),
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center mt-1 pt-1 border-t border-blue-200 dark:border-blue-700">
-                      <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                        Remaining Amount:
-                      </span>
-                      <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
-                        {formatCurrency(
-                          parseFloat(
-                            selectedItem?.maxSalesPrice?.toString() || "0",
-                          ) -
-                            parseFloat(saleForm.watch("amount")) -
-                            installments.reduce(
-                              (sum, inst) =>
-                                sum + (parseFloat(inst.amount) || 0),
-                              0,
-                            ),
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                  {installments.map((installment, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center space-x-2 p-3 border rounded-lg"
-                    >
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="Monto"
-                        value={installment.amount}
-                        onChange={(e) =>
-                          updateInstallment(index, "amount", e.target.value)
-                        }
-                      />
-                      <Input
-                        type="date"
-                        value={installment.dueDate}
-                        onChange={(e) =>
-                          updateInstallment(index, "dueDate", e.target.value)
-                        }
-                      />
-                      {installments.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeInstallment(index)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
                       )}
-                    </div>
-                  ))}
+                    </span>
+                  </div>
                 </div>
-              )}
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsSaleModalOpen(false)}
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createSaleMutation.isPending}
-                  data-testid="button-record-sale"
-                >
-                  {createSaleMutation.isPending
-                    ? "Procesando..."
-                    : "Registrar Venta"}
-                </Button>
+                {installments.map((installment, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center space-x-2 p-3 border rounded-lg"
+                  >
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Monto"
+                      value={installment.amount}
+                      onChange={(e) =>
+                        updateInstallment(index, "amount", e.target.value)
+                      }
+                    />
+                    <Input
+                      type="date"
+                      value={installment.dueDate}
+                      onChange={(e) =>
+                        updateInstallment(index, "dueDate", e.target.value)
+                      }
+                    />
+                    {installments.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeInstallment(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-    </MainLayout>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsSaleModalOpen(false)}
+                data-testid="button-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createSaleMutation.isPending}
+                data-testid="button-record-sale"
+              >
+                {createSaleMutation.isPending
+                  ? "Procesando..."
+                  : "Registrar Venta"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

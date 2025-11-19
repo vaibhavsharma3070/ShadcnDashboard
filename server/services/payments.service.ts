@@ -7,7 +7,7 @@ import {
   clientPayment, item, vendor, client,
   type ClientPayment, type InsertClientPayment, type Item, type Vendor, type Client
 } from '@shared/schema';
-import { eq, desc, sql, gte, lte, and } from 'drizzle-orm';
+import { eq, desc, sql, gte, lte, and, inArray } from 'drizzle-orm';
 import { toDbNumeric, toDbTimestamp } from './utils/db-helpers.js';
 import { NotFoundError } from './utils/errors.js';
 
@@ -170,7 +170,14 @@ export async function getRecentPayments(limit: number = 10): Promise<Array<Clien
  */
 export async function getPaymentMethodBreakdown(
   startDate: string,
-  endDate: string
+  endDate: string,
+  filters?: {
+    vendorIds?: string[];
+    clientIds?: string[];
+    brandIds?: string[];
+    categoryIds?: string[];
+    itemStatuses?: string[];
+  }
 ): Promise<Array<{
   paymentMethod: string;
   totalAmount: number;
@@ -182,6 +189,97 @@ export async function getPaymentMethodBreakdown(
   const start = new Date(startDate);
   const end = new Date(endDate);
   
+  // Build filter conditions
+  const conditions: any[] = [
+    gte(clientPayment.paidAt, start),
+    lte(clientPayment.paidAt, end)
+  ];
+  
+  // Apply filters if provided
+  if (filters?.vendorIds?.length || filters?.clientIds?.length || filters?.brandIds?.length || filters?.categoryIds?.length || filters?.itemStatuses?.length) {
+    // Need to join with item table for filtering
+    const itemConditions: any[] = [];
+    const paymentConditions: any[] = [];
+    
+    if (filters.vendorIds?.length) {
+      itemConditions.push(inArray(item.vendorId, filters.vendorIds));
+    }
+    if (filters.brandIds?.length) {
+      itemConditions.push(inArray(item.brandId, filters.brandIds));
+    }
+    if (filters.categoryIds?.length) {
+      itemConditions.push(inArray(item.categoryId, filters.categoryIds));
+    }
+    if (filters.itemStatuses?.length) {
+      itemConditions.push(inArray(item.status, filters.itemStatuses));
+    }
+    if (filters.clientIds?.length) {
+      paymentConditions.push(inArray(clientPayment.clientId, filters.clientIds));
+    }
+    
+    const results = await db
+      .select({
+        paymentMethod: clientPayment.paymentMethod,
+        totalAmount: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+        transactionCount: sql<number>`COUNT(*)`,
+        avgTransactionAmount: sql<number>`AVG(${clientPayment.amount})`,
+      })
+      .from(clientPayment)
+      .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+      .where(
+        and(
+          ...conditions,
+          ...itemConditions,
+          ...paymentConditions
+        )
+      )
+      .groupBy(clientPayment.paymentMethod)
+      .orderBy(desc(sql`SUM(${clientPayment.amount})`));
+    
+    // Calculate previous period for trend
+    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const prevStart = new Date(start);
+    prevStart.setDate(prevStart.getDate() - daysDiff);
+    const prevEnd = new Date(start);
+    prevEnd.setDate(prevEnd.getDate() - 1);
+
+    const prevResults = await db
+      .select({
+        paymentMethod: clientPayment.paymentMethod,
+        totalAmount: sql<number>`COALESCE(SUM(${clientPayment.amount}), 0)`,
+      })
+      .from(clientPayment)
+      .innerJoin(item, eq(clientPayment.itemId, item.itemId))
+      .where(
+        and(
+          gte(clientPayment.paidAt, prevStart),
+          lte(clientPayment.paidAt, prevEnd),
+          ...itemConditions,
+          ...paymentConditions
+        )
+      )
+      .groupBy(clientPayment.paymentMethod);
+
+    const prevRevenueMap = new Map(prevResults.map(r => [r.paymentMethod, Number(r.totalAmount)]));
+    const grandTotal = results.reduce((sum, r) => sum + Number(r.totalAmount), 0);
+
+    return results.map((row) => {
+      const currentAmount = Number(row.totalAmount);
+      const prevAmount = Number(prevRevenueMap.get(row.paymentMethod) || 0);
+      const trend = prevAmount > 0 ? ((currentAmount - prevAmount) / prevAmount) * 100 : 0;
+
+      return {
+        paymentMethod: row.paymentMethod,
+        totalAmount: currentAmount,
+        totalTransactions: Number(row.transactionCount),
+        percentage: grandTotal > 0 ? (currentAmount / grandTotal) * 100 : 0,
+        averageAmount: Number(row.avgTransactionAmount),
+        trend,
+      };
+    });
+  }
+  
+  // No filters - simple query
   const results = await db
     .select({
       paymentMethod: clientPayment.paymentMethod,
@@ -191,10 +289,7 @@ export async function getPaymentMethodBreakdown(
     })
     .from(clientPayment)
     .where(
-      and(
-        gte(clientPayment.paidAt, start),
-        lte(clientPayment.paidAt, end)
-      )
+      and(...conditions)
     )
     .groupBy(clientPayment.paymentMethod)
     .orderBy(desc(sql`SUM(${clientPayment.amount})`));

@@ -74,6 +74,7 @@ interface GroupPerformance {
   itemsSold: number;
   profitMargin?: number;
   change?: number;
+  itemCount?: number; // Added for backend compatibility
 }
 
 interface ItemProfitability {
@@ -176,8 +177,8 @@ function sortPerformanceData(data: GroupPerformance[], key: string, direction: '
     switch (key) {
       case 'name':
         return direction === 'asc' 
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name);
+          ? (a.groupName || '').localeCompare(b.groupName || '')
+          : (b.groupName || '').localeCompare(a.groupName || '');
       case 'revenue':
         aValue = a.revenue || 0;
         bValue = b.revenue || 0;
@@ -436,8 +437,43 @@ export default function Reports() {
       const response = await fetch(`/api/reports/inventory?${params}`);
       if (!response.ok) throw new Error('Failed to fetch inventory aging');
       const data = await response.json();
-      // Extract aging data from response
-      return data.aging || [];
+      
+      // Transform aging object to array format
+      const agingAnalysis = data.agingAnalysis || {};
+      const totalItems = (agingAnalysis.under30Days || 0) + 
+                        (agingAnalysis.days30To90 || 0) + 
+                        (agingAnalysis.days90To180 || 0) + 
+                        (agingAnalysis.over180Days || 0);
+      
+      // Calculate total value for each age range (approximate based on average)
+      const avgValue = data.totalValue && totalItems > 0 ? data.totalValue / totalItems : 0;
+      
+      return [
+        {
+          ageRange: 'Under 30 days',
+          itemCount: Number(agingAnalysis.under30Days || 0),
+          totalValue: Number(agingAnalysis.under30Days || 0) * avgValue,
+          percentage: totalItems > 0 ? (Number(agingAnalysis.under30Days || 0) / totalItems) * 100 : 0,
+        },
+        {
+          ageRange: '30-90 days',
+          itemCount: Number(agingAnalysis.days30To90 || 0),
+          totalValue: Number(agingAnalysis.days30To90 || 0) * avgValue,
+          percentage: totalItems > 0 ? (Number(agingAnalysis.days30To90 || 0) / totalItems) * 100 : 0,
+        },
+        {
+          ageRange: '90-180 days',
+          itemCount: Number(agingAnalysis.days90To180 || 0),
+          totalValue: Number(agingAnalysis.days90To180 || 0) * avgValue,
+          percentage: totalItems > 0 ? (Number(agingAnalysis.days90To180 || 0) / totalItems) * 100 : 0,
+        },
+        {
+          ageRange: 'Over 180 days',
+          itemCount: Number(agingAnalysis.over180Days || 0),
+          totalValue: Number(agingAnalysis.over180Days || 0) * avgValue,
+          percentage: totalItems > 0 ? (Number(agingAnalysis.over180Days || 0) / totalItems) * 100 : 0,
+        },
+      ];
     },
     enabled: activeTab === 'inventory',
   });
@@ -453,16 +489,54 @@ export default function Reports() {
     enabled: activeTab === 'payments',
   });
 
+  // Fetch timeseries data - combine multiple metrics into single array
   const { data: timeseriesData, isLoading: timeseriesLoading, error: timeseriesError } = useQuery<TimeseriesDataPoint[]>({
     queryKey: ['/api/reports/timeseries', filters],
     queryFn: async () => {
       const params = buildQueryParams(filters, { granularity: filters.granularity });
-      const response = await fetch(`/api/reports/timeseries?${params}`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Failed to fetch timeseries data: ${response.status}`);
-      }
-      return response.json();
+      
+      // Fetch all metrics in parallel
+      const [revenueData, profitData, itemsSoldData, expensesData] = await Promise.all([
+        fetch(`/api/reports/timeseries?${params}&metric=revenue`).then(r => r.ok ? r.json() : []),
+        fetch(`/api/reports/timeseries?${params}&metric=profit`).then(r => r.ok ? r.json() : []),
+        fetch(`/api/reports/timeseries?${params}&metric=itemsSold`).then(r => r.ok ? r.json() : []),
+        fetch(`/api/reports/timeseries?${params}&metric=expenses`).then(r => r.ok ? r.json() : []),
+      ]);
+
+      // Create a map of dates to combine all metrics
+      const dateMap = new Map<string, TimeseriesDataPoint>();
+      
+      // Process revenue data
+      revenueData.forEach((point: { period: string; value: number }) => {
+        const date = point.period?.split('T')[0] || point.period;
+        dateMap.set(date, { date, revenue: point.value || 0, profit: 0, itemsSold: 0, expenses: 0 });
+      });
+      
+      // Process profit data
+      profitData.forEach((point: { period: string; value: number }) => {
+        const date = point.period?.split('T')[0] || point.period;
+        const existing = dateMap.get(date) || { date, revenue: 0, profit: 0, itemsSold: 0, expenses: 0 };
+        dateMap.set(date, { ...existing, profit: point.value || 0 });
+      });
+      
+      // Process itemsSold data
+      itemsSoldData.forEach((point: { period: string; value: number }) => {
+        const date = point.period?.split('T')[0] || point.period;
+        const existing = dateMap.get(date) || { date, revenue: 0, profit: 0, itemsSold: 0, expenses: 0 };
+        dateMap.set(date, { ...existing, itemsSold: point.value || 0 });
+      });
+      
+      // Process expenses data (using payments count as proxy for expenses tracking)
+      expensesData.forEach((point: { period: string; value: number }) => {
+        const date = point.period?.split('T')[0] || point.period;
+        const existing = dateMap.get(date) || { date, revenue: 0, profit: 0, itemsSold: 0, expenses: 0 };
+        dateMap.set(date, { ...existing, expenses: point.value || 0 });
+      });
+      
+      // Convert map to array and sort by date
+      return Array.from(dateMap.values()).sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
     },
     enabled: activeTab === 'overview',
     retry: (failureCount, error) => {
@@ -501,8 +575,79 @@ export default function Reports() {
     });
   };
 
-  const exportReport = () => {
-    console.log("Export functionality will be implemented");
+  const exportReport = async () => {
+    try {
+      // Build query parameters based on active tab and filters
+      const params = new URLSearchParams();
+      params.append('reportType', activeTab);
+      
+      // Add date filters if available
+      if (filters.startDate) {
+        params.append('startDate', filters.startDate);
+      }
+      if (filters.endDate) {
+        params.append('endDate', filters.endDate);
+      }
+      
+      // Add granularity for overview tab
+      if (activeTab === 'overview' && filters.granularity) {
+        params.append('granularity', filters.granularity);
+      }
+      
+      // Add groupBy for performance tab
+      if (activeTab === 'performance' && sortConfig.groupType) {
+        params.append('groupBy', sortConfig.groupType);
+      }
+      
+      // Add filter IDs
+      if (filters.vendorIds.length > 0) {
+        params.append('vendorIds', filters.vendorIds.join(','));
+      }
+      if (filters.clientIds.length > 0) {
+        params.append('clientIds', filters.clientIds.join(','));
+      }
+      if (filters.brandIds.length > 0) {
+        params.append('brandIds', filters.brandIds.join(','));
+      }
+      if (filters.categoryIds.length > 0) {
+        params.append('categoryIds', filters.categoryIds.join(','));
+      }
+      
+      // Call the export API
+      const response = await fetch(`/api/reports/export?${params.toString()}`, {
+        method: 'GET',
+        credentials: 'include', // Include cookies for authentication
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to export report');
+      }
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `report-${activeTab}-${new Date().toISOString().split('T')[0]}.csv`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      // Download the CSV file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting report:', error);
+      alert(error instanceof Error ? error.message : 'Failed to export report. Please try again.');
+    }
   };
 
   // Profitability helper functions
@@ -684,7 +829,12 @@ export default function Reports() {
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    setTimeout(() => {
+      if (link.parentNode) {
+        link.remove();
+      }
+      URL.revokeObjectURL(url);
+    }, 100);
   };
 
   return (
@@ -720,6 +870,7 @@ export default function Reports() {
                 type="date"
                 className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background"
                 value={filters.startDate}
+                onKeyDown={(e) => e.preventDefault()} 
                 onChange={(e) => handleFilterChange('startDate', e.target.value)}
                 data-testid="input-start-date"
               />
@@ -731,6 +882,8 @@ export default function Reports() {
                 type="date"
                 className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background"
                 value={filters.endDate}
+                onKeyDown={(e) => e.preventDefault()} 
+                max={new Date().toISOString().split("T")[0]}  
                 onChange={(e) => handleFilterChange('endDate', e.target.value)}
                 data-testid="input-end-date"
               />
@@ -1377,7 +1530,7 @@ export default function Reports() {
                       <Card className="hover-lift" data-testid="card-vendor-summary-top">
                         <CardContent className="p-4">
                           <p className="text-sm font-medium text-muted-foreground">Top Performer</p>
-                          <p className="text-lg font-bold text-foreground truncate">{stats.topPerformer?.name || 'N/A'}</p>
+                          <p className="text-lg font-bold text-foreground truncate">{stats.topPerformer?.groupName || 'N/A'}</p>
                           <p className="text-xs text-amber-600">
                             {stats.topPerformer ? formatCurrencyAbbreviated(stats.topPerformer.revenue) : 'No data'}
                           </p>
@@ -1492,13 +1645,13 @@ export default function Reports() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <div className={`flex items-center justify-end ${vendor.change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                  {vendor.change >= 0 ? (
+                                <div className={`flex items-center justify-end ${(vendor.change || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {(vendor.change || 0) >= 0 ? (
                                     <TrendingUp className="h-3 w-3 mr-1" />
                                   ) : (
                                     <TrendingDown className="h-3 w-3 mr-1" />
                                   )}
-                                  <span className="text-sm font-medium">{formatPercentage(vendor.change)}</span>
+                                  <span className="text-sm font-medium">{formatPercentage(vendor.change || 0)}</span>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -1606,7 +1759,7 @@ export default function Reports() {
                       <Card className="hover-lift" data-testid="card-brand-summary-top">
                         <CardContent className="p-4">
                           <p className="text-sm font-medium text-muted-foreground">Top Performer</p>
-                          <p className="text-lg font-bold text-foreground truncate">{stats.topPerformer?.name || 'N/A'}</p>
+                          <p className="text-lg font-bold text-foreground truncate">{stats.topPerformer?.groupName || 'N/A'}</p>
                           <p className="text-xs text-amber-600">
                             {stats.topPerformer ? formatCurrencyAbbreviated(stats.topPerformer.revenue) : 'No data'}
                           </p>
@@ -1721,13 +1874,13 @@ export default function Reports() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <div className={`flex items-center justify-end ${brand.change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                  {brand.change >= 0 ? (
+                                <div className={`flex items-center justify-end ${(brand.change || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {(brand.change || 0) >= 0 ? (
                                     <TrendingUp className="h-3 w-3 mr-1" />
                                   ) : (
                                     <TrendingDown className="h-3 w-3 mr-1" />
                                   )}
-                                  <span className="text-sm font-medium">{formatPercentage(brand.change)}</span>
+                                  <span className="text-sm font-medium">{formatPercentage(brand.change || 0)}</span>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -1824,13 +1977,13 @@ export default function Reports() {
                         </div>
                         <div className="text-right">
                           <p className="font-semibold">{formatCurrencyAbbreviated(category.revenue)}</p>
-                          <div className={`text-sm flex items-center justify-end ${category.change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {category.change >= 0 ? (
+                          <div className={`text-sm flex items-center justify-end ${(category.change || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {(category.change || 0) >= 0 ? (
                               <TrendingUp className="h-3 w-3 mr-1" />
                             ) : (
                               <TrendingDown className="h-3 w-3 mr-1" />
                             )}
-                            <span>{formatPercentage(category.change)}</span>
+                            <span>{formatPercentage(category.change || 0)}</span>
                           </div>
                         </div>
                       </div>

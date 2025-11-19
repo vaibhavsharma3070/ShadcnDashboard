@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import 'dotenv/config';
 import { db } from "../db.js";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";

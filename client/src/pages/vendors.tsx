@@ -135,12 +135,14 @@ export default function Vendors() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
-      setIsCreateModalOpen(false);
       form.reset();
       toast({
         title: "Success",
         description: "Vendor created successfully",
       });
+      setTimeout(() => {
+        setIsCreateModalOpen(false);
+      }, 100);
     },
     onError: () => {
       toast({

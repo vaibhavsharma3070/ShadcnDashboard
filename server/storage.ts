@@ -689,6 +689,7 @@ export class DatabaseStorage implements IStorage {
       clientIds?: string[];
       brandIds?: string[];
       categoryIds?: string[];
+      itemStatuses?: string[];
     }
   ): Promise<Array<{
     paymentMethod: string;
@@ -698,8 +699,7 @@ export class DatabaseStorage implements IStorage {
     averageAmount: number;
     trend: number;
   }>> {
-    // For now, use the simpler version without filters
-    return paymentsService.getPaymentMethodBreakdown(startDate, endDate);
+    return paymentsService.getPaymentMethodBreakdown(startDate, endDate, filters);
   }
 
   // Payout methods
@@ -907,7 +907,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTimeSeries(
-    metric: "revenue" | "profit" | "itemsSold" | "payments",
+    metric: "revenue" | "profit" | "itemsSold" | "payments" | "expenses",
     granularity: "day" | "week" | "month",
     startDate: string,
     endDate: string,
