@@ -27,7 +27,7 @@ import { Loader2, Crown } from "lucide-react";
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-amber-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+    <div className="bg-gradient-to-br from-amber-50 via-white to-amber-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
       <div className="text-center space-y-4">
         <div className="flex items-center justify-center space-x-2 mb-6">
           <Crown className="h-8 w-8 text-amber-600 dark:text-amber-400" />

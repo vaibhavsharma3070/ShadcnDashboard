@@ -14,6 +14,7 @@ import {
   loginSchema, createUserSchema, updateUserSchema
 } from "@shared/schema";
 import { z } from "zod";
+import { NotFoundError } from './services/utils/errors.js';
 
 // Extend Express Request type to include user session
 declare global {
@@ -956,7 +957,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expenses = await storage.getExpenses();
       res.json(expenses);
     } catch (error) {
+      console.error("💥 GET /api/expenses error:", error);
       res.status(500).json({ error: "Failed to fetch expenses" });
+    }
+  });
+
+  app.get("/api/expenses/general", async (req, res) => {
+    try {
+      const expenses = await storage.getGeneralExpenses();
+      res.json(expenses);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch general expenses" });
     }
   });
 
@@ -997,6 +1008,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+
+  app.put("/api/expenses/:id", async (req, res) => {
+    console.log("🔍 [DEBUG] PUT /api/expenses/:id - Request received");
+    console.log("🔍 [DEBUG] PUT /api/expenses/:id - Expense ID:", req.params.id);
+    console.log("🔍 [DEBUG] PUT /api/expenses/:id - Request body:", req.body);
+    
+    try {
+      const expense = await storage.updateExpense(req.params.id, req.body);
+      console.log("✅ [DEBUG] PUT /api/expenses/:id - Expense updated successfully:", expense);
+      res.json(expense);
+    } catch (error) {
+      console.error("❌ [DEBUG] PUT /api/expenses/:id - Error occurred:", error);
+      if (error instanceof NotFoundError) {
+        res.status(404).json({ error: "Expense not found" });
+      } else if (error instanceof Error) {
+        res.status(400).json({ error: "Invalid expense data", details: error.message });
+      } else {
+        res.status(500).json({ error: "Failed to update expense" });
+      }
+    }
+  });
+
+  app.delete("/api/expenses/:id", async (req, res) => {
+    console.log("🔍 [DEBUG] DELETE /api/expenses/:id - Request received");
+    console.log("🔍 [DEBUG] DELETE /api/expenses/:id - Expense ID:", req.params.id);
+    
+    try {
+      await storage.deleteExpense(req.params.id);
+      console.log("✅ [DEBUG] DELETE /api/expenses/:id - Expense deleted successfully");
+      res.status(204).send();
+    } catch (error) {
+      console.error("❌ [DEBUG] DELETE /api/expenses/:id - Error occurred:", error);
+      if (error instanceof NotFoundError) {
+        res.status(404).json({ error: "Expense not found" });
+      } else {
+        res.status(500).json({ error: "Failed to delete expense" });
+      }
+    }
+  });
+
+
+
+
 
   // Installment plan routes
   app.get("/api/installment-plans", async (req, res) => {

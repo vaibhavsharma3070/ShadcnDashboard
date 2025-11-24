@@ -142,7 +142,7 @@ export const vendorPayout = pgTable("vendor_payout", {
 
 export const itemExpense = pgTable("item_expense", {
   expenseId: uuid("expense_id").primaryKey().defaultRandom(),
-  itemId: uuid("item_id").notNull(),
+  itemId: uuid("item_id"), // Optional - can be null for general business expenses
   expenseType: text("expense_type").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   incurredAt: timestamp("incurred_at", { withTimezone: true }).notNull(),
@@ -154,6 +154,25 @@ export const itemExpense = pgTable("item_expense", {
     foreignColumns: [item.itemId]
   }),
 }));
+
+// Update the relations
+export const itemExpenseRelations = relations(itemExpense, ({ one }) => ({
+  item: one(item, {
+    fields: [itemExpense.itemId],
+    references: [item.itemId]
+  }),
+}));
+
+// Update the insert schema
+export const insertItemExpenseSchema = createInsertSchema(itemExpense).omit({
+  expenseId: true,
+}).extend({
+  itemId: z.string().uuid().optional().nullable(),
+  amount: z.preprocess((val) => typeof val === 'string' ? parseFloat(val) : val, z.number()),
+  incurredAt: z.preprocess((val) => typeof val === 'string' ? new Date(val) : val, z.date()),
+});
+
+
 
 export const installmentPlan = pgTable("installment_plan", {
   installmentId: uuid("installment_id").primaryKey().defaultRandom(),
@@ -279,12 +298,6 @@ export const vendorPayoutRelations = relations(vendorPayout, ({ one }) => ({
   }),
 }));
 
-export const itemExpenseRelations = relations(itemExpense, ({ one }) => ({
-  item: one(item, {
-    fields: [itemExpense.itemId],
-    references: [item.itemId]
-  }),
-}));
 
 export const installmentPlanRelations = relations(installmentPlan, ({ one }) => ({
   item: one(item, {
@@ -386,12 +399,6 @@ export const insertVendorPayoutSchema = createInsertSchema(vendorPayout).omit({
   paidAt: z.preprocess((val) => typeof val === 'string' ? new Date(val) : val, z.date()),
 });
 
-export const insertItemExpenseSchema = createInsertSchema(itemExpense).omit({
-  expenseId: true,
-}).extend({
-  amount: z.preprocess((val) => typeof val === 'string' ? parseFloat(val) : val, z.number()),
-  incurredAt: z.preprocess((val) => typeof val === 'string' ? new Date(val) : val, z.date()),
-});
 
 export const insertInstallmentPlanSchema = createInsertSchema(installmentPlan).omit({
   installmentId: true,

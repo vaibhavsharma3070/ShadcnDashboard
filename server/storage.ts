@@ -167,9 +167,13 @@ export interface IStorage {
   >;
 
   // Expense methods
-  getExpenses(): Promise<Array<ItemExpense & { item: Item }>>;
+  getExpenses(): Promise<Array<ItemExpense & { item: Item | null }>>;
   getExpensesByItem(itemId: string): Promise<ItemExpense[]>;
+  getGeneralExpenses(): Promise<ItemExpense[]>;
   createExpense(expense: InsertItemExpense): Promise<ItemExpense>;
+  updateExpense(expenseId: string, expense: Partial<InsertItemExpense>): Promise<ItemExpense>;
+  deleteExpense(expenseId: string): Promise<ItemExpense>;
+
 
   // Installment plan methods
   getInstallmentPlans(): Promise<
@@ -748,8 +752,8 @@ export class DatabaseStorage implements IStorage {
     return payoutsService.getPayoutMetrics();
   }
 
-  // Expense methods
-  async getExpenses(): Promise<Array<ItemExpense & { item: Item }>> {
+  // Expense methods (add to implementation)
+  async getExpenses(): Promise<Array<ItemExpense & { item: Item | null }>> {
     return expensesService.getExpenses();
   }
 
@@ -757,8 +761,20 @@ export class DatabaseStorage implements IStorage {
     return expensesService.getExpensesByItem(itemId);
   }
 
+  async getGeneralExpenses(): Promise<ItemExpense[]> {
+    return expensesService.getGeneralExpenses();
+  }
+
   async createExpense(expense: InsertItemExpense): Promise<ItemExpense> {
     return expensesService.createExpense(expense);
+  }
+
+  async updateExpense(expenseId: string, expense: Partial<InsertItemExpense>): Promise<ItemExpense> {
+    return expensesService.updateExpense(expenseId, expense);
+  }
+
+  async deleteExpense(expenseId: string): Promise<ItemExpense> {
+    return expensesService.deleteExpense(expenseId);
   }
 
   // Installment plan methods

@@ -322,6 +322,8 @@ components:
         itemId:
           type: string
           format: uuid
+          nullable: true
+          description: Optional - null for general business expenses
         expenseType:
           type: string
         amount:
@@ -331,6 +333,7 @@ components:
           format: date-time
         notes:
           type: string
+
 
     InstallmentPlan:
       type: object
@@ -2693,7 +2696,106 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  # Expense Endpoints (3)
+  # Expense Endpoints (4)
+  /api/expenses:
+    get:
+      tags:
+        - Expenses
+      summary: Get all expenses
+      operationId: getExpenses
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of all expenses with optional item details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/Expense'
+                    - type: object
+                      properties:
+                        item:
+                          $ref: '#/components/schemas/Item'
+                          nullable: true
+        500:
+          description: Failed to fetch expenses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - Expenses
+      summary: Create new expense
+      operationId: createExpense
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - expenseType
+                - amount
+                - incurredAt
+              properties:
+                itemId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Optional - links expense to a specific item
+                expenseType:
+                  type: string
+                amount:
+                  type: number
+                incurredAt:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+      responses:
+        201:
+          description: Expense created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        400:
+          description: Invalid expense data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/expenses/general:
+    get:
+      tags:
+        - Expenses
+      summary: Get general business expenses (no item linked)
+      operationId: getGeneralExpenses
+      security:
+        - sessionAuth: []
+      responses:
+        200:
+          description: List of general business expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Expense'
+        500:
+          description: Failed to fetch expenses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/expenses/item/{itemId}:
     get:
       tags:
@@ -2720,29 +2822,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /api/expenses:
-    post:
+  /api/expenses/{id}:
+    put:
       tags:
         - Expenses
-      summary: Create new expense
-      operationId: createExpense
+      summary: Update expense
+      operationId: updateExpense
       security:
         - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idParam'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - itemId
-                - expenseType
-                - amount
-                - incurredAt
               properties:
                 itemId:
                   type: string
                   format: uuid
+                  nullable: true
                 expenseType:
                   type: string
                 amount:
@@ -2753,20 +2853,18 @@ paths:
                 notes:
                   type: string
       responses:
-        201:
-          description: Expense created successfully
+        200:
+          description: Expense updated successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Expense'
-        400:
-          description: Invalid expense data
+        404:
+          description: Expense not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
-  /api/expenses/{id}:
     delete:
       tags:
         - Expenses
@@ -2779,12 +2877,13 @@ paths:
       responses:
         204:
           description: Expense deleted successfully
-        500:
-          description: Failed to delete expense
+        404:
+          description: Expense not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
 
   # Installment Plan Endpoints (6)
   /api/installment-plans:

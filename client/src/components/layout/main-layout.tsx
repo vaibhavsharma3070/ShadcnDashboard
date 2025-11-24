@@ -10,7 +10,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ children, title, subtitle }: MainLayoutProps) {
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex bg-background">
       {/* Desktop Sidebar - hidden on mobile */}
       <div className="hidden md:block">
         <Sidebar />

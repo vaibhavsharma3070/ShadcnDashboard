@@ -11,7 +11,7 @@ export function ProtectedRoute({
   children, 
   requiredRole = 'readOnly',
   fallback = (
-    <div className="flex items-center justify-center min-h-screen bg-background dark:bg-gray-900">
+    <div className="flex items-center justify-center bg-background dark:bg-gray-900">
       <div className="text-center p-8 bg-card rounded-lg border shadow-sm max-w-md">
         <h2 className="text-xl font-semibold text-foreground mb-2">
           Acceso Denegado
